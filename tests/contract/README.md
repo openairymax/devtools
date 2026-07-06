@@ -110,4 +110,4 @@ pytest tests/contract/ -v --cov=agentos --cov-report=html -m contract
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.

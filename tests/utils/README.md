@@ -210,4 +210,4 @@ python tests/utils/python/test_quality_reporter.py
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.

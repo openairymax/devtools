@@ -248,4 +248,4 @@ scripts/ci/release/cleanup_builds.sh
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.

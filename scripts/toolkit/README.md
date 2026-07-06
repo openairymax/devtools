@@ -432,4 +432,4 @@ validator.validate_api_response(endpoint, response)
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.

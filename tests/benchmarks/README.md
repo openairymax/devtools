@@ -155,4 +155,4 @@ pytest tests/benchmarks/ --benchmark-only --benchmark-json=benchmark_results.jso
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.

@@ -129,4 +129,4 @@ python scripts/resources/tutorial/tutorial_engine.py --list
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.

@@ -240,4 +240,4 @@ python scripts/dev/utils/fixes/add_error_push_ex.py
 
 ---
 
-© 2026 SPHARX Ltd. All Rights Reserved.
+© 2025-2026 SPHARX Ltd. All Rights Reserved.
