@@ -13,32 +13,32 @@ add_compile_definitions(AGENTRT_COMPLIANCE_IMPL)
 # 公共 include 路径
 # ============================================================================
 set(INTEGRATION_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/coreloopthree/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/syscall/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/memory/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/llm_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/tool_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/monit_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/gateway_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/market_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/config_unified/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/cache/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/compat/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/network/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/ipc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/cupolas/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/cupolas/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/syscall/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/memory/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/monit_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/gateway_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/market_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/config_unified/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/cache/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/compat/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/network/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/ipc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/cupolas/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/cupolas/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -193,16 +193,36 @@ configure_real_lib_test(test_c_link_11_gateway_forward
 # v0.1.1 修复：真实 memoryrovol_bridge_create 依赖 builtin_init 成功，
 # 测试环境无 MemoryRovol 库时优雅降级到 builtin（弱符号机制）。
 # config_path 为 NULL 时使用默认路径，builtin_storage_create 会创建目录。
-configure_real_lib_test(test_c_link_12_memoryrovol_bridge
-    LIBS agentrt_coreloopthree agentrt_memory agentrt_core svc_common
-)
-
-# C2: L3 公共 API 测试需要 memoryrovol.h — 通过 agentrt_memoryrovol_bridge
-# 接口库的 include 路径获取（或直接指向 MemoryRovol include 目录）
+#
+# Task #38: memoryrovol.h 是商业产品头文件，仅在 products/memoryrovol 存在时可用。
+# 当 MemoryRovol 不可用时跳过该测试（非阻断），避免编译失败。
+set(_MEMORYROVOL_INCLUDE_DIR "")
 if(TARGET agentrt_memoryrovol_bridge)
-    target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentrt_memoryrovol_bridge)
-elseif(DEFINED MEMORYROVOL_DIR AND EXISTS "${MEMORYROVOL_DIR}/include")
-    target_include_directories(test_c_link_12_memoryrovol_bridge PRIVATE ${MEMORYROVOL_DIR}/include)
+    # 通过 agentrt_memoryrovol_bridge 接口库获取 include 路径
+    get_target_property(_bridge_inc agentrt_memoryrovol_bridge INTERFACE_INCLUDE_DIRECTORIES)
+    if(_bridge_inc)
+        set(_MEMORYROVOL_INCLUDE_DIR "${_bridge_inc}")
+    endif()
+elseif(DEFINED MEMORYROVOL_DIR AND EXISTS "${MEMORYROVOL_DIR}/include/memoryrovol.h")
+    set(_MEMORYROVOL_INCLUDE_DIR "${MEMORYROVOL_DIR}/include")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../products/memoryrovol/include/memoryrovol.h")
+    set(_MEMORYROVOL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../products/memoryrovol/include")
+endif()
+
+if(_MEMORYROVOL_INCLUDE_DIR AND (TARGET agentrt_memoryrovol OR TARGET agentrt_memoryrovol_bridge))
+    configure_real_lib_test(test_c_link_12_memoryrovol_bridge
+        LIBS agentrt_coreloopthree agentrt_memory agentrt_core svc_common
+    )
+    if(TARGET agentrt_memoryrovol)
+        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentrt_memoryrovol)
+    elseif(TARGET agentrt_memoryrovol_bridge)
+        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentrt_memoryrovol_bridge)
+    endif()
+    if(NOT TARGET agentrt_memoryrovol)
+        target_include_directories(test_c_link_12_memoryrovol_bridge PRIVATE ${_MEMORYROVOL_INCLUDE_DIR})
+    endif()
+else()
+    agentrt_print_warn("  [integration] test_c_link_12_memoryrovol_bridge: SKIPPED (MemoryRovol commercial library not built — set AGENTRT_WITH_MEMORYROVOL=ON and build products/memoryrovol)")
 endif()
 
 # ============================================================================
@@ -214,17 +234,17 @@ if(TARGET svc_common)
     add_executable(test_e2e_core test_e2e_core.c)
 
     target_include_directories(test_e2e_core PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/coreloopthree/tests/unit
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/coreloopthree/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/syscall/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/cache/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/corekern/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/coreloopthree/tests/unit
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/coreloopthree/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/syscall/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/string/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/cache/include
     )
 
     target_link_libraries(test_e2e_core PRIVATE
@@ -265,9 +285,9 @@ else()
 endif()
 
 # LLM Routing Integration Test (INT-15)
-set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/llm_d)
-set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons)
-set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms)
+set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/llm_d)
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons)
+set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms)
 set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
@@ -304,7 +324,7 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${COMMONS_DIR}/utils/compat/include
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/include
 )
 
 target_link_libraries(test_llm_d_routing PRIVATE

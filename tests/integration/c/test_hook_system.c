@@ -18,6 +18,7 @@
 #include "hook_timeout.h"
 #include "hook_executor.h"
 #include "safety_guard.h"
+#include "error.h"   /* Task #38: BAN-073 边界 — AGENTRT_ERR_NOT_FOUND */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -710,7 +711,7 @@ static void test_hook_statistics(void) {
 
     /* 获取不存在的 Hook 统计 */
     ret = agentrt_hook_get_stats("nonexistent_hook", &stats);
-    CHECK_EQ(ret, -1, "Get stats for nonexistent hook should return -1");
+    CHECK_EQ(ret, AGENTRT_ERR_NOT_FOUND, "Get stats for nonexistent hook should return AGENTRT_ERR_NOT_FOUND");
 
     agentrt_hook_shutdown();
     PASS();

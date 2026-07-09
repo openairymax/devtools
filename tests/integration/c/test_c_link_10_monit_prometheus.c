@@ -150,7 +150,7 @@ static void test_normal_http_metrics_endpoint(void) {
  * ============================================================================ */
 
 static void test_error_non_metrics_request(void) {
-    TEST("C-L10 Error: Non-metrics HTTP request → return -1");
+    TEST("C-L10 Error: Non-metrics HTTP request → return AGENTRT_ERR_INVALID_PARAM");
 
     int ret = prometheus_exporter_init("non_metrics_test");
     CHECK_EQ(ret, 0, "prometheus_exporter_init should succeed");
@@ -168,7 +168,7 @@ static void test_error_non_metrics_request(void) {
     size_t response_len = 0;
     ret = prometheus_exporter_handle_http(http_request, strlen(http_request),
                                            &response, &response_len);
-    CHECK_EQ(ret, -1, "Non-metrics request should return -1 (not handled)");
+    CHECK_EQ(ret, AGENTRT_ERR_INVALID_PARAM, "Non-metrics request should return AGENTRT_ERR_INVALID_PARAM (not handled)");
     CHECK(response == NULL, "Response should be NULL for non-metrics request");
 
     prometheus_exporter_shutdown();

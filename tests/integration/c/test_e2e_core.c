@@ -23,6 +23,7 @@
 #include "task.h"
 #include "ipc.h"
 #include "error.h"
+#include "memory_compat.h"   /* Task #38: AGENTRT_MEMSET 定义 (BAN-154 安全宏) */
 #include "agentrt_time.h"
 #include "observability.h"
 
@@ -917,7 +918,7 @@ static void e2e_scenario_17_error_propagation(void)
 
     for (int i = 0; i < err_count; i++) {
         agentrt_error_t e = err_list[i];
-        const char* name = agentrt_error_name(e);
+        const char* name = agentrt_error_str(e);
         TEST_ASSERT(name != NULL, "Step 2: 错误码名称可查询");
         TEST_ASSERT(strlen(name) > 0, "Step 2: 错误码名称非空");
     }
@@ -930,7 +931,7 @@ static void e2e_scenario_17_error_propagation(void)
     agentrt_error_t neg_code = -2;
     TEST_ASSERT(neg_code == AGENTRT_ENOMEM, "Step 4: ENOMEM值为-2");
 
-    const char* unknown_name = agentrt_error_name(AGENTRT_EUNKNOWN);
+    const char* unknown_name = agentrt_error_str(AGENTRT_EUNKNOWN);
     TEST_ASSERT(unknown_name != NULL, "Step 5: EUNKNOWN名称存在");
     TEST_ASSERT(strlen(unknown_name) > 0, "Step 5: EUNKNOWN名称非空");
 
