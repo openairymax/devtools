@@ -4,7 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+# 脚本位于 devtools/scripts/ci/pipeline/validate/ — 需向上 5 级到达项目根目录
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 
 # ============================================================================
 # 颜色输出
@@ -189,12 +190,40 @@ gate_cross_repo() {
 }
 
 # ============================================================================
+# Gate 6: 圈复杂度检查 (P0.19.6)
+# ============================================================================
+gate_complexity() {
+    section "Gate 6: Complexity Check (lizard v1.23.0)"
+
+    local complexity_script="${SCRIPT_DIR}/complexity-check.sh"
+    if [ -x "$complexity_script" ]; then
+        log_info "Running complexity check..."
+        if bash "$complexity_script" 2>&1 | tail -30; then
+            check_gate "Complexity" 0
+        else
+            local cx_exit=$?
+            if [ $cx_exit -eq 2 ]; then
+                log_warn "Complexity check: warnings found (CCN 16-25)"
+                check_gate "Complexity" 2
+            else
+                log_err "Complexity check: failures found (CCN > 25)"
+                check_gate "Complexity" 1
+            fi
+        fi
+    else
+        log_warn "Complexity check script not found: ${complexity_script}"
+        check_gate "Complexity" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
     local skip_security=false
     local security_only=false
     local skip_cross_repo=false
+    local skip_complexity=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -211,12 +240,16 @@ main() {
                 skip_cross_repo=true
                 shift
                 ;;
+            --skip-complexity)
+                skip_complexity=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -224,11 +257,13 @@ main() {
                 echo "  3. Security Scan (10 items: CVE, SAST, Docker, Secrets, SBOM, ...)"
                 echo "  4. Contract Version Check"
                 echo "  5. Cross-Repository Verification"
+                echo "  6. Complexity Check (lizard, CCN thresholds)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
                 echo "  --skip-security       Skip security scan"
                 echo "  --skip-cross-repo     Skip cross-repo verification"
+                echo "  --skip-complexity     Skip complexity check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -249,6 +284,7 @@ main() {
         $skip_security || gate_security
         gate_contract
         $skip_cross_repo || gate_cross_repo
+        $skip_complexity || gate_complexity
     fi
 
     # 输出结果
