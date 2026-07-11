@@ -4,7 +4,7 @@
 add_compile_definitions(AGENTRT_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    agentrt_print_warn("  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    airy_print_warn("  [security] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
@@ -22,11 +22,11 @@ target_include_directories(test_security_audit PRIVATE
 )
 
 target_link_libraries(test_security_audit PRIVATE
-    agentrt_core
-    agentrt_syscall
+    airy_core
+    airy_syscall
     svc_common
     Threads::Threads
-    agentrt_platform_libs
+    airy_platform_libs
     m
 )
 
@@ -41,7 +41,7 @@ target_compile_options(test_security_audit PRIVATE
 
 add_test(NAME security_audit COMMAND test_security_audit)
 
-agentrt_print_ok("  [security] test_security_audit: P2-C03 configured")
+airy_print_ok("  [security] test_security_audit: P2-C03 configured")
 
 # AgentRT SEC-017 桩函数合规验证测试 (TeamC P2-C05)
 add_executable(test_sec017_compliance test_sec017_compliance.c)
@@ -59,11 +59,11 @@ target_include_directories(test_sec017_compliance PRIVATE
 )
 
 target_link_libraries(test_sec017_compliance PRIVATE
-    agentrt_core
-    agentrt_syscall
+    airy_core
+    airy_syscall
     svc_common
     Threads::Threads
-    agentrt_platform_libs
+    airy_platform_libs
     m
 )
 
@@ -81,4 +81,4 @@ target_compile_options(test_sec017_compliance PRIVATE
 
 add_test(NAME sec017_compliance COMMAND test_sec017_compliance)
 
-agentrt_print_ok("  [security] test_sec017_compliance: P2-C05 configured")
+airy_print_ok("  [security] test_sec017_compliance: P2-C05 configured")

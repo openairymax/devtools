@@ -11,8 +11,8 @@ import sys
 MACRO_NAME = "ATM_RET_ERR"
 MACRO_DEF = (
     f"#define {MACRO_NAME}(c) \\\n"
-    f"    do {{ agentrt_error_push_ex((c), __FILE__, __LINE__, __func__, "
-    f'"%s", agentrt_error_str(c)); return (c); }} while(0)\n'
+    f"    do {{ airy_error_push_ex((c), __FILE__, __LINE__, __func__, "
+    f'"%s", airy_error_str(c)); return (c); }} while(0)\n'
 )
 
 INCLUDE_LINE = '#include "error_compat.h"\n'

@@ -99,7 +99,7 @@ services:
 
     # 环境变量
     environment:
-      - POSTGRES_DB=agentrt_preview
+      - POSTGRES_DB=airy_preview
       - POSTGRES_USER=agentos
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 

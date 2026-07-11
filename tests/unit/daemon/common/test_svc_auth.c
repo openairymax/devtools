@@ -242,7 +242,7 @@ int test_apikey_add_remove(void) {
 
     /* 添加重复的 Key */
     ret = auth_apikey_add("new-key-12345");
-    TEST_ASSERT(ret == AGENTRT_ERR_ALREADY_EXISTS, "Duplicate key should fail");
+    TEST_ASSERT(ret == AIRY_ERR_ALREADY_EXISTS, "Duplicate key should fail");
     TEST_PASS("API Key duplicate rejection");
 
     /* 移除 Key */
@@ -407,7 +407,7 @@ int test_edge_cases(void) {
     };
     auth_jwt_init(&config);
     int ret = auth_jwt_init(&config);  /* 再次初始化 */
-    TEST_ASSERT(ret == AGENTRT_ERR_ALREADY_INIT || ret == 0, 
+    TEST_ASSERT(ret == AIRY_ERR_ALREADY_INIT || ret == 0, 
               "Double init should handle gracefully");
     TEST_PASS("Double initialization handling");
     auth_jwt_cleanup();

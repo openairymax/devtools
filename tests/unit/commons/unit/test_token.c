@@ -23,13 +23,13 @@
 static int passed_tests = 0, failed_tests = 0;
 
 static int test_token_count(void) {
-    agentrt_token_counter_t* counter = agentrt_token_counter_create("gpt-4");
+    airy_token_counter_t* counter = airy_token_counter_create("gpt-4");
     if (!counter) { printf("  Token count: Skipped\n"); return 0; }
     
-    size_t count = agentrt_token_counter_count(counter, "Hello, World!");
+    size_t count = airy_token_counter_count(counter, "Hello, World!");
     printf("  Token count: %zu tokens\n", count);
     
-    agentrt_token_counter_destroy(counter);
+    airy_token_counter_destroy(counter);
     return 0;
 }
 

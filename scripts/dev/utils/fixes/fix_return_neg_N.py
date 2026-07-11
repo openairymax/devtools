@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fix return -N to AGENTRT_ERR_* + agentrt_error_push_ex in protocols/ and gateway/."""
+"""Fix return -N to AGENTRT_ERR_* + airy_error_push_ex in protocols/ and gateway/."""
 
 import re
 import os
@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 # Context keywords → error code mapping
 # Priority: check preceding lines for these keywords (order matters!)
 CONTEXT_MAP = [
-    (r'agentrt_error_push_ex\(.*AGENTRT_ERR_UNKNOWN.*operation failed',
+    (r'airy_error_push_ex\(.*AGENTRT_ERR_UNKNOWN.*operation failed',
      'AGENTRT_ERR_OUT_OF_MEMORY'),  # fix the UNKNOWN fallback for allocation contexts
     (r'AGENTRT_CALLOC|AGENTRT_MALLOC|AGENTRT_REALLOC\b|proto_ext_framework_create',
      'AGENTRT_ERR_OUT_OF_MEMORY'),
@@ -126,7 +126,7 @@ def fix_file(filepath):
             desc = make_context_description(ctx_lines, neg_val, error_code)
             
             result_lines.append(
-                f'{indent}agentrt_error_push_ex({error_code}, __FILE__, __LINE__, __func__, '
+                f'{indent}airy_error_push_ex({error_code}, __FILE__, __LINE__, __func__, '
                 f'"{desc}");\n'
             )
             result_lines.append(f'{indent}return {error_code};\n')

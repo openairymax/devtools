@@ -1,6 +1,6 @@
 # AgentRT 集成测试 CMake 配置
 # 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
-add_compile_definitions(AGENTRT_COMPLIANCE_IMPL)
+add_compile_definitions(AIRY_COMPLIANCE_IMPL)
 # @owner: team-C
 # P1.16m: 12 条连接线集成测试 + P2.8: Hook 系统集成测试
 #
@@ -63,7 +63,7 @@ function(configure_real_lib_test test_name)
             ${TEST_LIBS}
             "-Wl,--end-group"
             Threads::Threads
-            agentrt_platform_libs
+            airy_platform_libs
             m
         )
     else()
@@ -79,7 +79,7 @@ function(configure_real_lib_test test_name)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
-    agentrt_print_ok("  [integration] ${test_name}: configured (real libs, no stubs)")
+    airy_print_ok("  [integration] ${test_name}: configured (real libs, no stubs)")
 endfunction()
 
 # ============================================================================
@@ -88,31 +88,31 @@ endfunction()
 
 # C-L03: market_d → OpenLab（自包含 mock，仅需头文件）
 configure_real_lib_test(test_c_link_03_market_openlab
-    LIBS agentrt_common
+    LIBS airy_common
 )
 
 # C-L06: Orchestrator → CoreLoopThree（orchestrator 真实实现）
-# 注意：agentrt_coreloopthree 已 PUBLIC 链接 svc_common（含 orchestrator.c），
+# 注意：airy_coreloopthree 已 PUBLIC 链接 svc_common（含 orchestrator.c），
 # 链接器自动处理重复符号（仅从首个库提取 .o）
 # LTO 链接下 --start-group/--end-group 必须包裹所有传递依赖，
 # 否则组外库引用组内库符号时无法回溯解析。
 # 显式列出所有传递依赖：
-#   - agentrt_coreloopthree: 主库（含 cognition/engine.c, execution/tool_svc_adapter.c）
-#   - agentrt_llm_service:   提供 llm_service_complete[_stream]/llm_response_free
-#   - agentrt_tool_service:  提供 tool_service_execute/tool_approval_check/tool_result_free
-#   - agentrt_cognition:     传递依赖（引用 tool/llm 符号）
-#   - agentrt_execution:     传递依赖（引用 tool_approval_check）
-#   - agentrt_core:          atoms 内核
-#   - agentrt_memory:        记忆模块
+#   - airy_coreloopthree: 主库（含 cognition/engine.c, execution/tool_svc_adapter.c）
+#   - airy_llm_service:   提供 llm_service_complete[_stream]/llm_response_free
+#   - airy_tool_service:  提供 tool_service_execute/tool_approval_check/tool_result_free
+#   - airy_cognition:     传递依赖（引用 tool/llm 符号）
+#   - airy_execution:     传递依赖（引用 tool_approval_check）
+#   - airy_core:          atoms 内核
+#   - airy_memory:        记忆模块
 #   - svc_common:            daemon 公共库（含 orchestrator.c, checkpoint.c）
 configure_real_lib_test(test_c_link_06_orchestrator_loop
-    LIBS agentrt_coreloopthree agentrt_llm_service agentrt_tool_service
-         agentrt_cognition agentrt_execution agentrt_core agentrt_memory svc_common
+    LIBS airy_coreloopthree airy_llm_service airy_tool_service
+         airy_cognition airy_execution airy_core airy_memory svc_common
 )
 
 # C-L07: Checkpoint → CoreLoopThree（checkpoint_adapter 真实实现）
 configure_real_lib_test(test_c_link_07_checkpoint_loop
-    LIBS agentrt_coreloopthree
+    LIBS airy_coreloopthree
 )
 
 # C-L08: ServiceDiscovery → All Daemons（service_discovery 真实实现）
@@ -127,13 +127,13 @@ configure_real_lib_test(test_c_link_09_ipc_bus
 
 # C-L10: monit_d → Prometheus（prometheus_exporter 真实实现）
 configure_real_lib_test(test_c_link_10_monit_prometheus
-    LIBS agentrt_monit_service
+    LIBS airy_monit_service
 )
 
 # P2.8: Hook System Integration（hook_registry/executor/interceptor/timeout 真实实现）
-# SP04: hook 系统核心已迁移到 agentrt_coreloopthree，不再链接 agentrt_hook_service
+# SP04: hook 系统核心已迁移到 airy_coreloopthree，不再链接 airy_hook_service
 configure_real_lib_test(test_hook_system
-    LIBS agentrt_coreloopthree
+    LIBS airy_coreloopthree
 )
 
 # ============================================================================
@@ -147,13 +147,13 @@ configure_real_lib_test(test_hook_system
 #   test_12 ✅ memoryrovol_bridge builtin 降级
 # ============================================================================
 
-# C-L01: Manager → CoreLoopThree（已迁移到真实库 agentrt_common）
+# C-L01: Manager → CoreLoopThree（已迁移到真实库 airy_common）
 # v0.1.1 修复：memory_source_load 补全 yaml 分支（Bug A），env_source_load
 # 使用双分隔符 __ 作为层级分隔符 + lowercase + int 优先解析（Bug B），
 # 对齐桩函数行为。测试 env var 从 AGENTRT_KERNEL_MAX_ALLOC_MB 改为
 # AGENTRT_KERNEL__MAX_ALLOC_MB（双下划线分隔层级）。
 configure_real_lib_test(test_c_link_01_manager_loop
-    LIBS agentrt_common
+    LIBS airy_common
 )
 
 # C-L02: llm_d → CoreLoopThree（已迁移到真实库）
@@ -161,7 +161,7 @@ configure_real_lib_test(test_c_link_01_manager_loop
 # llm_svc_adapter.h 提供 llm_svc_adapter_* API（与测试一致），真实实现完整存在。
 # 真实 create 会启动 SD+IPC 引导，与 test_04 同模式。
 configure_real_lib_test(test_c_link_02_llm_loop
-    LIBS agentrt_cognition agentrt_core svc_common
+    LIBS airy_cognition airy_core svc_common
 )
 
 # C-L04: tool_d → CoreLoopThree（已迁移到真实库）
@@ -169,7 +169,7 @@ configure_real_lib_test(test_c_link_02_llm_loop
 # 真实 create 会启动 SD+IPC 引导，但 ipc_bus_helper_register_channel 按 ibh 实例
 # 独立注册（非全局 channel 名唯一性检查），多实例同 channel 名不冲突。
 configure_real_lib_test(test_c_link_04_tool_loop
-    LIBS agentrt_execution agentrt_core svc_common agentrt_tool_service
+    LIBS airy_execution airy_core svc_common airy_tool_service
 )
 
 # C-L05: Cupolas SafetyGuard → tool_d（已迁移到真实库）
@@ -178,15 +178,15 @@ configure_real_lib_test(test_c_link_04_tool_loop
 # (agent_id, tool_name) 组合授权，"restricted-agent"+"shell_exec" 不注册以验证拒绝路径。
 # 并发测试改用固定 tool_name（真实 ACL 精确匹配，不支持通配符）。
 configure_real_lib_test(test_c_link_05_safety_tool
-    LIBS agentrt_tool_service svc_common cupolas
+    LIBS airy_tool_service svc_common cupolas
 )
 
-# C-L11: gateway_d → Gateway（已迁移到真实库 agentrt_gateway_service）
+# C-L11: gateway_d → Gateway（已迁移到真实库 airy_gateway_service）
 # v0.1.1 修复：detect_proto 真实实现用 strncmp 前缀匹配 + body 检测，
 # 默认返回 JSONRPC（非桩的 COUNT）。测试 CHECK 用 `|| proto < COUNT` 宽泛条件，
 # 真实实现下仍通过。forward 调用不检查 ret（无后端 daemon 时超时返回错误）。
 configure_real_lib_test(test_c_link_11_gateway_forward
-    LIBS agentrt_gateway_service
+    LIBS airy_gateway_service
 )
 
 # C-L12: CoreLoopThree → MemoryRovol（已迁移到真实库）
@@ -197,9 +197,9 @@ configure_real_lib_test(test_c_link_11_gateway_forward
 # Task #38: memoryrovol.h 是商业产品头文件，仅在 products/memoryrovol 存在时可用。
 # 当 MemoryRovol 不可用时跳过该测试（非阻断），避免编译失败。
 set(_MEMORYROVOL_INCLUDE_DIR "")
-if(TARGET agentrt_memoryrovol_bridge)
-    # 通过 agentrt_memoryrovol_bridge 接口库获取 include 路径
-    get_target_property(_bridge_inc agentrt_memoryrovol_bridge INTERFACE_INCLUDE_DIRECTORIES)
+if(TARGET airy_memoryrovol_bridge)
+    # 通过 airy_memoryrovol_bridge 接口库获取 include 路径
+    get_target_property(_bridge_inc airy_memoryrovol_bridge INTERFACE_INCLUDE_DIRECTORIES)
     if(_bridge_inc)
         set(_MEMORYROVOL_INCLUDE_DIR "${_bridge_inc}")
     endif()
@@ -209,20 +209,20 @@ elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../products/memoryrovol/incl
     set(_MEMORYROVOL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../products/memoryrovol/include")
 endif()
 
-if(_MEMORYROVOL_INCLUDE_DIR AND (TARGET agentrt_memoryrovol OR TARGET agentrt_memoryrovol_bridge))
+if(_MEMORYROVOL_INCLUDE_DIR AND (TARGET airy_memoryrovol OR TARGET airy_memoryrovol_bridge))
     configure_real_lib_test(test_c_link_12_memoryrovol_bridge
-        LIBS agentrt_coreloopthree agentrt_memory agentrt_core svc_common
+        LIBS airy_coreloopthree airy_memory airy_core svc_common
     )
-    if(TARGET agentrt_memoryrovol)
-        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentrt_memoryrovol)
-    elseif(TARGET agentrt_memoryrovol_bridge)
-        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentrt_memoryrovol_bridge)
+    if(TARGET airy_memoryrovol)
+        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE airy_memoryrovol)
+    elseif(TARGET airy_memoryrovol_bridge)
+        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE airy_memoryrovol_bridge)
     endif()
-    if(NOT TARGET agentrt_memoryrovol)
+    if(NOT TARGET airy_memoryrovol)
         target_include_directories(test_c_link_12_memoryrovol_bridge PRIVATE ${_MEMORYROVOL_INCLUDE_DIR})
     endif()
 else()
-    agentrt_print_warn("  [integration] test_c_link_12_memoryrovol_bridge: SKIPPED (MemoryRovol commercial library not built — set AGENTRT_WITH_MEMORYROVOL=ON and build products/memoryrovol)")
+    airy_print_warn("  [integration] test_c_link_12_memoryrovol_bridge: SKIPPED (MemoryRovol commercial library not built — set AGENTRT_WITH_MEMORYROVOL=ON and build products/memoryrovol)")
 endif()
 
 # ============================================================================
@@ -248,22 +248,22 @@ if(TARGET svc_common)
     )
 
     target_link_libraries(test_e2e_core PRIVATE
-        agentrt_core
-        agentrt_syscall
+        airy_core
+        airy_syscall
         -Wl,--whole-archive
-        agentrt_coreloopthree
+        airy_coreloopthree
         -Wl,--no-whole-archive
         svc_common
         -Wl,--start-group
-        agentrt_cognition
-        agentrt_execution
-        agentrt_memory
-        agentrt_atoms
-        agentrt_llm_service
-        agentrt_tool_service
+        airy_cognition
+        airy_execution
+        airy_memory
+        airy_atoms
+        airy_llm_service
+        airy_tool_service
         -Wl,--end-group
         Threads::Threads
-        agentrt_platform_libs
+        airy_platform_libs
         m
     )
 
@@ -279,9 +279,9 @@ if(TARGET svc_common)
     add_test(NAME e2e_core COMMAND test_e2e_core
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    agentrt_print_ok("  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
+    airy_print_ok("  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
 else()
-    agentrt_print_warn("  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
+    airy_print_warn("  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
 endif()
 
 # LLM Routing Integration Test (INT-15)
@@ -359,4 +359,4 @@ target_compile_options(test_llm_d_routing PRIVATE
 add_test(NAME llm_d_routing COMMAND test_llm_d_routing
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-agentrt_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")
+airy_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")

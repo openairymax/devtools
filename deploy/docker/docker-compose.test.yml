@@ -70,13 +70,13 @@ services:
     ports:
       - "${TEST_POSTGRES_PORT:-15432}:5432"
     environment:
-      - POSTGRES_DB=agentrt_test
+      - POSTGRES_DB=airy_test
       - POSTGRES_USER=agentrt
-      - POSTGRES_PASSWORD=agentrt_test
+      - POSTGRES_PASSWORD=airy_test
     networks:
       - agentrt-test-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentrt -d agentrt_test"]
+      test: ["CMD-SHELL", "pg_isready -U agentrt -d airy_test"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -552,10 +552,10 @@ services:
         fi
         # Test metrics endpoint
         METRICS=$(curl -s http://gateway-d:9090/metrics 2>/dev/null || echo "")
-        if echo "$$METRICS" | grep -q "agentrt_"; then
-          echo "[PASS] Metrics endpoint (agentrt_ metrics found)"
+        if echo "$$METRICS" | grep -q "airy_"; then
+          echo "[PASS] Metrics endpoint (airy_ metrics found)"
         elif [ -n "$$METRICS" ]; then
-          echo "[WARN] Metrics endpoint responded but no agentrt_ metrics"
+          echo "[WARN] Metrics endpoint responded but no airy_ metrics"
         else
           echo "[INFO] Metrics endpoint (not yet exposing metrics)"
         fi

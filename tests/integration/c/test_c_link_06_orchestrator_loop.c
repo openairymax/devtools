@@ -23,7 +23,7 @@
 
 #include "memory_compat.h"
 #include "orchestrator.h"
-#include "agentrt_types.h"
+#include "airy_types.h"
 
 /* ============================================================================
  * Test Helpers

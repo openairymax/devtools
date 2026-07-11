@@ -25,9 +25,9 @@
 int test_majority_basic(void) {
     printf("  测试多数投票协调器基本功能...\n");
 
-    agentrt_coordinator_base_t* coordinator = NULL;
-    agentrt_error_t err = agentrt_coordinator_majority_create(3, 0.5f, &coordinator);
-    if (err != AGENTRT_SUCCESS) {
+    airy_coordinator_base_t* coordinator = NULL;
+    airy_error_t err = airy_coordinator_majority_create(3, 0.5f, &coordinator);
+    if (err != AIRY_SUCCESS) {
         printf("    创建协调器失败：%d\n", err);
         return 1;
     }
@@ -43,8 +43,8 @@ int test_majority_basic(void) {
     size_t input_count = 5;
 
     char* result = NULL;
-    agentrt_coordination_context_t context = {0};
+    airy_coordination_context_t context = {0};
 
     err = coordinator->coordinate(coordinator, &context, inputs, input_count, &result);
-    if (err != AGENTRT_SUCCESS) {
+    if (err != AIRY_SUCCESS) {
         printf("    协调执行失败：%d\n", err);

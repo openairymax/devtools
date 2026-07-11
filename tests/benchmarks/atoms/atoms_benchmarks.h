@@ -13,8 +13,8 @@
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef AGENTRT_ATOMS_BENCHMARKS_H
-#define AGENTRT_ATOMS_BENCHMARKS_H
+#ifndef AIRY_ATOMS_BENCHMARKS_H
+#define AIRY_ATOMS_BENCHMARKS_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -61,4 +61,4 @@ bool benchmark_verify_sla(const benchmark_result_t* result, uint64_t sla_thresho
 }
 #endif
 
-#endif /* AGENTRT_ATOMS_BENCHMARKS_H */
+#endif /* AIRY_ATOMS_BENCHMARKS_H */

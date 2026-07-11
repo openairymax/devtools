@@ -115,37 +115,37 @@ declare -A AGENTRT_ERROR_MESSAGES=(
 ###############################################################################
 # 公共API：获取错误描述
 ###############################################################################
-agentrt_error_get_message() {
+airy_error_get_message() {
     local error_code=$1
     local msg="${AGENTRT_ERROR_MESSAGES[$error_code]:-Unknown error code: $error_code}"
     echo "$msg"
 }
 
-agentrt_error_die() {
+airy_error_die() {
     local error_code=$1
     local message="${2:-}"
     local error_msg
-    error_msg=$(agentrt_error_get_message $error_code)
+    error_msg=$(airy_error_get_message $error_code)
     if [[ -n "$message" ]]; then
-        agentrt_log_fatal "[$error_code] $error_msg: $message"
+        airy_log_fatal "[$error_code] $error_msg: $message"
     else
-        agentrt_log_fatal "[$error_code] $error_msg"
+        airy_log_fatal "[$error_code] $error_msg"
     fi
 }
 
-agentrt_error_log() {
+airy_error_log() {
     local error_code=$1
     local message="${2:-}"
     local error_msg
-    error_msg=$(agentrt_error_get_message $error_code)
+    error_msg=$(airy_error_get_message $error_code)
     if [[ -n "$message" ]]; then
-        agentrt_log_error "[$error_code] $error_msg: $message"
+        airy_log_error "[$error_code] $error_msg: $message"
     else
-        agentrt_log_error "[$error_code] $error_msg"
+        airy_log_error "[$error_code] $error_msg"
     fi
 }
 
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f agentrt_error_get_message agentrt_error_die agentrt_error_log
+export -f airy_error_get_message airy_error_die airy_error_log

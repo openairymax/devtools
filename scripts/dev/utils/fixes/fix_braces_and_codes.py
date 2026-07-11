@@ -29,8 +29,8 @@ def fix_braces_and_error_codes(filepath):
             next_line = lines[i + 1]
             next_next_line = lines[i + 2]
 
-            # Check: next line is agentrt_error_push_ex, next+1 is return CODE;
-            push_match = re.match(r'^(\s*)agentrt_error_push_ex\(', next_line)
+            # Check: next line is airy_error_push_ex, next+1 is return CODE;
+            push_match = re.match(r'^(\s*)airy_error_push_ex\(', next_line)
             ret_match = re.match(r'^(\s*)return\s+(AGENTRT_ERR_\w+)\s*;', next_next_line)
 
             if push_match and ret_match:
@@ -76,7 +76,7 @@ def fix_braces_and_error_codes(filepath):
                     continue
         else:
             # Also check for non-if error_push + return patterns that might be standalone
-            push_match2 = re.match(r'^(\s*)agentrt_error_push_ex\((AGENTRT_ERR_UNKNOWN),', line)
+            push_match2 = re.match(r'^(\s*)airy_error_push_ex\((AGENTRT_ERR_UNKNOWN),', line)
             if push_match2 and i + 1 < len(lines):
                 ret_match2 = re.match(r'^(\s*)return\s+AGENTRT_ERR_UNKNOWN\s*;', lines[i + 1])
                 if ret_match2:

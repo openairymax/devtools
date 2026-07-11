@@ -22,7 +22,7 @@ AGENTRT_heapstore_DIR="$AGENTRT_PROJECT_ROOT/heapstore"
 ###############################################################################
 # 加载依赖模块
 ###############################################################################
-agentrt_load_libs() {
+airy_load_libs() {
     local libs=("log.sh" "error.sh" "platform.sh")
     local lib
 
@@ -39,34 +39,34 @@ agentrt_load_libs() {
     done
 }
 
-agentrt_load_libs
+airy_load_libs
 
 ###############################################################################
 # 字符串工具
 ###############################################################################
 
-agentrt_to_lower() {
+airy_to_lower() {
     echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
-agentrt_to_upper() {
+airy_to_upper() {
     echo "$1" | tr '[:lower:]' '[:upper:]'
 }
 
-agentrt_trim() {
+airy_trim() {
     local var="$1"
     var="${var#"${var%%[![:space:]]*}"}"
     var="${var%"${var##*[![:space:]]}"}"
     echo -n "$var"
 }
 
-agentrt_contains() {
+airy_contains() {
     local haystack="$1"
     local needle="$2"
     [[ "$haystack" == *"$needle"* ]]
 }
 
-agentrt_random_string() {
+airy_random_string() {
     local length="${1:-16}"
     LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | head -c "$length"
 }
@@ -75,7 +75,7 @@ agentrt_random_string() {
 # 文件工具
 ###############################################################################
 
-agentrt_mkdir() {
+airy_mkdir() {
     local dir="$1"
     local mode="${2:-0755}"
 
@@ -84,18 +84,18 @@ agentrt_mkdir() {
     fi
 
     if ! mkdir -p "$dir" 2>/dev/null; then
-        agentrt_log_error "Failed to create directory: $dir"
+        airy_log_error "Failed to create directory: $dir"
         return 1
     fi
 
     if ! chmod "$mode" "$dir" 2>/dev/null; then
-        agentrt_log_warn "Failed to set permissions on: $dir"
+        airy_log_warn "Failed to set permissions on: $dir"
     fi
 
     return 0
 }
 
-agentrt_safe_rm() {
+airy_safe_rm() {
     local file="$1"
 
     if [[ -f "$file" ]]; then
@@ -103,7 +103,7 @@ agentrt_safe_rm() {
     fi
 }
 
-agentrt_backup_file() {
+airy_backup_file() {
     local file="$1"
     local backup=""
 
@@ -114,7 +114,7 @@ agentrt_backup_file() {
     backup="${file}.backup.$(date +%Y%m%d_%H%M%S)"
 
     if ! cp "$file" "$backup"; then
-        agentrt_log_error "Failed to backup file: $file"
+        airy_log_error "Failed to backup file: $file"
         return 1
     fi
 
@@ -122,7 +122,7 @@ agentrt_backup_file() {
     return 0
 }
 
-agentrt_file_size() {
+airy_file_size() {
     local file="$1"
 
     if [[ ! -f "$file" ]]; then
@@ -144,7 +144,7 @@ agentrt_file_size() {
     fi
 }
 
-agentrt_is_executable() {
+airy_is_executable() {
     local file="$1"
     [[ -x "$file" ]] || [[ -f "$file" && "${file: -3}" == ".sh" ]]
 }
@@ -153,17 +153,17 @@ agentrt_is_executable() {
 # 进程工具
 ###############################################################################
 
-agentrt_is_process_running() {
+airy_is_process_running() {
     local pid="$1"
     kill -0 "$pid" 2>/dev/null
 }
 
-agentrt_wait_for_process() {
+airy_wait_for_process() {
     local pid="$1"
     local timeout="${2:-60}"
     local elapsed=0
 
-    while agentrt_is_process_running "$pid"; do
+    while airy_is_process_running "$pid"; do
         if [[ $elapsed -ge $timeout ]]; then
             return 124
         fi
@@ -174,17 +174,17 @@ agentrt_wait_for_process() {
     return 0
 }
 
-agentrt_kill_process() {
+airy_kill_process() {
     local pid="$1"
     local sig="${2:-TERM}"
 
-    if ! agentrt_is_process_running "$pid"; then
+    if ! airy_is_process_running "$pid"; then
         return 0
     fi
 
     kill -$sig "$pid" 2>/dev/null || true
-    agentrt_wait_for_process "$pid" 5
-    if agentrt_is_process_running "$pid"; then
+    airy_wait_for_process "$pid" 5
+    if airy_is_process_running "$pid"; then
         kill -9 "$pid" 2>/dev/null || true
     fi
 }
@@ -193,7 +193,7 @@ agentrt_kill_process() {
 # 网络工具
 ###############################################################################
 
-agentrt_is_port_available() {
+airy_is_port_available() {
     local port="$1"
 
     if command -v lsof &> /dev/null; then
@@ -205,7 +205,7 @@ agentrt_is_port_available() {
     fi
 }
 
-agentrt_wait_for_url() {
+airy_wait_for_url() {
     local url="$1"
     local timeout="${2:-60}"
     local elapsed=0
@@ -225,7 +225,7 @@ agentrt_wait_for_url() {
 # 数组工具
 ###############################################################################
 
-agentrt_in_array() {
+airy_in_array() {
     local element="$1"
     shift
     local array=("$@")
@@ -238,7 +238,7 @@ agentrt_in_array() {
     return 1
 }
 
-agentrt_array_length() {
+airy_array_length() {
     local array=("$@")
     echo "${#array[@]}"
 }
@@ -247,7 +247,7 @@ agentrt_array_length() {
 # 版本比较
 ###############################################################################
 
-agentrt_version_compare() {
+airy_version_compare() {
     local v1="$1"
     local v2="$2"
 
@@ -272,11 +272,11 @@ agentrt_version_compare() {
     return 0
 }
 
-agentrt_version_check() {
+airy_version_check() {
     local required="$1"
     local actual="$2"
 
-    agentrt_version_compare "$actual" "$required"
+    airy_version_compare "$actual" "$required"
     local result=$?
 
     [[ $result -ne 2 ]]
@@ -286,7 +286,7 @@ agentrt_version_check() {
 # 配置文件工具
 ###############################################################################
 
-agentrt_config_get() {
+airy_config_get() {
     local file="$1"
     local key="$2"
     local default="${3:-}"
@@ -306,7 +306,7 @@ agentrt_config_get() {
     fi
 }
 
-agentrt_config_set() {
+airy_config_set() {
     local file="$1"
     local key="$2"
     local value="$3"
@@ -326,7 +326,7 @@ agentrt_config_set() {
 # 用户交互工具
 ###############################################################################
 
-agentrt_confirm() {
+airy_confirm() {
     local prompt="${1:-Are you sure?}"
     local default="${2:-N}"
 
@@ -342,7 +342,7 @@ agentrt_confirm() {
     [[ "$yn" =~ ^[Yy]$ ]]
 }
 
-agentrt_select() {
+airy_select() {
     local prompt="$1"
     shift
     local options=("$@")
@@ -369,7 +369,7 @@ agentrt_select() {
 # 下载工具
 ###############################################################################
 
-agentrt_download() {
+airy_download() {
     local url="$1"
     local dest="$2"
     local timeout="${3:-60}"
@@ -385,7 +385,7 @@ agentrt_download() {
     fi
 
     if ! curl "${curl_opts[@]}" "$url"; then
-        agentrt_log_error "Failed to download: $url"
+        airy_log_error "Failed to download: $url"
         return 1
     fi
 
@@ -395,13 +395,13 @@ agentrt_download() {
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f agentrt_load_libs
-export -f agentrt_to_lower agentrt_to_upper agentrt_trim agentrt_contains agentrt_random_string
-export -f agentrt_mkdir agentrt_safe_rm agentrt_backup_file agentrt_file_size agentrt_is_executable
-export -f agentrt_is_process_running agentrt_wait_for_process agentrt_kill_process
-export -f agentrt_is_port_available agentrt_wait_for_url
-export -f agentrt_in_array agentrt_array_length
-export -f agentrt_version_compare agentrt_version_check
-export -f agentrt_config_get agentrt_config_set
-export -f agentrt_confirm agentrt_select
-export -f agentrt_download
+export -f airy_load_libs
+export -f airy_to_lower airy_to_upper airy_trim airy_contains airy_random_string
+export -f airy_mkdir airy_safe_rm airy_backup_file airy_file_size airy_is_executable
+export -f airy_is_process_running airy_wait_for_process airy_kill_process
+export -f airy_is_port_available airy_wait_for_url
+export -f airy_in_array airy_array_length
+export -f airy_version_compare airy_version_check
+export -f airy_config_get airy_config_set
+export -f airy_confirm airy_select
+export -f airy_download

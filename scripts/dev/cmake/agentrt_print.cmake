@@ -1,5 +1,5 @@
 # =============================================================================
-# agentrt_print.cmake — AgentRT 统一构建打印系统
+# airy_print.cmake — AgentRT 统一构建打印系统
 # 版本：1.0.0
 # 创建：2026-07-01
 #
@@ -73,51 +73,51 @@ endmacro()
 # ---- 公开 API ----
 
 # OK — 绿色，成功/确认
-function(agentrt_print_ok msg)
+function(airy_print_ok msg)
     _AGENTRT_TIMESTAMP(_ts)
     message("${_AGENTRT_C_GREEN}[${_ts}] [  OK  ] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # INFO — 蓝色，信息性输出
-function(agentrt_print_info msg)
+function(airy_print_info msg)
     _AGENTRT_TIMESTAMP(_ts)
     message("${_AGENTRT_C_BLUE}[${_ts}] [ INFO ] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # WARN — 黄色，警告
-function(agentrt_print_warn msg)
+function(airy_print_warn msg)
     _AGENTRT_TIMESTAMP(_ts)
     message("${_AGENTRT_C_YELLOW}[${_ts}] [ WARN ] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # ERROR — 红色，错误（不终止构建）
-function(agentrt_print_error msg)
+function(airy_print_error msg)
     _AGENTRT_TIMESTAMP(_ts)
     message("${_AGENTRT_C_RED}[${_ts}] [ ERROR] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # FATAL — 品红，致命错误（终止构建）
-function(agentrt_print_fatal msg)
+function(airy_print_fatal msg)
     _AGENTRT_TIMESTAMP(_ts)
     message(FATAL_ERROR "${_AGENTRT_C_MAGENTA}[${_ts}] [ FATAL] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # DEBUG — 灰色，调试信息
-function(agentrt_print_debug msg)
+function(airy_print_debug msg)
     _AGENTRT_TIMESTAMP(_ts)
     message("${_AGENTRT_C_GRAY}[${_ts}] [DEBUG ] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # SECTION — 青色加粗，章节标题
-function(agentrt_print_section msg)
+function(airy_print_section msg)
     _AGENTRT_TIMESTAMP(_ts)
     message("${_AGENTRT_C_CYAN}${_AGENTRT_C_BOLD}[${_ts}] [======] ${msg}${_AGENTRT_C_RESET}")
 endfunction()
 
 # STATUS — 兼容旧 message(STATUS)，蓝色
-function(agentrt_print_status msg)
-    agentrt_print_info("${msg}")
+function(airy_print_status msg)
+    airy_print_info("${msg}")
 endfunction()
 
 # ---- 兼容宏：将 message(STATUS ...) 自动映射（可选 include 后使用） ----
-# 不覆盖 message()，避免破坏第三方 CMake。各模块主动调用 agentrt_print_* 函数。
+# 不覆盖 message()，避免破坏第三方 CMake。各模块主动调用 airy_print_* 函数。

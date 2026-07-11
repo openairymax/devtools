@@ -52,7 +52,7 @@ class TestConfig:
     TEST_DATA_DIR = PROJECT_ROOT / "tests" / "fixtures" / "data"
 
     # 临时文件目录
-    TEMP_DIR = Path(tempfile.gettempdir()) / "agentrt_tests"
+    TEMP_DIR = Path(tempfile.gettempdir()) / "airy_tests"
 
     # 覆盖率目标
     COVERAGE_TARGET = 80
@@ -126,7 +126,7 @@ def temp_dir():
     Yields:
         Path: 临时目录路径
     """
-    temp_path = Path(tempfile.mkdtemp(prefix="agentrt_test_"))
+    temp_path = Path(tempfile.mkdtemp(prefix="airy_test_"))
 
     yield temp_path
 

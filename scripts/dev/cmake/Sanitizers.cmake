@@ -38,7 +38,7 @@ endif()
 # =============================================================================
 # 平台检查
 # =============================================================================
-function(agentrt_check_sanitizer_support)
+function(airy_check_sanitizer_support)
     if(MSVC)
         message(WARNING "Sanitizers are not supported on MSVC. Disabling all sanitizers.")
         set(AGENTRT_ENABLE_ASAN OFF PARENT_SCOPE)
@@ -59,7 +59,7 @@ endfunction()
 # =============================================================================
 # AddressSanitizer + LeakSanitizer (SEC-05)
 # =============================================================================
-function(agentrt_enable_asan target scope)
+function(airy_enable_asan target scope)
     if(NOT AGENTRT_ENABLE_ASAN)
         return()
     endif()
@@ -88,7 +88,7 @@ endfunction()
 # =============================================================================
 # UndefinedBehaviorSanitizer (SEC-09)
 # =============================================================================
-function(agentrt_enable_ubsan target scope)
+function(airy_enable_ubsan target scope)
     if(NOT AGENTRT_ENABLE_UBSAN)
         return()
     endif()
@@ -118,7 +118,7 @@ endfunction()
 # ThreadSanitizer (SEC-08)
 # 注意：TSan 不能与 ASan 同时使用，需要独立编译
 # =============================================================================
-function(agentrt_enable_tsan target scope)
+function(airy_enable_tsan target scope)
     if(NOT AGENTRT_ENABLE_TSAN)
         return()
     endif()
@@ -143,7 +143,7 @@ endfunction()
 # =============================================================================
 # 栈保护 (SEC-12 — INF-05 合规)
 # =============================================================================
-function(agentrt_enable_stack_protector target scope)
+function(airy_enable_stack_protector target scope)
     if(NOT AGENTRT_ENABLE_STACK_PROTECTOR OR MSVC)
         return()
     endif()
@@ -159,7 +159,7 @@ endfunction()
 # =============================================================================
 # FORTIFY_SOURCE 编译时缓冲区溢出检测
 # =============================================================================
-function(agentrt_enable_fortify target scope)
+function(airy_enable_fortify target scope)
     if(NOT AGENTRT_ENABLE_FORTIFY OR MSVC)
         return()
     endif()
@@ -188,7 +188,7 @@ function(enable_agentrt_sanitizers target)
         set(_scope "${ARGV1}")
     endif()
 
-    agentrt_check_sanitizer_support()
+    airy_check_sanitizer_support()
 
     # 将结果传回父作用域
     set(AGENTRT_ENABLE_ASAN ${AGENTRT_ENABLE_ASAN} PARENT_SCOPE)
@@ -196,19 +196,19 @@ function(enable_agentrt_sanitizers target)
     set(AGENTRT_ENABLE_TSAN ${AGENTRT_ENABLE_TSAN} PARENT_SCOPE)
 
     # 安全编译基础选项（始终启用，无论 sanitizer）
-    agentrt_enable_stack_protector(${target} ${_scope})
-    agentrt_enable_fortify(${target} ${_scope})
+    airy_enable_stack_protector(${target} ${_scope})
+    airy_enable_fortify(${target} ${_scope})
 
     # TSan 与其他 sanitizer 互斥
     if(AGENTRT_ENABLE_TSAN)
         message(STATUS "ThreadSanitizer mode: ASan + UBSan disabled (mutual exclusion)")
-        agentrt_enable_tsan(${target} ${_scope})
+        airy_enable_tsan(${target} ${_scope})
     else()
         if(AGENTRT_ENABLE_ASAN)
-            agentrt_enable_asan(${target} ${_scope})
+            airy_enable_asan(${target} ${_scope})
         endif()
         if(AGENTRT_ENABLE_UBSAN)
-            agentrt_enable_ubsan(${target} ${_scope})
+            airy_enable_ubsan(${target} ${_scope})
         endif()
     endif()
 
@@ -225,7 +225,7 @@ endfunction()
 # =============================================================================
 # 打印 sanitizer 配置摘要
 # =============================================================================
-function(agentrt_print_sanitizer_summary)
+function(airy_print_sanitizer_summary)
     message(STATUS "=========================================")
     message(STATUS "  AgentOS Runtime Detection Configuration")
     message(STATUS "=========================================")

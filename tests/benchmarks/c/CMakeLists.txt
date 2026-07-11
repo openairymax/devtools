@@ -4,7 +4,7 @@
 add_compile_definitions(AGENTRT_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    agentrt_print_warn("  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    airy_print_warn("  [benchmarks] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
@@ -24,16 +24,16 @@ target_include_directories(test_performance_benchmarks PRIVATE
 )
 
 target_link_libraries(test_performance_benchmarks PRIVATE
-    agentrt_core
-    agentrt_syscall
+    airy_core
+    airy_syscall
     -Wl,--whole-archive
-    agentrt_coreloopthree
+    airy_coreloopthree
     -Wl,--no-whole-archive
     svc_common
-    agentrt_llm_service
-    agentrt_tool_service
+    airy_llm_service
+    airy_tool_service
     Threads::Threads
-    agentrt_platform_libs
+    airy_platform_libs
     m
 )
 
@@ -48,4 +48,4 @@ target_compile_options(test_performance_benchmarks PRIVATE
 
 add_test(NAME performance_benchmarks COMMAND test_performance_benchmarks)
 
-agentrt_print_ok("  [benchmarks] test_performance_benchmarks: P2-C02 configured")
+airy_print_ok("  [benchmarks] test_performance_benchmarks: P2-C02 configured")

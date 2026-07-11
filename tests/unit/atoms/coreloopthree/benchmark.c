@@ -19,9 +19,9 @@
  * @brief 基准测试：任务提交性能
  */
 static void benchmark_task_submit() {
-    agentrt_core_loop_t* loop = NULL;
-    agentrt_error_t err = agentrt_loop_create(NULL, &loop);
-    if (err != AGENTRT_SUCCESS) {
+    airy_core_loop_t* loop = NULL;
+    airy_error_t err = airy_loop_create(NULL, &loop);
+    if (err != AIRY_SUCCESS) {
         printf("benchmark_task_submit: Failed to create loop\n");
         return;
     }
@@ -32,14 +32,14 @@ static void benchmark_task_submit() {
     char** task_ids;
     SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
     if (!task_ids) {
-        agentrt_loop_destroy(loop);
+        airy_loop_destroy(loop);
         return;
     }
 
     clock_t start = clock();
     for (int i = 0; i < num_tasks; i++) {
-        err = agentrt_loop_submit(loop, input, input_len, &task_ids[i]);
-        if (err != AGENTRT_SUCCESS) {
+        err = airy_loop_submit(loop, input, input_len, &task_ids[i]);
+        if (err != AIRY_SUCCESS) {
             printf("benchmark_task_submit: Failed to submit task %d\n", i);
             break;
         }
@@ -52,21 +52,21 @@ static void benchmark_task_submit() {
 
     for (int i = 0; i < num_tasks; i++) {
         if (task_ids[i]) {
-            AGENTRT_FREE(task_ids[i]);
+            AIRY_FREE(task_ids[i]);
         }
     }
-    AGENTRT_FREE(task_ids);
+    AIRY_FREE(task_ids);
 
-    agentrt_loop_destroy(loop);
+    airy_loop_destroy(loop);
 }
 
 /**
  * @brief 基准测试：任务查询性能
  */
 static void benchmark_task_query() {
-    agentrt_execution_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_execution_create(4, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_execution_engine_t* engine = NULL;
+    airy_error_t err = airy_execution_create(4, &engine);
+    if (err != AIRY_SUCCESS) {
         printf("benchmark_task_query: Failed to create engine\n");
         return;
     }
@@ -75,12 +75,12 @@ static void benchmark_task_query() {
     char** task_ids;
     SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
     if (!task_ids) {
-        agentrt_execution_destroy(engine);
+        airy_execution_destroy(engine);
         return;
     }
 
     for (int i = 0; i < num_tasks; i++) {
-        agentrt_task_t task = {
+        airy_task_t task = {
             .task_id = NULL,
             .task_id_len = 0,
             .task_agent_id = "test_agent",
@@ -97,8 +97,8 @@ static void benchmark_task_query() {
             .task_error_msg = NULL
         };
 
-        err = agentrt_execution_submit(engine, &task, &task_ids[i]);
-        if (err != AGENTRT_SUCCESS) {
+        err = airy_execution_submit(engine, &task, &task_ids[i]);
+        if (err != AIRY_SUCCESS) {
             printf("benchmark_task_query: Failed to submit task %d\n", i);
             break;
         }
@@ -107,9 +107,9 @@ static void benchmark_task_query() {
     clock_t start = clock();
     for (int i = 0; i < num_tasks; i++) {
         if (task_ids[i]) {
-            agentrt_task_status_t status;
-            err = agentrt_execution_query(engine, task_ids[i], &status);
-            if (err != AGENTRT_SUCCESS) {
+            airy_task_status_t status;
+            err = airy_execution_query(engine, task_ids[i], &status);
+            if (err != AIRY_SUCCESS) {
                 printf("benchmark_task_query: Failed to query task %d\n", i);
                 break;
             }
@@ -123,21 +123,21 @@ static void benchmark_task_query() {
 
     for (int i = 0; i < num_tasks; i++) {
         if (task_ids[i]) {
-            AGENTRT_FREE(task_ids[i]);
+            AIRY_FREE(task_ids[i]);
         }
     }
-    AGENTRT_FREE(task_ids);
+    AIRY_FREE(task_ids);
 
-    agentrt_execution_destroy(engine);
+    airy_execution_destroy(engine);
 }
 
 /**
  * @brief 基准测试：记忆写入性能
  */
 static void benchmark_memory_write() {
-    agentrt_memory_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_memory_engine_t* engine = NULL;
+    airy_error_t err = airy_memory_create(NULL, &engine);
+    if (err != AIRY_SUCCESS) {
         printf("benchmark_memory_write: Failed to create engine\n");
         return;
     }
@@ -146,14 +146,14 @@ static void benchmark_memory_write() {
     char** record_ids;
     SAFE_MALLOC_ARRAY(record_ids, num_records, sizeof(char*));
     if (!record_ids) {
-        agentrt_memory_destroy(engine);
+        airy_memory_destroy(engine);
         return;
     }
 
-    agentrt_memory_record_t record = {
+    airy_memory_record_t record = {
         .memory_record_id = NULL,
         .memory_record_id_len = 0,
-        .memory_record_type = AGENTRT_MEMTYPE_TEXT,
+        .memory_record_type = AIRY_MEMTYPE_TEXT,
         .memory_record_timestamp_ns = 0,
         .memory_record_source_agent = "test_agent",
         .memory_record_source_len = strlen("test_agent"),
@@ -167,8 +167,8 @@ static void benchmark_memory_write() {
 
     clock_t start = clock();
     for (int i = 0; i < num_records; i++) {
-        err = agentrt_memory_write(engine, &record, &record_ids[i]);
-        if (err != AGENTRT_SUCCESS) {
+        err = airy_memory_write(engine, &record, &record_ids[i]);
+        if (err != AIRY_SUCCESS) {
             printf("benchmark_memory_write: Failed to write record %d\n", i);
             break;
         }
@@ -181,31 +181,31 @@ static void benchmark_memory_write() {
 
     for (int i = 0; i < num_records; i++) {
         if (record_ids[i]) {
-            AGENTRT_FREE(record_ids[i]);
+            AIRY_FREE(record_ids[i]);
         }
     }
-    AGENTRT_FREE(record_ids);
+    AIRY_FREE(record_ids);
 
-    agentrt_memory_destroy(engine);
+    airy_memory_destroy(engine);
 }
 
 /**
  * @brief 基准测试：记忆查询性能
  */
 static void benchmark_memory_query() {
-    agentrt_memory_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_memory_engine_t* engine = NULL;
+    airy_error_t err = airy_memory_create(NULL, &engine);
+    if (err != AIRY_SUCCESS) {
         printf("benchmark_memory_query: Failed to create engine\n");
         return;
     }
 
     int num_records = 1000;
     for (int i = 0; i < num_records; i++) {
-        agentrt_memory_record_t record = {
+        airy_memory_record_t record = {
             .memory_record_id = NULL,
             .memory_record_id_len = 0,
-            .memory_record_type = AGENTRT_MEMTYPE_TEXT,
+            .memory_record_type = AIRY_MEMTYPE_TEXT,
             .memory_record_timestamp_ns = 0,
             .memory_record_source_agent = "test_agent",
             .memory_record_source_len = strlen("test_agent"),
@@ -218,13 +218,13 @@ static void benchmark_memory_query() {
         };
 
         char* record_id = NULL;
-        err = agentrt_memory_write(engine, &record, &record_id);
-        if (err == AGENTRT_SUCCESS && record_id) {
-            AGENTRT_FREE(record_id);
+        err = airy_memory_write(engine, &record, &record_id);
+        if (err == AIRY_SUCCESS && record_id) {
+            AIRY_FREE(record_id);
         }
     }
 
-    agentrt_memory_query_t query = {
+    airy_memory_query_t query = {
         .memory_query_text = "test",
         .memory_query_text_len = strlen("test"),
         .memory_query_start_time = 0,
@@ -239,10 +239,10 @@ static void benchmark_memory_query() {
     int num_queries = 100;
     clock_t start = clock();
     for (int i = 0; i < num_queries; i++) {
-        agentrt_memory_result_ext_t* result = NULL;
-        err = agentrt_memory_query(engine, &query, &result);
-        if (err == AGENTRT_SUCCESS && result) {
-            agentrt_memory_result_free(result);
+        airy_memory_result_ext_t* result = NULL;
+        err = airy_memory_query(engine, &query, &result);
+        if (err == AIRY_SUCCESS && result) {
+            airy_memory_result_free(result);
         }
     }
     clock_t end = clock();
@@ -251,7 +251,7 @@ static void benchmark_memory_query() {
     printf("benchmark_memory_query: %d queries in %.3f seconds (%.3f queries/sec)\n",
            num_queries, elapsed, num_queries / elapsed);
 
-    agentrt_memory_destroy(engine);
+    airy_memory_destroy(engine);
 }
 
 int main() {

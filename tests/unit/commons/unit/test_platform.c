@@ -46,10 +46,10 @@ static int failed_tests = 0;
  * @brief 测试平台检测宏
  */
 static int test_platform_detection(void) {
-#ifdef AGENTRT_PLATFORM_WINDOWS
-    printf("  Platform: Windows (%d-bit)\n", AGENTRT_PLATFORM_BITS);
-    TEST_ASSERT(AGENTRT_PLATFORM_WINDOWS == 1, "Platform should be Windows");
-    TEST_ASSERT(strcmp(AGENTRT_PLATFORM_NAME, "Windows") == 0, "Platform name should be Windows");
+#ifdef AIRY_PLATFORM_WINDOWS
+    printf("  Platform: Windows (%d-bit)\n", AIRY_PLATFORM_BITS);
+    TEST_ASSERT(AIRY_PLATFORM_WINDOWS == 1, "Platform should be Windows");
+    TEST_ASSERT(strcmp(AIRY_PLATFORM_NAME, "Windows") == 0, "Platform name should be Windows");
 #else
     printf("  Platform: POSIX\n");
 #endif
@@ -60,7 +60,7 @@ static int test_platform_detection(void) {
  * @brief 测试时间函数
  */
 static int test_time_functions(void) {
-    uint64_t time1 = agentrt_time_ns();
+    uint64_t time1 = airy_time_ns();
     
     /* 等待一小段时间 */
 #ifdef _WIN32
@@ -70,7 +70,7 @@ static int test_time_functions(void) {
     nanosleep(&ts, NULL);
 #endif
     
-    uint64_t time2 = agentrt_time_ns();
+    uint64_t time2 = airy_time_ns();
     
     TEST_ASSERT(time2 > time1, "Time should increase");
     TEST_ASSERT((time2 - time1) >= 5000000, "Time difference should be at least 5ms");
@@ -83,20 +83,20 @@ static int test_time_functions(void) {
  * @brief 测试内存分配函数
  */
 static int test_memory_allocation(void) {
-    void* ptr1 = agentrt_mem_alloc(1024);
+    void* ptr1 = airy_mem_alloc(1024);
     TEST_ASSERT(ptr1 != NULL, "Memory allocation should succeed");
     
     /* 测试重复分配 */
-    void* ptr2 = agentrt_mem_alloc(512);
+    void* ptr2 = airy_mem_alloc(512);
     TEST_ASSERT(ptr2 != NULL, "Second allocation should succeed");
     
     /* 测试零大小分�?*/
-    void* ptr3 = agentrt_mem_alloc(0);
+    void* ptr3 = airy_mem_alloc(0);
     TEST_ASSERT(ptr3 == NULL, "Zero-size allocation should return NULL");
     
     /* 清理 */
-    agentrt_mem_free(ptr1);
-    agentrt_mem_free(ptr2);
+    airy_mem_free(ptr1);
+    airy_mem_free(ptr2);
     
     printf("  Memory allocation: OK\n");
     return 0;
@@ -108,21 +108,21 @@ static int test_memory_allocation(void) {
 static int test_string_functions(void) {
     char buffer[64];
     
-    /* 测试 agentrt_strlcpy */
+    /* 测试 airy_strlcpy */
     const char* src = "Hello, World!";
-    char* result = agentrt_strlcpy(buffer, sizeof(buffer), src);
+    char* result = airy_strlcpy(buffer, sizeof(buffer), src);
     TEST_ASSERT(result == buffer, "strlcpy should return buffer");
     TEST_ASSERT(strcmp(buffer, src) == 0, "String should be copied correctly");
     
     /* 测试截断 */
     char small_buffer[8];
-    agentrt_strlcpy(small_buffer, sizeof(small_buffer), "This is a long string");
+    airy_strlcpy(small_buffer, sizeof(small_buffer), "This is a long string");
     TEST_ASSERT(strlen(small_buffer) < sizeof(small_buffer), "String should be truncated");
     TEST_ASSERT(small_buffer[sizeof(small_buffer) - 1] == '\0', "String should be null-terminated");
     
-    /* 测试 agentrt_strlcat */
+    /* 测试 airy_strlcat */
     char concat_buffer[32] = "Hello";
-    agentrt_strlcat(concat_buffer, sizeof(concat_buffer), ", World!");
+    airy_strlcat(concat_buffer, sizeof(concat_buffer), ", World!");
     TEST_ASSERT(strcmp(concat_buffer, "Hello, World!") == 0, "String should be concatenated");
     
     printf("  String functions: OK\n");
@@ -140,7 +140,7 @@ static int test_file_operations(void) {
         fprintf(f, "Test content");
         fclose(f);
         
-        int64_t size = agentrt_file_size(test_file);
+        int64_t size = airy_file_size(test_file);
         TEST_ASSERT(size > 0, "File size should be positive");
         
         /* 清理 */
@@ -158,22 +158,22 @@ static int test_file_operations(void) {
  * @brief 测试线程原语
  */
 static int test_thread_primitives(void) {
-    agentrt_mutex_t mutex = AGENTRT_INVALID_MUTEX;
+    airy_mutex_t mutex = AIRY_INVALID_MUTEX;
     
     /* 测试互斥锁初始化 */
-    int ret = agentrt_mutex_init(&mutex);
+    int ret = airy_mutex_init(&mutex);
     TEST_ASSERT(ret == 0, "Mutex initialization should succeed");
-    TEST_ASSERT(mutex != AGENTRT_INVALID_MUTEX, "Mutex should be valid after init");
+    TEST_ASSERT(mutex != AIRY_INVALID_MUTEX, "Mutex should be valid after init");
     
     /* 测试加锁解锁 */
-    ret = agentrt_mutex_lock(&mutex);
+    ret = airy_mutex_lock(&mutex);
     TEST_ASSERT(ret == 0, "Mutex lock should succeed");
     
-    ret = agentrt_mutex_unlock(&mutex);
+    ret = airy_mutex_unlock(&mutex);
     TEST_ASSERT(ret == 0, "Mutex unlock should succeed");
     
     /* 清理 */
-    ret = agentrt_mutex_destroy(&mutex);
+    ret = airy_mutex_destroy(&mutex);
     TEST_ASSERT(ret == 0, "Mutex destroy should succeed");
     
     printf("  Thread primitives: OK\n");
@@ -185,16 +185,16 @@ static int test_thread_primitives(void) {
  */
 static int test_network_functions(void) {
     /* 测试网络初始�?*/
-    int ret = agentrt_network_init();
-    TEST_ASSERT(ret == 0 || ret == AGENTRT_ERR_ALREADY_EXISTS, 
+    int ret = airy_network_init();
+    TEST_ASSERT(ret == 0 || ret == AIRY_ERR_ALREADY_EXISTS, 
                 "Network initialization should succeed or already exist");
     
     /* 测试忽略 SIGPIPE */
-    ret = agentrt_ignore_sigpipe();
+    ret = airy_ignore_sigpipe();
     TEST_ASSERT(ret == 0, "Ignore SIGPIPE should succeed");
     
     /* 清理 */
-    agentrt_network_cleanup();
+    airy_network_cleanup();
     
     printf("  Network functions: OK\n");
     return 0;

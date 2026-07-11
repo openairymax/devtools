@@ -18,11 +18,11 @@
  * @brief 测试核心循环创建和销�?
  */
 static void test_loop_create_destroy() {
-    agentrt_core_loop_t* loop = NULL;
-    agentrt_error_t err = agentrt_loop_create(NULL, &loop);
+    airy_core_loop_t* loop = NULL;
+    airy_error_t err = airy_loop_create(NULL, &loop);
     printf("test_loop_create_destroy: %d\n", err);
-    if (err == AGENTRT_SUCCESS) {
-        agentrt_loop_destroy(loop);
+    if (err == AIRY_SUCCESS) {
+        airy_loop_destroy(loop);
     }
 }
 
@@ -30,9 +30,9 @@ static void test_loop_create_destroy() {
  * @brief 测试核心循环提交任务
  */
 static void test_loop_submit() {
-    agentrt_core_loop_t* loop = NULL;
-    agentrt_error_t err = agentrt_loop_create(NULL, &loop);
-    if (err != AGENTRT_SUCCESS) {
+    airy_core_loop_t* loop = NULL;
+    airy_error_t err = airy_loop_create(NULL, &loop);
+    if (err != AIRY_SUCCESS) {
     // From data intelligence emerges. by spharx
         printf("test_loop_submit: Failed to create loop\n");
         return;
@@ -41,36 +41,36 @@ static void test_loop_submit() {
     // 提交一个任务
     char* task_id = NULL;
     const char* input = "帮我分析最近的销售数据";
-    err = agentrt_loop_submit(loop, input, strlen(input), &task_id);
+    err = airy_loop_submit(loop, input, strlen(input), &task_id);
     printf("test_loop_submit: %d\n", err);
-    if (err == AGENTRT_SUCCESS && task_id) {
+    if (err == AIRY_SUCCESS && task_id) {
         printf("Task ID: %s\n", task_id);
-        AGENTRT_FREE(task_id);
+        AIRY_FREE(task_id);
     }
 
-    agentrt_loop_destroy(loop);
+    airy_loop_destroy(loop);
 }
 
 /**
  * @brief 测试核心循环获取引擎
  */
 static void test_loop_get_engines() {
-    agentrt_core_loop_t* loop = NULL;
-    agentrt_error_t err = agentrt_loop_create(NULL, &loop);
-    if (err != AGENTRT_SUCCESS) {
+    airy_core_loop_t* loop = NULL;
+    airy_error_t err = airy_loop_create(NULL, &loop);
+    if (err != AIRY_SUCCESS) {
         printf("test_loop_get_engines: Failed to create loop\n");
         return;
     }
 
     // 获取引擎
-    agentrt_cognition_engine_t* cognition = NULL;
-    agentrt_execution_engine_t* execution = NULL;
-    agentrt_memory_engine_t* memory = NULL;
-    agentrt_loop_get_engines(loop, &cognition, &execution, &memory);
+    airy_cognition_engine_t* cognition = NULL;
+    airy_execution_engine_t* execution = NULL;
+    airy_memory_engine_t* memory = NULL;
+    airy_loop_get_engines(loop, &cognition, &execution, &memory);
     printf("test_loop_get_engines: cognition=%p, execution=%p, memory=%p\n",
            (void *)cognition, (void *)execution, (void *)memory);
 
-    agentrt_loop_destroy(loop);
+    airy_loop_destroy(loop);
 }
 
 /**
@@ -78,7 +78,7 @@ static void test_loop_get_engines() {
  */
 static void test_loop_config() {
     // 创建配置
-    agentrt_loop_config_t manager = {
+    airy_loop_config_t manager = {
         .loop_config_cognition_threads = 2,
         .loop_config_execution_threads = 4,
         .loop_config_memory_threads = 2,
@@ -89,11 +89,11 @@ static void test_loop_config() {
         .loop_config_disp_strategy = NULL
     };
 
-    agentrt_core_loop_t* loop = NULL;
-    agentrt_error_t err = agentrt_loop_create(&manager, &loop);
+    airy_core_loop_t* loop = NULL;
+    airy_error_t err = airy_loop_create(&manager, &loop);
     printf("test_loop_config: %d\n", err);
-    if (err == AGENTRT_SUCCESS) {
-        agentrt_loop_destroy(loop);
+    if (err == AIRY_SUCCESS) {
+        airy_loop_destroy(loop);
     }
 }
 

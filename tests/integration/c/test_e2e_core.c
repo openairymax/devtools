@@ -18,13 +18,13 @@
 #include <unistd.h>
 
 /* corekern */
-#include "agentrt.h"
+#include "airy_rt.h"
 #include "mem.h"
 #include "task.h"
 #include "ipc.h"
 #include "error.h"
-#include "memory_compat.h"   /* Task #38: AGENTRT_MEMSET 定义 (BAN-154 安全宏) */
-#include "agentrt_time.h"
+#include "memory_compat.h"   /* Task #38: AIRY_MEMSET 定义 (BAN-154 安全宏) */
+#include "airy_time.h"
 #include "observability.h"
 
 /* daemons/common */
@@ -90,38 +90,38 @@ static void e2e_scenario_1_core_init_shutdown(void)
 {
     printf("\n--- [E2E-01] 核心系统完整启动与关闭 ---\n");
 
-    agentrt_mem_init(0);
+    airy_mem_init(0);
     TEST_ASSERT(1, "Step 1: 内存子系统初始化完成");
 
-    agentrt_task_init();
+    airy_task_init();
     TEST_ASSERT(1, "Step 2: 任务调度初始化完成");
 
-    agentrt_error_t err = agentrt_ipc_init();
-    TEST_ASSERT_EQ(err, AGENTRT_SUCCESS, "Step 3: IPC初始化成功");
+    airy_err_t err = airy_ipc_init();
+    TEST_ASSERT_EQ(err, AIRY_SUCCESS, "Step 3: IPC初始化成功");
 
-    agentrt_observability_config_t obs_cfg = {
+    airy_observability_config_t obs_cfg = {
         .enable_metrics = 1,
         .enable_tracing = 1,
         .enable_health_check = 1
     };
-    int ret = agentrt_observability_init(&obs_cfg);
-    TEST_ASSERT_EQ(ret, AGENTRT_SUCCESS, "Step 4: 可观测性初始化成功");
+    int ret = airy_observability_init(&obs_cfg);
+    TEST_ASSERT_EQ(ret, AIRY_SUCCESS, "Step 4: 可观测性初始化成功");
 
-    ret = agentrt_core_init();
-    TEST_ASSERT_EQ(ret, AGENTRT_SUCCESS, "Step 5: 核心总初始化成功");
+    ret = airy_init();
+    TEST_ASSERT_EQ(ret, AIRY_SUCCESS, "Step 5: 核心总初始化成功");
 
-    agentrt_task_id_t tid = agentrt_task_self();
+    airy_task_id_t tid = airy_task_self();
     TEST_ASSERT(1, "Step 6: 任务系统可查询自身ID");
 
-    void* test_ptr = agentrt_mem_alloc(1024);
+    void* test_ptr = airy_mem_alloc(1024);
     TEST_ASSERT_NOT_NULL(test_ptr, "Step 6: 内存分配功能正常");
-    if (test_ptr) agentrt_mem_free(test_ptr);
+    if (test_ptr) airy_mem_free(test_ptr);
 
-    agentrt_core_shutdown();
-    agentrt_observability_shutdown();
-    agentrt_ipc_cleanup();
-    agentrt_task_cleanup();
-    agentrt_mem_cleanup();
+    airy_shutdown();
+    airy_observability_shutdown();
+    airy_ipc_cleanup();
+    airy_task_cleanup();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 7: 所有子系统按序关闭完成");
 }
 
@@ -201,7 +201,7 @@ static void e2e_scenario_3_ipc_dispatcher_link(void)
 {
     printf("\n--- [E2E-03] 跨模块IPC通信链路 ---\n");
 
-    agentrt_ipc_init();
+    airy_ipc_init();
     method_dispatcher_t* disp = method_dispatcher_create(16);
     TEST_ASSERT_NOT_NULL(disp, "Step 1: 方法分发器创建成功");
 
@@ -211,10 +211,10 @@ static void e2e_scenario_3_ipc_dispatcher_link(void)
                                ipc_e2e_handler, NULL);
     TEST_ASSERT(1, "Step 2: 跨模块方法注册完成");
 
-    agentrt_ipc_channel_t* ch = NULL;
-    agentrt_error_t err = agentrt_ipc_create_channel(
+    airy_ipc_channel_t* ch = NULL;
+    airy_err_t err = airy_ipc_create_channel(
         "e2e_dispatcher", NULL, NULL, &ch);
-    TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+    TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                    "Step 3: IPC通道创建（取决于实现）");
 
     g_ipc_dispatched = 0;
@@ -231,9 +231,9 @@ static void e2e_scenario_3_ipc_dispatcher_link(void)
     cJSON_Delete(req);
 
     if (ch) {
-        agentrt_ipc_close(ch);
+        airy_ipc_close(ch);
     }
-    agentrt_ipc_cleanup();
+    airy_ipc_cleanup();
     method_dispatcher_destroy(disp);
     TEST_ASSERT(1, "Step 5: IPC和分发器清理完成");
 }
@@ -246,11 +246,11 @@ static void e2e_scenario_4_syscall_workflow(void)
 {
     printf("\n--- [E2E-04] 系统调用完整工作流 ---\n");
 
-    agentrt_mem_init(0);
-    agentrt_observability_config_t obs_cfg = {
+    airy_mem_init(0);
+    airy_observability_config_t obs_cfg = {
         .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 0
     };
-    agentrt_observability_init(&obs_cfg);
+    airy_observability_init(&obs_cfg);
     TEST_ASSERT(1, "Step 1: 依赖子系统初始化完成");
 
     TEST_ASSERT_EQ(SYSCALL_API_VERSION_MAJOR, 1,
@@ -261,39 +261,39 @@ static void e2e_scenario_4_syscall_workflow(void)
     /* Step 3: 任务提交系统调用 */
     const char* task_input = "{\"action\":\"test\"}";
     char* task_output = NULL;
-    agentrt_error_t err = agentrt_sys_task_submit(task_input, strlen(task_input),
+    airy_err_t err = airy_sys_task_submit(task_input, strlen(task_input),
                                                     5000, &task_output);
-    TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+    TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                 "Step 3: sys_task_submit 可调用");
-    if (task_output) agentrt_sys_free(task_output);
+    if (task_output) airy_sys_free(task_output);
 
     /* Step 4: 内存写入系统调用 */
     const char* mem_data = "test_memory_data";
     char* record_id = NULL;
-    err = agentrt_sys_memory_write(mem_data, strlen(mem_data),
+    err = airy_sys_memory_write(mem_data, strlen(mem_data),
                                     "{\"type\":\"test\"}", &record_id);
-    TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+    TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                 "Step 4: sys_memory_write 可调用");
-    if (record_id) agentrt_sys_free(record_id);
+    if (record_id) airy_sys_free(record_id);
 
     /* Step 5: Agent创建系统调用 */
     const char* agent_spec = "{\"name\":\"e2e_test\",\"type\":\"TEST\"}";
     char* agent_id = NULL;
-    err = agentrt_sys_agent_spawn(agent_spec, &agent_id);
-    TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+    err = airy_sys_agent_spawn(agent_spec, &agent_id);
+    TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                 "Step 5: sys_agent_spawn 可调用");
-    if (agent_id) agentrt_sys_free(agent_id);
+    if (agent_id) airy_sys_free(agent_id);
 
     /* Step 6: 验证性能指标 */
     double cpu = -1, mem_usage = -1;
     int threads = -1;
-    err = agentrt_performance_get_metrics(&cpu, &mem_usage, &threads);
-    TEST_ASSERT_EQ(err, AGENTRT_SUCCESS, "Step 6: 性能指标获取成功");
+    err = airy_performance_get_metrics(&cpu, &mem_usage, &threads);
+    TEST_ASSERT_EQ(err, AIRY_SUCCESS, "Step 6: 性能指标获取成功");
     TEST_ASSERT(cpu >= 0.0 && cpu <= 100.0, "Step 6: CPU在合理范围");
 
     /* Step 7: 清理 */
-    agentrt_observability_shutdown();
-    agentrt_mem_cleanup();
+    airy_observability_shutdown();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 7: 清理完成");
 }
 
@@ -355,25 +355,25 @@ static void e2e_scenario_5_fault_recovery(void)
 /* ======================================================================== */
 
 static int g_concurrent_inits = 0;
-static agentrt_mutex_t* g_concurrent_mtx = NULL;
+static airy_mtx_t* g_concurrent_mtx = NULL;
 
 static void* concurrent_thread_fn(void* arg)
 {
     int thread_id = *(int*)arg;
 
     for (int round = 0; round < 50; round++) {
-        void* p = agentrt_mem_alloc(64 + (size_t)(thread_id % 8) * 32);
+        void* p = airy_mem_alloc(64 + (size_t)(thread_id % 8) * 32);
         if (p) {
-            AGENTRT_MEMSET(p, (unsigned char)(thread_id + round),
+            AIRY_MEMSET(p, (unsigned char)(thread_id + round),
                    64 + (size_t)(thread_id % 8) * 32);
-            agentrt_mem_free(p);
+            airy_mem_free(p);
         }
     }
 
     if (g_concurrent_mtx) {
-        agentrt_mutex_lock(g_concurrent_mtx);
+        airy_mtx_lock(g_concurrent_mtx);
         g_concurrent_inits++;
-        agentrt_mutex_unlock(g_concurrent_mtx);
+        airy_mtx_unlock(g_concurrent_mtx);
     }
 
     return NULL;
@@ -383,34 +383,34 @@ static void e2e_scenario_6_multithread_integration(void)
 {
     printf("\n--- [E2E-06] 多线程并发集成测试 ---\n");
 
-    agentrt_mem_init(0);
-    g_concurrent_mtx = agentrt_mutex_create();
+    airy_mem_init(0);
+    g_concurrent_mtx = airy_mtx_create();
     g_concurrent_inits = 0;
 
     #define THREAD_COUNT 6
-    agentrt_thread_t threads[THREAD_COUNT];
+    airy_thread_t threads[THREAD_COUNT];
     int ids[THREAD_COUNT];
 
     for (int i = 0; i < THREAD_COUNT; i++) {
         ids[i] = i;
-        agentrt_platform_thread_create(&threads[i], concurrent_thread_fn, &ids[i]);
+        airy_platform_thread_create(&threads[i], concurrent_thread_fn, &ids[i]);
     }
     TEST_ASSERT(1, "Step 1: 创建6个并发线程");
 
     for (int i = 0; i < THREAD_COUNT; i++) {
-        agentrt_platform_thread_join(threads[i], NULL);
+        airy_platform_thread_join(threads[i], NULL);
     }
     TEST_ASSERT(1, "Step 2: 所有线程安全退出");
 
     TEST_ASSERT(g_concurrent_inits == THREAD_COUNT,
                 "Step 3: 所有线程都执行了计数操作");
 
-    size_t leaks = agentrt_mem_check_leaks();
+    size_t leaks = airy_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "Step 4: 并发内存分配无泄漏");
 
-    agentrt_mutex_free(g_concurrent_mtx);
+    airy_mtx_free(g_concurrent_mtx);
     g_concurrent_mtx = NULL;
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 5: 多线程集成清理完成");
 }
 
@@ -422,42 +422,42 @@ static void e2e_scenario_7_cross_module_tracing(void)
 {
     printf("\n--- [E2E-07] 可观测性跨子系统追踪 ---\n");
 
-    agentrt_observability_config_t obs_cfg = {
+    airy_observability_config_t obs_cfg = {
         .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 1
     };
-    agentrt_observability_init(&obs_cfg);
+    airy_observability_init(&obs_cfg);
 
-    agentrt_trace_context_t ctx_svc, ctx_db, ctx_api;
+    airy_trace_context_t ctx_svc, ctx_db, ctx_api;
 
-    agentrt_trace_span_start(&ctx_svc, "svc_layer", "handle_request");
+    airy_trace_span_start(&ctx_svc, "svc_layer", "handle_request");
     TEST_ASSERT(ctx_svc.trace_id[0] != '\0', "Step 1: 服务层span启动");
 
-    agentrt_trace_set_tag(&ctx_svc, "http.method", "POST");
-    agentrt_trace_set_tag(&ctx_svc, "http.url", "/api/v1/task");
-    agentrt_trace_log(&ctx_svc, "Processing incoming request");
+    airy_trace_set_tag(&ctx_svc, "http.method", "POST");
+    airy_trace_set_tag(&ctx_svc, "http.url", "/api/v1/task");
+    airy_trace_log(&ctx_svc, "Processing incoming request");
 
-    agentrt_trace_span_start(&ctx_db, "db_layer", "query_memory");
+    airy_trace_span_start(&ctx_db, "db_layer", "query_memory");
     TEST_ASSERT(strcmp(ctx_db.trace_id, ctx_svc.trace_id) == 0 ||
                 ctx_db.trace_id[0] != '\0',
                 "Step 2: 数据库层span继承trace_id");
 
-    agentrt_trace_log(&ctx_db, "Executing SQL query");
-    agentrt_trace_span_end(&ctx_db, 5000000);
+    airy_trace_log(&ctx_db, "Executing SQL query");
+    airy_trace_span_end(&ctx_db, 5000000);
 
-    agentrt_trace_span_start(&ctx_api, "api_layer", "format_response");
-    agentrt_trace_log(&ctx_api, "Building JSON response");
-    agentrt_trace_span_end(&ctx_api, 1000000);
+    airy_trace_span_start(&ctx_api, "api_layer", "format_response");
+    airy_trace_log(&ctx_api, "Building JSON response");
+    airy_trace_span_end(&ctx_api, 1000000);
 
-    agentrt_trace_span_end(&ctx_svc, 20000000);
+    airy_trace_span_end(&ctx_svc, 20000000);
     TEST_ASSERT(ctx_svc.end_ns > ctx_svc.start_ns, "Step 3: span时间戳有效");
     TEST_ASSERT(ctx_db.end_ns > ctx_db.start_ns, "Step 3: 子span时间戳有效");
 
     double cpu = -1, mem = -1;
     int threads = -1;
-    agentrt_error_t err = agentrt_performance_get_metrics(&cpu, &mem, &threads);
-    TEST_ASSERT_EQ(err, AGENTRT_SUCCESS, "Step 4: 性能指标获取正常");
+    airy_err_t err = airy_performance_get_metrics(&cpu, &mem, &threads);
+    TEST_ASSERT_EQ(err, AIRY_SUCCESS, "Step 4: 性能指标获取正常");
 
-    agentrt_observability_shutdown();
+    airy_observability_shutdown();
     TEST_ASSERT(1, "Step 5: 可观测性关闭完成");
 }
 
@@ -477,36 +477,36 @@ static void e2e_scenario_8_timer_task_joint(void)
 {
     printf("\n--- [E2E-08] 定时器+任务调度联合测试 ---\n");
 
-    agentrt_task_init();
+    airy_task_init();
     g_timer_task_counter = 0;
 
-    agentrt_timer_t* timer = agentrt_timer_create(timer_task_cb, NULL);
+    airy_timer_t* timer = airy_timer_create(timer_task_cb, NULL);
     TEST_ASSERT_NOT_NULL(timer, "Step 1: 定时器创建成功");
 
-    agentrt_error_t err = agentrt_timer_start(timer, 15, 0);
-    TEST_ASSERT_EQ(err, AGENTRT_SUCCESS, "Step 2: 周期定时器启动成功");
+    airy_err_t err = airy_timer_start(timer, 15, 0);
+    TEST_ASSERT_EQ(err, AIRY_SUCCESS, "Step 2: 周期定时器启动成功");
 
     for (int cycle = 0; cycle < 5; cycle++) {
-        agentrt_task_sleep(20);
-        agentrt_time_timer_process();
+        airy_task_sleep(20);
+        airy_time_timer_process();
     }
 
     TEST_ASSERT(g_timer_task_counter >= 2,
                 "Step 3: 定时器在多周期内触发>=2次");
 
-    agentrt_task_yield();
+    airy_task_yield();
     TEST_ASSERT(1, "Step 4: 任务调度yield不崩溃");
 
-    agentrt_timer_stop(timer);
+    airy_timer_stop(timer);
     int count_after_stop = g_timer_task_counter;
-    agentrt_task_sleep(30);
-    agentrt_time_timer_process();
+    airy_task_sleep(30);
+    airy_time_timer_process();
     TEST_ASSERT(g_timer_task_counter == count_after_stop,
                 "Step 5: 停止后不再触发");
 
-    agentrt_timer_destroy(timer);
+    airy_timer_destroy(timer);
     /* timer_cleanup 是内部API，不在此调用 */
-    agentrt_task_cleanup();
+    airy_task_cleanup();
     TEST_ASSERT(1, "Step 6: 定时器+调度联合清理完成");
 }
 
@@ -575,34 +575,34 @@ static void e2e_scenario_10_idempotency(void)
     printf("\n--- [E2E-10] 全系统幂等性验证 ---\n");
 
     for (int attempt = 0; attempt < 3; attempt++) {
-        agentrt_mem_init(0);
-        agentrt_task_init();
+        airy_mem_init(0);
+        airy_task_init();
 
-        agentrt_ipc_init();
-        agentrt_observability_config_t ocfg = {
+        airy_ipc_init();
+        airy_observability_config_t ocfg = {
             .enable_metrics = 1, .enable_tracing = 0, .enable_health_check = 0
         };
-        agentrt_observability_init(&ocfg);
+        airy_observability_init(&ocfg);
 
         cm_init(NULL);
         am_init(NULL);
 
-        void* ptr = agentrt_mem_alloc(256);
-        if (ptr) agentrt_mem_free(ptr);
+        void* ptr = airy_mem_alloc(256);
+        if (ptr) airy_mem_free(ptr);
 
         am_shutdown();
         cm_shutdown();
-        agentrt_observability_shutdown();
-        agentrt_ipc_cleanup();
-        agentrt_task_cleanup();
-        agentrt_mem_cleanup();
+        airy_observability_shutdown();
+        airy_ipc_cleanup();
+        airy_task_cleanup();
+        airy_mem_cleanup();
     }
 
-    agentrt_mem_init(0);
-    void* final_ptr = agentrt_mem_alloc(512);
+    airy_mem_init(0);
+    void* final_ptr = airy_mem_alloc(512);
     TEST_ASSERT_NOT_NULL(final_ptr, "Step: 3次循环后内存仍可用");
-    if (final_ptr) agentrt_mem_free(final_ptr);
-    agentrt_mem_cleanup();
+    if (final_ptr) airy_mem_free(final_ptr);
+    airy_mem_cleanup();
 
     TEST_ASSERT(1, "Step: 3轮完整init/shutdown循环全部成功（幂等性验证）");
 }
@@ -612,21 +612,21 @@ static void e2e_scenario_10_idempotency(void)
 /* ======================================================================== */
 
 static int g_tpool_completed = 0;
-static agentrt_mutex_t* g_tpool_mtx = NULL;
+static airy_mtx_t* g_tpool_mtx = NULL;
 
 static void tpool_task_fn(void* arg)
 {
     int* counter = (int*)arg;
-    if (g_tpool_mtx) agentrt_mutex_lock(g_tpool_mtx);
+    if (g_tpool_mtx) airy_mtx_lock(g_tpool_mtx);
     (*counter)++;
-    if (g_tpool_mtx) agentrt_mutex_unlock(g_tpool_mtx);
+    if (g_tpool_mtx) airy_mtx_unlock(g_tpool_mtx);
 }
 
 static void e2e_scenario_11_thread_pool_workflow(void)
 {
     printf("\n--- [E2E-11] 线程池集成工作流 ---\n");
 
-    g_tpool_mtx = agentrt_mutex_create();
+    g_tpool_mtx = airy_mtx_create();
     g_tpool_completed = 0;
     TEST_ASSERT_NOT_NULL(g_tpool_mtx, "Step 1: 互斥锁创建成功");
 
@@ -647,17 +647,17 @@ static void e2e_scenario_11_thread_pool_workflow(void)
 
     int wait_cycles = 0;
     while (g_tpool_completed < 20 && wait_cycles < 100) {
-        agentrt_task_sleep(5);
-        agentrt_time_timer_process();
+        airy_task_sleep(5);
+        airy_time_timer_process();
         wait_cycles++;
     }
-    agentrt_mutex_lock(g_tpool_mtx);
+    airy_mtx_lock(g_tpool_mtx);
     int final_count = g_tpool_completed;
-    agentrt_mutex_unlock(g_tpool_mtx);
+    airy_mtx_unlock(g_tpool_mtx);
     TEST_ASSERT(final_count >= 14, "Step 4: 大多数任务已完成");
 
     thread_pool_destroy(pool);
-    agentrt_mutex_free(g_tpool_mtx);
+    airy_mtx_free(g_tpool_mtx);
     g_tpool_mtx = NULL;
     TEST_ASSERT(1, "Step 5: 线程池销毁完成");
 }
@@ -794,24 +794,24 @@ static void e2e_scenario_15_memory_batch_fragmentation(void)
 {
     printf("\n--- [E2E-15] 内存批量分配与碎片回收 ---\n");
 
-    agentrt_mem_init(0);
+    airy_mem_init(0);
     TEST_ASSERT(1, "Step 1: 内存子系统初始化完成");
 
     #define ALLOC_COUNT 200
     void* ptrs[ALLOC_COUNT];
-    AGENTRT_MEMSET(ptrs, 0, sizeof(ptrs));
+    AIRY_MEMSET(ptrs, 0, sizeof(ptrs));
 
     for (int i = 0; i < ALLOC_COUNT; i++) {
         size_t sz = (size_t)(64 + (i % 16) * 32);
-        ptrs[i] = agentrt_mem_alloc(sz);
-        if (ptrs[i]) AGENTRT_MEMSET(ptrs[i], (unsigned char)(i & 0xFF), sz);
+        ptrs[i] = airy_mem_alloc(sz);
+        if (ptrs[i]) AIRY_MEMSET(ptrs[i], (unsigned char)(i & 0xFF), sz);
     }
     TEST_ASSERT(1, "Step 2: 批量分配200个不同大小的内存块");
 
     int freed = 0;
     for (int i = 0; i < ALLOC_COUNT; i += 2) {
         if (ptrs[i]) {
-            agentrt_mem_free(ptrs[i]);
+            airy_mem_free(ptrs[i]);
             ptrs[i] = NULL;
             freed++;
         }
@@ -821,26 +821,26 @@ static void e2e_scenario_15_memory_batch_fragmentation(void)
 
     for (int i = 0; i < 60; i++) {
         size_t sz = (size_t)(128 + (i % 10) * 16);
-        void* p = agentrt_mem_alloc(sz);
+        void* p = airy_mem_alloc(sz);
         if (p) {
-            AGENTRT_MEMSET(p, 0xAB, sz);
-            agentrt_mem_free(p);
+            AIRY_MEMSET(p, 0xAB, sz);
+            airy_mem_free(p);
         }
     }
     TEST_ASSERT(1, "Step 4: 在碎片状态下分配/释放短期内存");
 
     for (int i = 1; i < ALLOC_COUNT; i += 2) {
         if (ptrs[i]) {
-            agentrt_mem_free(ptrs[i]);
+            airy_mem_free(ptrs[i]);
             ptrs[i] = NULL;
         }
     }
     TEST_ASSERT(1, "Step 5: 释放剩余内存块");
 
-    size_t leaks = agentrt_mem_check_leaks();
+    size_t leaks = airy_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "Step 6: 批量碎片分配后无泄漏");
 
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 7: 内存子系统清理完成");
 }
 
@@ -862,39 +862,39 @@ static void e2e_scenario_16_task_scheduling_coop(void)
 {
     printf("\n--- [E2E-16] 任务调度协同验证 ---\n");
 
-    agentrt_mem_init(0);
-    agentrt_task_init();
+    airy_mem_init(0);
+    airy_task_init();
     g_task_coop_counter = 0;
     TEST_ASSERT(1, "Step 1: 内存与任务调度初始化完成");
 
-    agentrt_timer_t* t1 = agentrt_timer_create(task_coop_cb, &g_task_coop_counter);
-    agentrt_timer_t* t2 = agentrt_timer_create(task_coop_cb, &g_task_coop_counter);
+    airy_timer_t* t1 = airy_timer_create(task_coop_cb, &g_task_coop_counter);
+    airy_timer_t* t2 = airy_timer_create(task_coop_cb, &g_task_coop_counter);
     TEST_ASSERT_NOT_NULL(t1, "Step 2: 定时器1创建成功");
     TEST_ASSERT_NOT_NULL(t2, "Step 2: 定时器2创建成功");
 
-    agentrt_timer_start(t1, 10, 10);
-    agentrt_timer_start(t2, 15, 15);
+    airy_timer_start(t1, 10, 10);
+    airy_timer_start(t2, 15, 15);
     TEST_ASSERT(1, "Step 3: 两个周期定时器启动");
 
     for (int cycle = 0; cycle < 20; cycle++) {
-        agentrt_task_sleep(5);
-        agentrt_time_timer_process();
-        agentrt_task_yield();
+        airy_task_sleep(5);
+        airy_time_timer_process();
+        airy_task_yield();
     }
 
     TEST_ASSERT(g_task_coop_counter >= 2, "Step 4: 协同任务执行>=2次");
 
-    agentrt_timer_stop(t1);
-    agentrt_timer_stop(t2);
+    airy_timer_stop(t1);
+    airy_timer_stop(t2);
     int final_val = g_task_coop_counter;
-    agentrt_task_sleep(20);
-    agentrt_time_timer_process();
+    airy_task_sleep(20);
+    airy_time_timer_process();
     TEST_ASSERT(g_task_coop_counter == final_val, "Step 5: 停止后不再触发");
 
-    agentrt_timer_destroy(t1);
-    agentrt_timer_destroy(t2);
-    agentrt_task_cleanup();
-    agentrt_mem_cleanup();
+    airy_timer_destroy(t1);
+    airy_timer_destroy(t2);
+    airy_task_cleanup();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 6: 任务调度协同清理完成");
 }
 
@@ -906,36 +906,36 @@ static void e2e_scenario_17_error_propagation(void)
 {
     printf("\n--- [E2E-17] 错误码跨层传播 ---\n");
 
-    agentrt_mem_init(0);
+    airy_mem_init(0);
     TEST_ASSERT(1, "Step 1: 基础环境初始化");
 
-    agentrt_error_t err_list[] = {
-        AGENTRT_SUCCESS, AGENTRT_EINVAL, AGENTRT_ENOMEM,
-        AGENTRT_EBUSY, AGENTRT_ETIMEDOUT, AGENTRT_EPERM,
-        AGENTRT_EIO, AGENTRT_ENOTINIT, AGENTRT_EUNKNOWN
+    airy_err_t err_list[] = {
+        AIRY_SUCCESS, AIRY_EINVAL, AIRY_ENOMEM,
+        AIRY_EBUSY, AIRY_ETIMEDOUT, AIRY_EPERM,
+        AIRY_EIO, AIRY_ENOTINIT, AIRY_EUNKNOWN
     };
     int err_count = (int)(sizeof(err_list) / sizeof(err_list[0]));
 
     for (int i = 0; i < err_count; i++) {
-        agentrt_error_t e = err_list[i];
-        const char* name = agentrt_error_str(e);
+        airy_err_t e = err_list[i];
+        const char* name = airy_err_str(e);
         TEST_ASSERT(name != NULL, "Step 2: 错误码名称可查询");
         TEST_ASSERT(strlen(name) > 0, "Step 2: 错误码名称非空");
     }
 
-    const char* i18n_str = agentrt_error_str_i18n(AGENTRT_ENOMEM, 0);
+    const char* i18n_str = airy_err_str_i18n(AIRY_ENOMEM, 0);
     if (i18n_str) {
         TEST_ASSERT(strlen(i18n_str) > 0, "Step 3: ENOMEM有i18n描述信息");
     }
 
-    agentrt_error_t neg_code = -2;
-    TEST_ASSERT(neg_code == AGENTRT_ENOMEM, "Step 4: ENOMEM值为-2");
+    airy_err_t neg_code = -2;
+    TEST_ASSERT(neg_code == AIRY_ENOMEM, "Step 4: ENOMEM值为-2");
 
-    const char* unknown_name = agentrt_error_str(AGENTRT_EUNKNOWN);
+    const char* unknown_name = airy_err_str(AIRY_EUNKNOWN);
     TEST_ASSERT(unknown_name != NULL, "Step 5: EUNKNOWN名称存在");
     TEST_ASSERT(strlen(unknown_name) > 0, "Step 5: EUNKNOWN名称非空");
 
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 6: 错误码跨层传播测试通过");
 }
 
@@ -955,40 +955,40 @@ static void e2e_scenario_18_timer_precision(void)
 {
     printf("\n--- [E2E-18] 定时器多间隔精确度验证 ---\n");
 
-    agentrt_task_init();
+    airy_task_init();
     g_timer_precision_ctr = 0;
     TEST_ASSERT(1, "Step 1: 任务调度初始化完成");
 
-    agentrt_timer_t* fast = agentrt_timer_create(precision_cb, NULL);
-    agentrt_timer_t* medium = agentrt_timer_create(precision_cb, NULL);
-    agentrt_timer_t* slow = agentrt_timer_create(precision_cb, NULL);
+    airy_timer_t* fast = airy_timer_create(precision_cb, NULL);
+    airy_timer_t* medium = airy_timer_create(precision_cb, NULL);
+    airy_timer_t* slow = airy_timer_create(precision_cb, NULL);
     TEST_ASSERT_NOT_NULL(fast, "Step 2: 三个定时器创建成功");
 
-    agentrt_timer_start(fast, 5, 5);
-    agentrt_timer_start(medium, 15, 15);
-    agentrt_timer_start(slow, 25, 25);
+    airy_timer_start(fast, 5, 5);
+    airy_timer_start(medium, 15, 15);
+    airy_timer_start(slow, 25, 25);
     TEST_ASSERT(1, "Step 3: 5ms/15ms/25ms三个定时器启动");
 
     int cycles = 0;
     while (g_timer_precision_ctr < 5 && cycles < 50) {
-        agentrt_task_sleep(3);
-        agentrt_time_timer_process();
+        airy_task_sleep(3);
+        airy_time_timer_process();
         cycles++;
     }
     TEST_ASSERT(g_timer_precision_ctr >= 3, "Step 4: 多定时器在合理时间内触发>=3次");
 
     int count_before_stop = g_timer_precision_ctr;
-    agentrt_timer_stop(fast);
-    agentrt_timer_stop(medium);
-    agentrt_timer_stop(slow);
+    airy_timer_stop(fast);
+    airy_timer_stop(medium);
+    airy_timer_stop(slow);
     TEST_ASSERT(g_timer_precision_ctr >= count_before_stop,
                 "Step 5: 停止时计数器不丢失");
 
-    agentrt_timer_destroy(fast);
-    agentrt_timer_destroy(medium);
-    agentrt_timer_destroy(slow);
+    airy_timer_destroy(fast);
+    airy_timer_destroy(medium);
+    airy_timer_destroy(slow);
     g_timer_precision_ctr = 0;
-    agentrt_task_cleanup();
+    airy_task_cleanup();
     TEST_ASSERT(1, "Step 6: 定时器精确测试清理完成");
 }
 
@@ -1000,45 +1000,45 @@ static void e2e_scenario_19_syscall_comprehensive(void)
 {
     printf("\n--- [E2E-19] 系统调用全类型顺序工作流 ---\n");
 
-    agentrt_mem_init(0);
-    agentrt_observability_config_t obs_cfg = {
+    airy_mem_init(0);
+    airy_observability_config_t obs_cfg = {
         .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 0
     };
-    agentrt_observability_init(&obs_cfg);
+    airy_observability_init(&obs_cfg);
     TEST_ASSERT(1, "Step 1: 基础环境初始化");
 
     for (int round = 0; round < 3; round++) {
         char* result_id = NULL;
-        agentrt_error_t err = agentrt_sys_memory_write(
+        airy_err_t err = airy_sys_memory_write(
             "round_data", 10,
             "{\"round\":\"0\"}", &result_id);
-        TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+        TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                     "Step 2: sys_memory_write round(可调用)");
-        if (result_id) agentrt_sys_free(result_id);
+        if (result_id) airy_sys_free(result_id);
 
         char* task_out = NULL;
-        err = agentrt_sys_task_submit("{\"op\":\"test\"}", 13,
+        err = airy_sys_task_submit("{\"op\":\"test\"}", 13,
                                        2000, &task_out);
-        TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+        TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                     "Step 2: sys_task_submit round(可调用)");
-        if (task_out) agentrt_sys_free(task_out);
+        if (task_out) airy_sys_free(task_out);
 
         char* agent_id = NULL;
-        err = agentrt_sys_agent_spawn(
+        err = airy_sys_agent_spawn(
             "{\"name\":\"batch\",\"type\":\"BATCH\"}", &agent_id);
-        TEST_ASSERT(err == AGENTRT_SUCCESS || err != 0,
+        TEST_ASSERT(err == AIRY_SUCCESS || err != 0,
                     "Step 2: sys_agent_spawn round(可调用)");
-        if (agent_id) agentrt_sys_free(agent_id);
+        if (agent_id) airy_sys_free(agent_id);
     }
     TEST_ASSERT(1, "Step 3: 3轮全类型syscall调用无崩溃");
 
     double cpu = -1, mem = -1;
     int threads = -1;
-    agentrt_error_t err = agentrt_performance_get_metrics(&cpu, &mem, &threads);
-    TEST_ASSERT_EQ(err, AGENTRT_SUCCESS, "Step 4: 综合调用后性能指标正常");
+    airy_err_t err = airy_performance_get_metrics(&cpu, &mem, &threads);
+    TEST_ASSERT_EQ(err, AIRY_SUCCESS, "Step 4: 综合调用后性能指标正常");
 
-    agentrt_observability_shutdown();
-    agentrt_mem_cleanup();
+    airy_observability_shutdown();
+    airy_mem_cleanup();
     TEST_ASSERT(1, "Step 5: 综合调用清理完成");
 }
 

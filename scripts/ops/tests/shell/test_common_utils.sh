@@ -18,31 +18,31 @@ source "$AGENTRT_SCRIPTS_DIR/library/common.sh"
 
 test_to_lower() {
     local result
-    result=$(agentrt_to_lower "HELLO WORLD")
+    result=$(airy_to_lower "HELLO WORLD")
     assert_equal "hello world" "$result" "to_lower should convert to lowercase"
 }
 
 test_to_upper() {
     local result
-    result=$(agentrt_to_upper "hello world")
+    result=$(airy_to_upper "hello world")
     assert_equal "HELLO WORLD" "$result" "to_upper should convert to uppercase"
 }
 
 test_trim() {
     local result
-    result=$(agentrt_trim "  hello world  ")
+    result=$(airy_trim "  hello world  ")
     assert_equal "hello world" "$result" "trim should remove leading/trailing whitespace"
 }
 
 test_contains() {
     local result
-    result=$(agentrt_contains "hello world" "world")
+    result=$(airy_contains "hello world" "world")
     assert_equal "0" "$?" "contains should return 0 when substring exists"
 }
 
 test_random_string() {
     local result
-    result=$(agentrt_random_string 16)
+    result=$(airy_random_string 16)
     assert_equal 16 "${#result}" "random_string should generate correct length"
 }
 
@@ -51,24 +51,24 @@ test_random_string() {
 ###############################################################################
 
 test_mkdir() {
-    local test_dir="/tmp/agentrt_test_$$"
-    agentrt_mkdir "$test_dir"
+    local test_dir="/tmp/airy_test_$$"
+    airy_mkdir "$test_dir"
     assert_dir_exists "$test_dir"
     rm -rf "$test_dir"
 }
 
 test_safe_rm() {
-    local test_file="/tmp/agentrt_test_file_$$"
+    local test_file="/tmp/airy_test_file_$$"
     echo "test" > "$test_file"
-    agentrt_safe_rm "$test_file"
+    airy_safe_rm "$test_file"
     assert_false "[[ -f $test_file ]]" "safe_rm should remove file"
 }
 
 test_backup_file() {
-    local test_file="/tmp/agentrt_test_backup_$$"
+    local test_file="/tmp/airy_test_backup_$$"
     echo "test content" > "$test_file"
     local backup
-    backup=$(agentrt_backup_file "$test_file")
+    backup=$(airy_backup_file "$test_file")
     assert_true "[[ -f $backup ]]" "backup_file should create backup"
     rm -rf "$test_file" "$backup"
 }
@@ -78,24 +78,24 @@ test_backup_file() {
 ###############################################################################
 
 test_version_compare_equal() {
-    agentrt_version_compare "1.0.0" "1.0.0"
+    airy_version_compare "1.0.0" "1.0.0"
     assert_equal "0" "$?" "version_compare should return 0 for equal versions"
 }
 
 test_version_compare_greater() {
-    agentrt_version_compare "2.0.0" "1.0.0"
+    airy_version_compare "2.0.0" "1.0.0"
     assert_equal "1" "$?" "version_compare should return 1 when v1 > v2"
 }
 
 test_version_compare_less() {
-    agentrt_version_compare "1.0.0" "2.0.0"
+    airy_version_compare "1.0.0" "2.0.0"
     assert_equal "2" "$?" "version_compare should return 2 when v1 < v2"
 }
 
 test_version_check() {
-    assert_true "agentrt_version_check '1.0.0' '1.0.0'" "version_check should pass for equal version"
-    assert_true "agentrt_version_check '1.0.0' '2.0.0'" "version_check should pass when actual > required"
-    assert_false "agentrt_version_check '2.0.0' '1.0.0'" "version_check should fail when actual < required"
+    assert_true "airy_version_check '1.0.0' '1.0.0'" "version_check should pass for equal version"
+    assert_true "airy_version_check '1.0.0' '2.0.0'" "version_check should pass when actual > required"
+    assert_false "airy_version_check '2.0.0' '1.0.0'" "version_check should fail when actual < required"
 }
 
 ###############################################################################
@@ -104,10 +104,10 @@ test_version_check() {
 
 test_in_array() {
     local arr=("apple" "banana" "cherry")
-    agentrt_in_array "banana" "${arr[@]}"
+    airy_in_array "banana" "${arr[@]}"
     assert_equal "0" "$?" "in_array should return 0 when element exists"
 
-    agentrt_in_array "grape" "${arr[@]}"
+    airy_in_array "grape" "${arr[@]}"
     assert_equal "1" "$?" "in_array should return 1 when element doesn't exist"
 }
 
@@ -116,22 +116,22 @@ test_in_array() {
 ###############################################################################
 
 test_config_get() {
-    local test_config="/tmp/agentrt_test_config_$$"
+    local test_config="/tmp/airy_test_config_$$"
     cat > "$test_config" << 'EOF'
 key1=value1
 key2=value2
 key3=value with spaces
 EOF
-    assert_equal "value1" "$(agentrt_config_get "$test_config" "key1")" "config_get should return correct value"
-    assert_equal "value with spaces" "$(agentrt_config_get "$test_config" "key3")" "config_get should handle spaces"
+    assert_equal "value1" "$(airy_config_get "$test_config" "key1")" "config_get should return correct value"
+    assert_equal "value with spaces" "$(airy_config_get "$test_config" "key3")" "config_get should handle spaces"
     rm -f "$test_config"
 }
 
 test_config_set() {
-    local test_config="/tmp/agentrt_test_config2_$$"
+    local test_config="/tmp/airy_test_config2_$$"
     touch "$test_config"
-    agentrt_config_set "$test_config" "newkey" "newvalue"
-    assert_equal "newvalue" "$(agentrt_config_get "$test_config" "newkey")" "config_set should set value"
+    airy_config_set "$test_config" "newkey" "newvalue"
+    assert_equal "newvalue" "$(airy_config_get "$test_config" "newkey")" "config_set should set value"
     rm -f "$test_config"
 }
 
@@ -140,7 +140,7 @@ test_config_set() {
 ###############################################################################
 
 test_confirm() {
-    echo "y" | agentrt_confirm "Test prompt"
+    echo "y" | airy_confirm "Test prompt"
     assert_equal "0" "$?" "confirm should return 0 for 'y'"
 }
 

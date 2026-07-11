@@ -40,11 +40,11 @@ static void test_service_create(void) {
     printf("Test: service create... ");
     
     gateway_service_t service = NULL;
-    agentrt_error_t err = gateway_service_create(&service, NULL);
+    airy_error_t err = gateway_service_create(&service, NULL);
     
-    assert(err == AGENTRT_SUCCESS);
+    assert(err == AIRY_SUCCESS);
     assert(service != NULL);
-    assert(gateway_service_get_state(service) == AGENTRT_SVC_STATE_CREATED);
+    assert(gateway_service_get_state(service) == AIRY_SVC_STATE_CREATED);
     
     gateway_service_destroy(service);
     
@@ -65,21 +65,21 @@ static void test_service_lifecycle(void) {
     config.stdio.enabled = false;
     
     gateway_service_t service = NULL;
-    agentrt_error_t err = gateway_service_create(&service, &config);
-    assert(err == AGENTRT_SUCCESS);
+    airy_error_t err = gateway_service_create(&service, &config);
+    assert(err == AIRY_SUCCESS);
     
     err = gateway_service_init(service);
-    assert(err == AGENTRT_SUCCESS);
-    assert(gateway_service_get_state(service) == AGENTRT_SVC_STATE_READY);
+    assert(err == AIRY_SUCCESS);
+    assert(gateway_service_get_state(service) == AIRY_SVC_STATE_READY);
     
     err = gateway_service_start(service);
-    assert(err == AGENTRT_SUCCESS);
-    assert(gateway_service_get_state(service) == AGENTRT_SVC_STATE_RUNNING);
+    assert(err == AIRY_SUCCESS);
+    assert(gateway_service_get_state(service) == AIRY_SVC_STATE_RUNNING);
     assert(gateway_service_is_running(service) == true);
     
     err = gateway_service_stop(service, false);
-    assert(err == AGENTRT_SUCCESS);
-    assert(gateway_service_get_state(service) == AGENTRT_SVC_STATE_STOPPED);
+    assert(err == AIRY_SUCCESS);
+    assert(gateway_service_get_state(service) == AIRY_SVC_STATE_STOPPED);
     
     gateway_service_destroy(service);
     
@@ -103,8 +103,8 @@ static void test_healthcheck(void) {
     gateway_service_init(service);
     gateway_service_start(service);
     
-    agentrt_error_t err = gateway_service_healthcheck(service);
-    assert(err == AGENTRT_SUCCESS);
+    airy_error_t err = gateway_service_healthcheck(service);
+    assert(err == AIRY_SUCCESS);
     
     gateway_service_stop(service, false);
     gateway_service_destroy(service);
@@ -129,9 +129,9 @@ static void test_stats(void) {
     gateway_service_init(service);
     gateway_service_start(service);
     
-    agentrt_svc_stats_t stats;
-    agentrt_error_t err = gateway_service_get_stats(service, &stats);
-    assert(err == AGENTRT_SUCCESS);
+    airy_svc_stats_t stats;
+    airy_error_t err = gateway_service_get_stats(service, &stats);
+    assert(err == AIRY_SUCCESS);
     
     gateway_service_stop(service, false);
     gateway_service_destroy(service);

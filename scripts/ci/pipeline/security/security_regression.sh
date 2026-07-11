@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-BUILD_DIR="${AGENTRT_BUILD_DIR:-$(mktemp -d /tmp/agentrt_build_XXXXXX)}"
+BUILD_DIR="${AGENTRT_BUILD_DIR:-$(mktemp -d /tmp/airy_build_XXXXXX)}"
 
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'

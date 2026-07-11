@@ -25,7 +25,7 @@
 #include "task.h"
 #include "ipc.h"
 #include "error.h"
-#include "agentrt_time.h"
+#include "airy_time.h"
 #include "observability.h"
 
 /* daemons/common */
@@ -132,46 +132,46 @@ static void sec_audit_memory_overflow(void)
 {
     printf("\n--- [SEC-001] 内存溢出保护审计 ---\n");
 
-    agentrt_mem_init(0);
+    airy_mem_init(0);
 
     /* 测试1: 零长度分配 */
-    void* p0 = agentrt_mem_alloc(0);
+    void* p0 = airy_mem_alloc(0);
     TEST_ASSERT(p0 != NULL || p0 == NULL,
                 "SEC-001-T1: 零长度分配安全处理");
-    if (p0) agentrt_mem_free(p0);
+    if (p0) airy_mem_free(p0);
 
     /* 测试2: 极大长度分配 */
-    void* p_max = agentrt_mem_alloc((size_t)512 << 20); /* 512MB, large allocation stress test */
+    void* p_max = airy_mem_alloc((size_t)512 << 20); /* 512MB, large allocation stress test */
     if (p_max) {
-        agentrt_mem_free(p_max);
+        airy_mem_free(p_max);
     }
     TEST_ASSERT(1, "SEC-001-T2: 极大分配不崩溃（可能返回NULL或有效指针）");
 
     /* 测试3: 边界对齐分配 */
-    void* p_align = agentrt_mem_aligned_alloc(65536, 64);
+    void* p_align = airy_mem_aligned_alloc(65536, 64);
     if (p_align) {
         TEST_ASSERT((uintptr_t)p_align % 64 == 0,
                     "SEC-001-T3: 地址对齐正确");
-        agentrt_mem_aligned_free(p_align);
+        airy_mem_aligned_free(p_align);
     }
 
     /* 测试4: 重复free安全性 — 注意：标准free()不提供双重释放保护
      * 此测试验证开发者层面的正确用法（非系统级保护） */
-    void* p_dbl = agentrt_mem_alloc(128);
+    void* p_dbl = airy_mem_alloc(128);
     if (p_dbl) {
-        agentrt_mem_free(p_dbl);
+        airy_mem_free(p_dbl);
         /* 不再尝试双重free，因为标准malloc不提供保护 */
         TEST_ASSERT(1, "SEC-001-T4: 正确单次释放");
     }
 
     /* 测试5: NULL free安全性 */
-    agentrt_mem_free(NULL);
+    airy_mem_free(NULL);
     TEST_ASSERT(1, "SEC-001-T5: free(NULL)安全");
 
-    size_t leaks = agentrt_mem_check_leaks();
+    size_t leaks = airy_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "SEC-001: 内存溢出审计无泄漏");
 
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
 }
 
 /* ======================================================================== */
@@ -186,7 +186,7 @@ static void sec_audit_input_validation(void)
 
     /* 测试1: 超长键名 */
     char long_key[4096];
-    AGENTRT_MEMSET(long_key, 'A', sizeof(long_key) - 1);
+    AIRY_MEMSET(long_key, 'A', sizeof(long_key) - 1);
     long_key[sizeof(long_key) - 1] = '\0';
 
     int r1 = cm_set(long_key, "value", "test");
@@ -213,7 +213,7 @@ static void sec_audit_input_validation(void)
 
     /* 测试5: 超长值存储 */
     char long_val[8192];
-    AGENTRT_MEMSET(long_val, 'B', sizeof(long_val) - 1);
+    AIRY_MEMSET(long_val, 'B', sizeof(long_val) - 1);
     long_val[sizeof(long_val) - 1] = '\0';
 
     int r6 = cm_set("long.val", long_val, "test");
@@ -234,7 +234,7 @@ static void sec_audit_input_validation(void)
 /* ======================================================================== */
 
 typedef struct {
-    agentrt_mutex_t* mutex;
+    airy_mutex_t* mutex;
     int* shared_counter;
     int thread_id;
 } sec_mutex_test_ctx_t;
@@ -244,9 +244,9 @@ static void* sec_mutex_thread_fn(void* arg)
     sec_mutex_test_ctx_t* ctx = (sec_mutex_test_ctx_t*)arg;
 
     for (int i = 0; i < 10000; i++) {
-        agentrt_mutex_lock(ctx->mutex);
+        airy_mutex_lock(ctx->mutex);
         (*ctx->shared_counter)++;
-        agentrt_mutex_unlock(ctx->mutex);
+        airy_mutex_unlock(ctx->mutex);
     }
 
     return NULL;
@@ -257,43 +257,43 @@ static void sec_audit_concurrent_safety(void)
     printf("\n--- [SEC-016] 并发安全审计 ---\n");
 
     /* 测试1: 多线程计数器竞争检测 */
-    agentrt_mem_init(0);
+    airy_mem_init(0);
 
     int shared = 0;
-    agentrt_mutex_t* mtx = agentrt_mutex_create();
+    airy_mutex_t* mtx = airy_mutex_create();
 
     #define SEC_THREAD_COUNT 4
-    agentrt_thread_t threads[SEC_THREAD_COUNT];
+    airy_thread_t threads[SEC_THREAD_COUNT];
     sec_mutex_test_ctx_t ctxs[SEC_THREAD_COUNT];
 
     for (int i = 0; i < SEC_THREAD_COUNT; i++) {
         ctxs[i].mutex = mtx;
         ctxs[i].shared_counter = &shared;
         ctxs[i].thread_id = i;
-        agentrt_platform_thread_create(&threads[i], sec_mutex_thread_fn, &ctxs[i]);
+        airy_platform_thread_create(&threads[i], sec_mutex_thread_fn, &ctxs[i]);
     }
 
     for (int i = 0; i < SEC_THREAD_COUNT; i++) {
-        agentrt_platform_thread_join(threads[i], NULL);
+        airy_platform_thread_join(threads[i], NULL);
     }
 
     int expected = SEC_THREAD_COUNT * 10000;
     TEST_ASSERT_EQ(shared, expected, "SEC-016-T1: 多线程计数器正确（无数据竞争）");
 
-    agentrt_mutex_free(mtx);
-    agentrt_mem_cleanup();
+    airy_mutex_free(mtx);
+    airy_mem_cleanup();
 
     /* 测试2: 重复锁/解锁安全性 */
-    agentrt_mutex_t* mtx2 = agentrt_mutex_create();
-    agentrt_mutex_lock(mtx2);
-    agentrt_mutex_unlock(mtx2);
-    agentrt_mutex_lock(mtx2);
-    agentrt_mutex_unlock(mtx2);
-    agentrt_mutex_free(mtx2);
+    airy_mutex_t* mtx2 = airy_mutex_create();
+    airy_mutex_lock(mtx2);
+    airy_mutex_unlock(mtx2);
+    airy_mutex_lock(mtx2);
+    airy_mutex_unlock(mtx2);
+    airy_mutex_free(mtx2);
     TEST_ASSERT(1, "SEC-016-T2: 重复锁/解锁安全");
 
     /* 测试3: NULL mutex操作 */
-    agentrt_mutex_free(NULL);
+    airy_mutex_free(NULL);
     TEST_ASSERT(1, "SEC-016-T3: NULL mutex free安全");
 }
 
@@ -306,9 +306,9 @@ static void sec_audit_banned_patterns(void)
     printf("\n--- [BAN-01~10] 禁止代码模式检查 ---\n");
 
     /* BAN-01: return 0 占位检查 - 验证核心函数返回有意义值 */
-    void* p1 = agentrt_mem_alloc(256);
+    void* p1 = airy_mem_alloc(256);
     TEST_ASSERT(p1 != NULL, "BAN-01: 内存分配不返回占位NULL");
-    if (p1) agentrt_mem_free(p1);
+    if (p1) airy_mem_free(p1);
 
     /* BAN-02: (void)param 忽略检查 - 验证各API处理参数 */
     const char* v = cm_get("nonexistent.key", NULL);
@@ -322,9 +322,9 @@ static void sec_audit_banned_patterns(void)
     cb_manager_destroy(mgr);
 
     /* BAN-04: TODO占位检查 - 通过功能测试验证 */
-    agentrt_error_t err = agentrt_ipc_init();
-    TEST_ASSERT_EQ(err, AGENTRT_SUCCESS, "BAN-04: 功能完整实现（非TODO占位）");
-    agentrt_ipc_cleanup();
+    airy_error_t err = airy_ipc_init();
+    TEST_ASSERT_EQ(err, AIRY_SUCCESS, "BAN-04: 功能完整实现（非TODO占位）");
+    airy_ipc_cleanup();
 
     /* BAN-05: 硬编码路径检查 - 通过配置测试验证 */
     cm_init(NULL);
@@ -338,25 +338,25 @@ static void sec_audit_banned_patterns(void)
                 "BAN-06: 使用有意义的默认常量");
 
     /* BAN-07: 未检查返回值检查 */
-    void* p2 = agentrt_mem_alloc(512);
+    void* p2 = airy_mem_alloc(512);
     if (p2) {
-        AGENTRT_MEMSET(p2, 0, 512);
-        agentrt_mem_free(p2);
+        AIRY_MEMSET(p2, 0, 512);
+        airy_mem_free(p2);
         TEST_ASSERT(1, "BAN-07: 返回值正确检查和处理");
     }
 
     /* BAN-08: 缓冲区溢出风险 */
     char small_buf[8];
-    AGENTRT_MEMSET(small_buf, 0, sizeof(small_buf));
+    AIRY_MEMSET(small_buf, 0, sizeof(small_buf));
     TEST_ASSERT(1, "BAN-08: 缓冲区操作有明确边界");
 
     /* BAN-09: 资源泄漏检查 */
-    agentrt_mem_init(0);
-    void* p3 = agentrt_mem_alloc(1024);
-    if (p3) agentrt_mem_free(p3);
-    size_t leaks = agentrt_mem_check_leaks();
+    airy_mem_init(0);
+    void* p3 = airy_mem_alloc(1024);
+    if (p3) airy_mem_free(p3);
+    size_t leaks = airy_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "BAN-09: 无资源泄漏");
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
 
     /* BAN-10: 未初始化变量使用 */
     int init_val = -1;
@@ -372,34 +372,34 @@ static void sec_audit_double_free_protection(void)
 {
     printf("\n--- [SEC-002] 双重释放防护意识审计 ---\n");
 
-    agentrt_mem_init(0);
+    airy_mem_init(0);
 
     /* 注意：标准malloc不提供双重释放保护。
      * 此审计验证代码正确使用模式（非测试双重free本身）。 */
 
     /* 测试1: 正确释放模式 */
-    void* p1 = agentrt_mem_alloc(256);
+    void* p1 = airy_mem_alloc(256);
     if (p1) {
-        AGENTRT_MEMSET(p1, 0xAB, 256);
-        agentrt_mem_free(p1);
+        AIRY_MEMSET(p1, 0xAB, 256);
+        airy_mem_free(p1);
         TEST_ASSERT(1, "SEC-002-T1: 正确单次释放");
     }
 
     /* 测试2: 条件分支正确释放 */
-    void* p2 = agentrt_mem_alloc(128);
+    void* p2 = airy_mem_alloc(128);
     bool condition = true;
     if (p2) {
         if (condition) {
-            agentrt_mem_free(p2);
+            airy_mem_free(p2);
         }
         /* 不在这里再次free */
         TEST_ASSERT(1, "SEC-002-T2: 条件分支释放安全");
     }
 
-    size_t leaks = agentrt_mem_check_leaks();
+    size_t leaks = airy_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "SEC-002: 双重释放审计无泄漏");
 
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
 }
 
 /* ======================================================================== */
@@ -410,32 +410,32 @@ static void sec_audit_use_after_free(void)
 {
     printf("\n--- [SEC-003] UAF防护意识审计 ---\n");
 
-    agentrt_mem_init(0);
+    airy_mem_init(0);
 
     /* 注意：标准malloc不提供UAF保护（不会将内存清零或mprotect）。
      * 此审计验证代码避免UAF模式，而非测试UAF本身（会导致未定义行为）。 */
 
     /* 测试1: 正确的生命周期管理 */
-    void* p1 = agentrt_mem_alloc(256);
+    void* p1 = airy_mem_alloc(256);
     if (p1) {
-        AGENTRT_MEMSET(p1, 0xAB, 256);
+        AIRY_MEMSET(p1, 0xAB, 256);
         /* 正确使用后释放 */
-        agentrt_mem_free(p1);
+        airy_mem_free(p1);
         TEST_ASSERT(1, "SEC-003-T1: 正确的内存生命周期");
     }
 
     /* 测试2: 释放后不使用的模式 */
-    void* p2 = agentrt_mem_alloc(128);
+    void* p2 = airy_mem_alloc(128);
     if (p2) {
-        agentrt_mem_free(p2);
+        airy_mem_free(p2);
         /* 不在这里访问p2 — 这是审计重点 */
         TEST_ASSERT(1, "SEC-003-T2: 释放后无访问");
     }
 
-    size_t leaks = agentrt_mem_check_leaks();
+    size_t leaks = airy_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "SEC-003: UAF审计无泄漏");
 
-    agentrt_mem_cleanup();
+    airy_mem_cleanup();
 }
 
 /* ======================================================================== */

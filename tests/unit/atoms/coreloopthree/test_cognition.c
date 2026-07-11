@@ -18,11 +18,11 @@
  * @brief 测试认知引擎创建和销�?
  */
 static void test_cognition_create_destroy() {
-    agentrt_cognition_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
+    airy_cognition_engine_t* engine = NULL;
+    airy_error_t err = airy_cognition_create_take(NULL, NULL, NULL, &engine);
     printf("test_cognition_create_destroy: %d\n", err);
-    if (err == AGENTRT_SUCCESS) {
-        agentrt_cognition_destroy(engine);
+    if (err == AIRY_SUCCESS) {
+        airy_cognition_destroy(engine);
     }
 }
 
@@ -30,87 +30,87 @@ static void test_cognition_create_destroy() {
  * @brief 测试认知引擎处理输入
  */
 static void test_cognition_process() {
-    agentrt_cognition_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_cognition_engine_t* engine = NULL;
+    airy_error_t err = airy_cognition_create_take(NULL, NULL, NULL, &engine);
+    if (err != AIRY_SUCCESS) {
     // From data intelligence emerges. by spharx
         printf("test_cognition_process: Failed to create engine\n");
         return;
     }
 
     const char* input = "帮我分析最近的销售数据";
-    agentrt_task_plan_t* plan = NULL;
-    err = agentrt_cognition_process(engine, input, strlen(input), &plan);
+    airy_task_plan_t* plan = NULL;
+    err = airy_cognition_process(engine, input, strlen(input), &plan);
     printf("test_cognition_process: %d\n", err);
 
     if (plan) {
-        agentrt_task_plan_free(plan);
+        airy_task_plan_free(plan);
     }
 
-    agentrt_cognition_destroy(engine);
+    airy_cognition_destroy(engine);
 }
 
 /**
  * @brief 测试认知引擎设置上下�?
  */
 static void test_cognition_set_context() {
-    agentrt_cognition_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_cognition_engine_t* engine = NULL;
+    airy_error_t err = airy_cognition_create_take(NULL, NULL, NULL, &engine);
+    if (err != AIRY_SUCCESS) {
         printf("test_cognition_set_context: Failed to create engine\n");
         return;
     }
 
     int context_data = 42;
-    agentrt_cognition_set_context_take(engine, &context_data, NULL);
+    airy_cognition_set_context_take(engine, &context_data, NULL);
     printf("test_cognition_set_context: Success\n");
 
-    agentrt_cognition_destroy(engine);
+    airy_cognition_destroy(engine);
 }
 
 /**
  * @brief 测试认知引擎获取统计信息
  */
 static void test_cognition_stats() {
-    agentrt_cognition_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_cognition_engine_t* engine = NULL;
+    airy_error_t err = airy_cognition_create_take(NULL, NULL, NULL, &engine);
+    if (err != AIRY_SUCCESS) {
         printf("test_cognition_stats: Failed to create engine\n");
         return;
     }
 
     char* stats = NULL;
     size_t len = 0;
-    err = agentrt_cognition_stats(engine, &stats, &len);
+    err = airy_cognition_stats(engine, &stats, &len);
     printf("test_cognition_stats: %d\n", err);
-    if (err == AGENTRT_SUCCESS && stats) {
+    if (err == AIRY_SUCCESS && stats) {
         printf("Stats: %s\n", stats);
-        AGENTRT_FREE(stats);
+        AIRY_FREE(stats);
     }
 
-    agentrt_cognition_destroy(engine);
+    airy_cognition_destroy(engine);
 }
 
 /**
  * @brief 测试认知引擎健康检�?
  */
 static void test_cognition_health_check() {
-    agentrt_cognition_engine_t* engine = NULL;
-    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
-    if (err != AGENTRT_SUCCESS) {
+    airy_cognition_engine_t* engine = NULL;
+    airy_error_t err = airy_cognition_create_take(NULL, NULL, NULL, &engine);
+    if (err != AIRY_SUCCESS) {
         printf("test_cognition_health_check: Failed to create engine\n");
         return;
     }
 
     char* health = NULL;
-    err = agentrt_cognition_health_check(engine, &health);
+    err = airy_cognition_health_check(engine, &health);
     printf("test_cognition_health_check: %d\n", err);
-    if (err == AGENTRT_SUCCESS && health) {
+    if (err == AIRY_SUCCESS && health) {
         printf("Health: %s\n", health);
-        AGENTRT_FREE(health);
+        AIRY_FREE(health);
     }
 
-    agentrt_cognition_destroy(engine);
+    airy_cognition_destroy(engine);
 }
 
 int main() {

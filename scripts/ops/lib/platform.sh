@@ -83,7 +83,7 @@ _is_windows() {
 ###############################################################################
 # 公共API：获取平台
 ###############################################################################
-agentrt_platform_detect() {
+airy_platform_detect() {
     if [[ $_AGENTRT_PLATFORM_DETECTED -eq 1 ]]; then
         echo "$_AGENTRT_PLATFORM"
         return
@@ -105,38 +105,38 @@ agentrt_platform_detect() {
     echo "$_AGENTRT_PLATFORM"
 }
 
-agentrt_platform_is_linux() {
+airy_platform_is_linux() {
     local platform
-    platform=$(agentrt_platform_detect)
+    platform=$(airy_platform_detect)
     [[ "$platform" == "$PLATFORM_LINUX" ]] || [[ "$platform" == "$PLATFORM_WSL" ]]
 }
 
-agentrt_platform_is_macos() {
+airy_platform_is_macos() {
     local platform
-    platform=$(agentrt_platform_detect)
+    platform=$(airy_platform_detect)
     [[ "$platform" == "$PLATFORM_MACOS" ]]
 }
 
-agentrt_platform_is_windows() {
+airy_platform_is_windows() {
     local platform
-    platform=$(agentrt_platform_detect)
+    platform=$(airy_platform_detect)
     [[ "$platform" == "$PLATFORM_WINDOWS" ]] || [[ "$platform" == "$PLATFORM_WSL" ]]
 }
 
-agentrt_platform_is_wsl() {
+airy_platform_is_wsl() {
     local platform
-    platform=$(agentrt_platform_detect)
+    platform=$(airy_platform_detect)
     [[ "$platform" == "$PLATFORM_WSL" ]]
 }
 
-agentrt_platform_is_unix() {
-    agentrt_platform_is_linux || agentrt_platform_is_macos
+airy_platform_is_unix() {
+    airy_platform_is_linux || airy_platform_is_macos
 }
 
 ###############################################################################
 # 公共API：获取架构
 ###############################################################################
-agentrt_arch_detect() {
+airy_arch_detect() {
     if [[ -n "$_AGENTRT_ARCH" ]]; then
         echo "$_AGENTRT_ARCH"
         return
@@ -166,20 +166,20 @@ agentrt_arch_detect() {
     echo "$_AGENTRT_ARCH"
 }
 
-agentrt_arch_is_x86_64() {
-    [[ "$(agentrt_arch_detect)" == "$ARCH_X86_64" ]]
+airy_arch_is_x86_64() {
+    [[ "$(airy_arch_detect)" == "$ARCH_X86_64" ]]
 }
 
-agentrt_arch_is_arm64() {
+airy_arch_is_arm64() {
     local arch
-    arch=$(agentrt_arch_detect)
+    arch=$(airy_arch_detect)
     [[ "$arch" == "$ARCH_ARM64" ]] || [[ "$arch" == "$ARCH_AARCH64" ]]
 }
 
 ###############################################################################
 # 公共API：获取Linux发行版信息
 ###############################################################################
-agentrt_linux_distro_detect() {
+airy_linux_distro_detect() {
     if [[ -n "$_AGENTRT_DISTRO" ]]; then
         echo "$_AGENTRT_DISTRO"
         return
@@ -199,9 +199,9 @@ agentrt_linux_distro_detect() {
     echo "$_AGENTRT_DISTRO"
 }
 
-agentrt_linux_distro_version() {
+airy_linux_distro_version() {
     if [[ -z "$_AGENTRT_DISTRO_VERSION" ]]; then
-        agentrt_linux_distro_detect > /dev/null
+        airy_linux_distro_detect > /dev/null
     fi
     echo "$_AGENTRT_DISTRO_VERSION"
 }
@@ -209,7 +209,7 @@ agentrt_linux_distro_version() {
 ###############################################################################
 # 公共API：检测包管理器
 ###############################################################################
-agentrt_package_manager_detect() {
+airy_package_manager_detect() {
     if command -v apt-get &> /dev/null; then
         echo "apt"
     elif command -v yum &> /dev/null; then
@@ -230,16 +230,16 @@ agentrt_package_manager_detect() {
 ###############################################################################
 # 公共API：检测必需命令
 ###############################################################################
-agentrt_check_command() {
+airy_check_command() {
     local cmd="$1"
     if ! command -v "$cmd" &> /dev/null; then
-        agentrt_log_error "Required command not found: $cmd"
+        airy_log_error "Required command not found: $cmd"
         return 1
     fi
     return 0
 }
 
-agentrt_check_commands() {
+airy_check_commands() {
     local missing=()
     local cmd
     for cmd in "$@"; do
@@ -249,7 +249,7 @@ agentrt_check_commands() {
     done
 
     if [[ ${#missing[@]} -gt 0 ]]; then
-        agentrt_log_error "Missing required commands: ${missing[*]}"
+        airy_log_error "Missing required commands: ${missing[*]}"
         return 1
     fi
     return 0
@@ -258,13 +258,13 @@ agentrt_check_commands() {
 ###############################################################################
 # 公共API：获取系统信息
 ###############################################################################
-agentrt_system_info() {
+airy_system_info() {
     local info=""
-    info+="Platform: $(agentrt_platform_detect)\n"
-    info+="Architecture: $(agentrt_arch_detect)\n"
+    info+="Platform: $(airy_platform_detect)\n"
+    info+="Architecture: $(airy_arch_detect)\n"
 
-    if agentrt_platform_is_linux; then
-        info+="Distribution: $(agentrt_linux_distro_detect) $(agentrt_linux_distro_version)\n"
+    if airy_platform_is_linux; then
+        info+="Distribution: $(airy_linux_distro_detect) $(airy_linux_distro_version)\n"
     fi
 
     if command -v cmake &> /dev/null; then
@@ -285,7 +285,7 @@ agentrt_system_info() {
 ###############################################################################
 # 公共API：CPU核心数
 ###############################################################################
-agentrt_cpu_count() {
+airy_cpu_count() {
     if [[ "$(uname)" == "Darwin" ]]; then
         sysctl -n hw.ncpu 2>/dev/null || echo "1"
     else
@@ -296,7 +296,7 @@ agentrt_cpu_count() {
 ###############################################################################
 # 公共API：内存信息
 ###############################################################################
-agentrt_total_memory() {
+airy_total_memory() {
     if [[ "$(uname)" == "Darwin" ]]; then
         sysctl -n hw.memsize 2>/dev/null | awk '{printf "%.0f GB", $1/1024/1024/1024}'
     else
@@ -307,9 +307,9 @@ agentrt_total_memory() {
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f agentrt_platform_detect agentrt_platform_is_linux agentrt_platform_is_macos
-export -f agentrt_platform_is_windows agentrt_platform_is_wsl agentrt_platform_is_unix
-export -f agentrt_arch_detect agentrt_arch_is_x86_64 agentrt_arch_is_arm64
-export -f agentrt_linux_distro_detect agentrt_linux_distro_version
-export -f agentrt_package_manager_detect agentrt_check_command agentrt_check_commands
-export -f agentrt_system_info agentrt_cpu_count agentrt_total_memory
+export -f airy_platform_detect airy_platform_is_linux airy_platform_is_macos
+export -f airy_platform_is_windows airy_platform_is_wsl airy_platform_is_unix
+export -f airy_arch_detect airy_arch_is_x86_64 airy_arch_is_arm64
+export -f airy_linux_distro_detect airy_linux_distro_version
+export -f airy_package_manager_detect airy_check_command airy_check_commands
+export -f airy_system_info airy_cpu_count airy_total_memory

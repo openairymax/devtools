@@ -64,10 +64,10 @@ def add_missing_braces(filepath):
             if_indent = if_match.group(1)
             body_indent = if_indent + '    '
             
-            # Check if next two lines are agentrt_error_push_ex + return at deeper indent
+            # Check if next two lines are airy_error_push_ex + return at deeper indent
             # but there's no opening brace
             next_line = lines[i + 1]
-            next_indent_match = re.match(r'^(\s*)agentrt_error_push_ex\(', next_line)
+            next_indent_match = re.match(r'^(\s*)airy_error_push_ex\(', next_line)
             
             if next_indent_match:
                 next_indent = next_indent_match.group(1)

@@ -436,7 +436,7 @@ class ProtocolTestSuite:
 
         is_prometheus = False
         if isinstance(body_text, str):
-            is_prometheus = "# TYPE" in body_text or "agentrt_" in body_text
+            is_prometheus = "# TYPE" in body_text or "airy_" in body_text
         elif isinstance(body_text, dict):
             is_prometheus = False
 

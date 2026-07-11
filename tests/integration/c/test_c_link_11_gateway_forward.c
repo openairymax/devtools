@@ -23,7 +23,7 @@
 
 #include "memory_compat.h"
 #include "gateway_forward.h"
-#include "agentrt_types.h"
+#include "airy_types.h"
 
 /* ============================================================================
  * Test Helpers

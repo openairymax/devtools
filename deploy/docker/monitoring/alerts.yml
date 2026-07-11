@@ -22,7 +22,7 @@ groups:
       
       # 健康检查失败
       - alert: HealthCheckFailed
-        expr: agentrt_health_status != 1
+        expr: airy_health_status != 1
         for: 2m
         labels:
           severity: warning
@@ -89,7 +89,7 @@ groups:
     rules:
       # 会话数过多
       - alert: TooManySessions
-        expr: agentrt_session_count > 10000
+        expr: airy_session_count > 10000
         for: 5m
         labels:
           severity: warning
@@ -100,7 +100,7 @@ groups:
       
       # 会话创建失败率高
       - alert: SessionCreationFailure
-        expr: rate(agentrt_session_creation_failed_total[5m]) > 10
+        expr: rate(airy_session_creation_failed_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -111,7 +111,7 @@ groups:
       
       # 会话清理过慢
       - alert: SessionCleanupSlow
-        expr: rate(agentrt_session_cleanup_total[5m]) < 1 and agentrt_session_count > 1000
+        expr: rate(airy_session_cleanup_total[5m]) < 1 and airy_session_count > 1000
         for: 10m
         labels:
           severity: info
@@ -128,7 +128,7 @@ groups:
     rules:
       # 连接池耗尽
       - alert: ConnectionPoolExhausted
-        expr: agentrt_connection_pool_available == 0
+        expr: airy_connection_pool_available == 0
         for: 2m
         labels:
           severity: critical
@@ -139,7 +139,7 @@ groups:
       
       # WebSocket 连接数过多
       - alert: TooManyWebSocketConnections
-        expr: agentrt_websocket_connections > 5000
+        expr: airy_websocket_connections > 5000
         for: 5m
         labels:
           severity: warning
@@ -150,7 +150,7 @@ groups:
       
       # 连接失败率高
       - alert: HighConnectionFailureRate
-        expr: rate(agentrt_connection_failed_total[5m]) / rate(agentrt_connection_total[5m]) > 0.1
+        expr: rate(airy_connection_failed_total[5m]) / rate(airy_connection_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -167,7 +167,7 @@ groups:
     rules:
       # 认证失败率高
       - alert: HighAuthenticationFailure
-        expr: rate(agentrt_auth_failed_total[5m]) > 100
+        expr: rate(airy_auth_failed_total[5m]) > 100
         for: 5m
         labels:
           severity: warning
@@ -178,7 +178,7 @@ groups:
       
       # 限流触发过多
       - alert: RateLimitTriggered
-        expr: rate(agentrt_ratelimit_triggered_total[5m]) > 50
+        expr: rate(airy_ratelimit_triggered_total[5m]) > 50
         for: 5m
         labels:
           severity: info
@@ -189,7 +189,7 @@ groups:
       
       # JWT 令牌过期过多
       - alert: JWTTokenExpired
-        expr: rate(agentrt_jwt_expired_total[5m]) > 100
+        expr: rate(airy_jwt_expired_total[5m]) > 100
         for: 10m
         labels:
           severity: info
@@ -206,7 +206,7 @@ groups:
     rules:
       # HTTP 网关错误
       - alert: HTTPGatewayError
-        expr: rate(agentrt_http_gateway_errors_total[5m]) > 10
+        expr: rate(airy_http_gateway_errors_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -217,7 +217,7 @@ groups:
       
       # WebSocket 网关错误
       - alert: WebSocketGatewayError
-        expr: rate(agentrt_websocket_gateway_errors_total[5m]) > 10
+        expr: rate(airy_websocket_gateway_errors_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -228,7 +228,7 @@ groups:
       
       # 请求大小超限
       - alert: RequestSizeExceeded
-        expr: rate(agentrt_request_size_exceeded_total[5m]) > 5
+        expr: rate(airy_request_size_exceeded_total[5m]) > 5
         for: 5m
         labels:
           severity: warning
@@ -245,7 +245,7 @@ groups:
     rules:
       # Redis 连接失败
       - alert: RedisConnectionFailed
-        expr: agentrt_redis_connection_status != 1
+        expr: airy_redis_connection_status != 1
         for: 2m
         labels:
           severity: critical
@@ -256,7 +256,7 @@ groups:
       
       # Redis 延迟过高
       - alert: RedisHighLatency
-        expr: histogram_quantile(0.95, rate(agentrt_redis_command_duration_seconds_bucket[5m])) > 0.1
+        expr: histogram_quantile(0.95, rate(airy_redis_command_duration_seconds_bucket[5m])) > 0.1
         for: 5m
         labels:
           severity: warning

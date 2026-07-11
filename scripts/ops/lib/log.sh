@@ -76,95 +76,95 @@ _agentrt_log_write() {
 ###############################################################################
 # 公共API：日志函数
 ###############################################################################
-agentrt_log_debug() {
+airy_log_debug() {
     if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]]; then
         _agentrt_log_write $LOG_LEVEL_DEBUG "$1"
     fi
 }
 
-agentrt_log_info() {
+airy_log_info() {
     if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_INFO ]]; then
         _agentrt_log_write $LOG_LEVEL_INFO "$1"
     fi
 }
 
-agentrt_log_warn() {
+airy_log_warn() {
     ((_AGENTRT_SCRIPT_WARNINGS++))
     if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_WARN ]]; then
         _agentrt_log_write $LOG_LEVEL_WARN "$1"
     fi
 }
 
-agentrt_log_error() {
+airy_log_error() {
     ((_AGENTRT_SCRIPT_ERRORS++))
     if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_ERROR ]]; then
         _agentrt_log_write $LOG_LEVEL_ERROR "$1"
     fi
 }
 
-agentrt_log_fatal() {
+airy_log_fatal() {
     ((_AGENTRT_SCRIPT_ERRORS++))
     _agentrt_log_write $LOG_LEVEL_FATAL "$1"
-    agentrt_exit 1
+    airy_exit 1
 }
 
 ###############################################################################
 # 公共API：设置日志级别
 ###############################################################################
-agentrt_log_set_level() {
+airy_log_set_level() {
     case "$1" in
         debug|DEBUG) _AGENTRT_LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
         info|INFO)   _AGENTRT_LOG_LEVEL=$LOG_LEVEL_INFO ;;
         warn|WARN)  _AGENTRT_LOG_LEVEL=$LOG_LEVEL_WARN ;;
         error|ERROR) _AGENTRT_LOG_LEVEL=$LOG_LEVEL_ERROR ;;
-        *)          agentrt_log_warn "Unknown log level: $1, using INFO"; _AGENTRT_LOG_LEVEL=$LOG_LEVEL_INFO ;;
+        *)          airy_log_warn "Unknown log level: $1, using INFO"; _AGENTRT_LOG_LEVEL=$LOG_LEVEL_INFO ;;
     esac
 }
 
 ###############################################################################
 # 公共API：设置日志文件
 ###############################################################################
-agentrt_log_set_file() {
+airy_log_set_file() {
     _AGENTRT_LOG_FILE="$1"
 }
 
 ###############################################################################
 # 公共API：打印消息（不带日志级别前缀）
 ###############################################################################
-agentrt_echo() {
+airy_echo() {
     echo -e "$1"
 }
 
-agentrt_echo_info() {
+airy_echo_info() {
     echo -e "${COLOR_BLUE}[INFO]${COLOR_NC} $1"
 }
 
-agentrt_echo_success() {
+airy_echo_success() {
     echo -e "${COLOR_GREEN}[SUCCESS]${COLOR_NC} $1"
 }
 
-agentrt_echo_warning() {
+airy_echo_warning() {
     echo -e "${COLOR_YELLOW}[WARNING]${COLOR_NC} $1"
 }
 
-agentrt_echo_error() {
+airy_echo_error() {
     echo -e "${COLOR_RED}[ERROR]${COLOR_NC} $1"
 }
 
 ###############################################################################
 # 公共API：错误处理
 ###############################################################################
-agentrt_die() {
-    agentrt_log_fatal "$1"
+airy_die() {
+    airy_log_fatal "$1"
     exit "${2:-1}"
 }
 
-agentrt_exit() {
+airy_exit() {
     local exit_code=$1
     if [[ $exit_code -eq 0 ]]; then
-        agentrt_log_info "Script $_AGENTRT_SCRIPT_NAME completed successfully"
+        airy_log_info "Script $_AGENTRT_SCRIPT_NAME completed successfully"
     else
-        agentrt_log_error "Script $_AGENTRT_SCRIPT_NAME failed with exit code $exit_code"
+        airy_log_error "Script $_AGENTRT_SCRIPT_NAME failed with exit code $exit_code"
     fi
     exit $exit_code
 }
@@ -172,76 +172,76 @@ agentrt_exit() {
 ###############################################################################
 # 公共API：错误统计获取
 ###############################################################################
-agentrt_get_error_count() {
+airy_get_error_count() {
     echo $_AGENTRT_SCRIPT_ERRORS
 }
 
-agentrt_get_warning_count() {
+airy_get_warning_count() {
     echo $_AGENTRT_SCRIPT_WARNINGS
 }
 
 ###############################################################################
 # 公共API：断言函数
 ###############################################################################
-agentrt_assert() {
+airy_assert() {
     local condition="$1"
     local message="${2:-Assertion failed}"
     if ! eval "$condition"; then
-        agentrt_log_fatal "$message (condition: $condition)"
+        airy_log_fatal "$message (condition: $condition)"
     fi
 }
 
-agentrt_assert_not_empty() {
+airy_assert_not_empty() {
     local value="$1"
     local name="${2:-value}"
     if [[ -z "$value" ]]; then
-        agentrt_log_fatal "Assert failed: $name must not be empty"
+        airy_log_fatal "Assert failed: $name must not be empty"
     fi
 }
 
-agentrt_assert_file_exists() {
+airy_assert_file_exists() {
     local file="$1"
     local name="${2:-file}"
     if [[ ! -f "$file" ]]; then
-        agentrt_log_fatal "Assert failed: $name does not exist: $file"
+        airy_log_fatal "Assert failed: $name does not exist: $file"
     fi
 }
 
-agentrt_assert_dir_exists() {
+airy_assert_dir_exists() {
     local dir="$1"
     local name="${2:-directory}"
     if [[ ! -d "$dir" ]]; then
-        agentrt_log_fatal "Assert failed: $name does not exist: $dir"
+        airy_log_fatal "Assert failed: $name does not exist: $dir"
     fi
 }
 
-agentrt_assert_command_exists() {
+airy_assert_command_exists() {
     local cmd="$1"
     if ! command -v "$cmd" &> /dev/null; then
-        agentrt_log_fatal "Assert failed: required command not found: $cmd"
+        airy_log_fatal "Assert failed: required command not found: $cmd"
     fi
 }
 
 ###############################################################################
 # 公共API：追踪ID
 ###############################################################################
-agentrt_get_trace_id() {
+airy_get_trace_id() {
     echo "$_AGENTRT_TRACE_ID"
 }
 
-agentrt_set_trace_id() {
+airy_set_trace_id() {
     _AGENTRT_TRACE_ID="$1"
 }
 
 ###############################################################################
 # 公共API：进度显示
 ###############################################################################
-agentrt_progress_start() {
+airy_progress_start() {
     local message="$1"
     echo -ne "${COLOR_BLUE}[......]${COLOR_NC} $message"
 }
 
-agentrt_progress_update() {
+airy_progress_update() {
     local step="$1"
     echo -ne "\b\b\b\b\b\b"
     case "$step" in
@@ -254,7 +254,7 @@ agentrt_progress_update() {
     esac
 }
 
-agentrt_progress_done() {
+airy_progress_done() {
     local message="$1"
     local status="${2:-SUCCESS}"
     echo -ne "\b\b\b\b\b\b"
@@ -269,11 +269,11 @@ agentrt_progress_done() {
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f agentrt_log_debug agentrt_log_info agentrt_log_warn agentrt_log_error agentrt_log_fatal
-export -f agentrt_log_set_level agentrt_log_set_file
-export -f agentrt_echo agentrt_echo_info agentrt_echo_success agentrt_echo_warning agentrt_echo_error
-export -f agentrt_die agentrt_exit
-export -f agentrt_get_error_count agentrt_get_warning_count
-export -f agentrt_assert agentrt_assert_not_empty agentrt_assert_file_exists agentrt_assert_dir_exists agentrt_assert_command_exists
-export -f agentrt_get_trace_id agentrt_set_trace_id
-export -f agentrt_progress_start agentrt_progress_update agentrt_progress_done
+export -f airy_log_debug airy_log_info airy_log_warn airy_log_error airy_log_fatal
+export -f airy_log_set_level airy_log_set_file
+export -f airy_echo airy_echo_info airy_echo_success airy_echo_warning airy_echo_error
+export -f airy_die airy_exit
+export -f airy_get_error_count airy_get_warning_count
+export -f airy_assert airy_assert_not_empty airy_assert_file_exists airy_assert_dir_exists airy_assert_command_exists
+export -f airy_get_trace_id airy_set_trace_id
+export -f airy_progress_start airy_progress_update airy_progress_done

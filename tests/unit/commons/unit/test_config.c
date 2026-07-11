@@ -23,8 +23,8 @@
 static int passed_tests = 0, failed_tests = 0;
 
 static int test_config_load(void) {
-    agentrt_config_t* manager = agentrt_config_load("test_config.json");
-    if (manager) agentrt_config_free(manager);
+    airy_config_t* manager = airy_config_load("test_config.json");
+    if (manager) airy_config_free(manager);
     printf("  manager load: OK\n");
     return 0;
 }

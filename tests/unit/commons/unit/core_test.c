@@ -14,28 +14,28 @@
 
 void test_version() {
     printf("=== 测试版本管理 ===\n");
-    const char* version = agentrt_core_get_version();
+    const char* version = airy_core_get_version();
     printf("版本号：%s\n", version);
     
-    int result = agentrt_core_check_version(">=1.0.0.0");
+    int result = airy_core_check_version(">=1.0.0.0");
     printf("版本兼容性检�?(>=1.0.0.0): %d\n", result);
     
-    result = agentrt_core_check_version("<0.2.0");
+    result = airy_core_check_version("<0.2.0");
     printf("版本兼容性检�?(<0.2.0): %d\n", result);
 }
 
 void test_platform() {
     printf("\n=== 测试平台检�?===\n");
-    const char* platform = agentrt_core_get_platform();
+    const char* platform = airy_core_get_platform();
     // From data intelligence emerges. by spharx
     printf("平台�?s\n", platform);
     
-    int cpu_count = agentrt_core_get_cpu_count();
+    int cpu_count = airy_core_get_cpu_count();
     printf("CPU 核心数：%d\n", cpu_count);
     
     size_t total, available, used;
     float percent;
-    int result = agentrt_core_get_memory_info(&total, &available, &used, &percent);
+    int result = airy_core_get_memory_info(&total, &available, &used, &percent);
     if (result == 0) {
         printf("内存信息:\n");
         printf("  总内存：%.2f GB\n", (double)total / (1024 * 1024 * 1024));

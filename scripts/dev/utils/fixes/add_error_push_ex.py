@@ -43,7 +43,7 @@ context_hints = {
     'openai_enterprise_adapter.c': 'openai',
     'china_eco_adapter.c': 'china_eco',
     'protocol_transformers.c': 'transformers',
-    'agentrt_protocol_interface.c': 'protocol_interface',
+    'airy_protocol_interface.c': 'protocol_interface',
     'agntcy_acp_adapter.c': 'agntcy_acp',
     'mcp_transport.c': 'mcp_transport',
     'protocol_registry.c': 'protocol_registry',
@@ -84,7 +84,7 @@ def process_file(filepath):
                 continue
 
             desc = error_descriptions.get(err_code, 'error')
-            error_push_line = f'{indent}agentrt_error_push_ex({err_code}, __FILE__, __LINE__, __func__, "{ctx}: {desc}");\n'
+            error_push_line = f'{indent}airy_error_push_ex({err_code}, __FILE__, __LINE__, __func__, "{ctx}: {desc}");\n'
             lines.insert(i, error_push_line)
             total_added += 1
             i += 2  # Skip past the inserted line + the return line
@@ -119,7 +119,7 @@ files_to_fix = [
     'agentrt/protocols/integrations/openai/src/openai_enterprise_adapter.c',
     'agentrt/protocols/integrations/china_eco/src/china_eco_adapter.c',
     'agentrt/protocols/core/transformers/src/protocol_transformers.c',
-    'agentrt/protocols/src/agentrt_protocol_interface.c',
+    'agentrt/protocols/src/airy_protocol_interface.c',
     'agentrt/protocols/standards/agntcy/src/agntcy_acp_adapter.c',
     'agentrt/protocols/core/registry/src/protocol_registry.c',
     'agentrt/protocols/standards/mcp/src/mcp_transport.c',

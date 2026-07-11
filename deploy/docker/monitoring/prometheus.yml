@@ -39,7 +39,7 @@ scrape_configs:
     metric_relabel_configs:
       # 保留关键指标
       - source_labels: [__name__]
-        regex: 'agentrt_.*|http_.*|websocket_.*|session_.*|connection_.*'
+        regex: 'airy_.*|http_.*|websocket_.*|session_.*|connection_.*'
         action: keep
 
   # ==========================================================================

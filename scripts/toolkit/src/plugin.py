@@ -253,7 +253,7 @@ class PluginRegistry:
             # 基于文件路径哈希生成唯一模块名，确保每个插件独立命名空间
             # 微内核架构要求插件之间完全隔离，避免 sys.modules 命名冲突
             path_hash = hash(resolved_path) & 0xffffffff
-            module_name = f"agentrt_plugin_{Path(module_path).stem}_{path_hash:08x}"
+            module_name = f"airy_plugin_{Path(module_path).stem}_{path_hash:08x}"
             logger.debug("load_plugin_from_module: 生成模块名='%s' (path_hash=0x%08x)", module_name, path_hash)
 
             # 防止重复加载同一模块

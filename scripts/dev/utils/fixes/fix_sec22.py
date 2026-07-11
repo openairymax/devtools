@@ -212,8 +212,8 @@ def process_file(filepath):
             indent = indent_match.group(1) if indent_match else ''
             stripped_line = line.lstrip()
             if not stripped_line.startswith('AGENTRT_FREE'):
-                agentrt_pos = line.find('AGENTRT_FREE')
-                indent = line[:agentrt_pos]
+                airy_pos = line.find('AGENTRT_FREE')
+                indent = line[:airy_pos]
             null_line = f'{indent}{ptr_name} = NULL;\n'
             result.append(null_line)
             changes += 1

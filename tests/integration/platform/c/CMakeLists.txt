@@ -4,7 +4,7 @@
 add_compile_definitions(AGENTRT_COMPLIANCE_IMPL)
 
 if(NOT TARGET svc_common)
-    agentrt_print_warn("  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
+    airy_print_warn("  [platform] Skipping tests: svc_common not available (BUILD_DAEMON=OFF)")
     return()
 endif()
 
@@ -22,11 +22,11 @@ target_include_directories(test_platform_compat PRIVATE
 )
 
 target_link_libraries(test_platform_compat PRIVATE
-    agentrt_core
-    agentrt_syscall
+    airy_core
+    airy_syscall
     svc_common
     Threads::Threads
-    agentrt_platform_libs
+    airy_platform_libs
     m
 )
 
@@ -39,7 +39,7 @@ target_compile_options(test_platform_compat PRIVATE
     -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
 )
 
-agentrt_print_ok("  [platform] test_platform_compat: P2-C04 configured")
+airy_print_ok("  [platform] test_platform_compat: P2-C04 configured")
 
 add_executable(test_mkdir_recursive test_mkdir_recursive.c)
 
@@ -55,7 +55,7 @@ target_compile_options(test_mkdir_recursive PRIVATE
 
 target_link_libraries(test_mkdir_recursive PRIVATE
     Threads::Threads
-    agentrt_platform_libs
+    airy_platform_libs
 )
 
 add_test(
@@ -64,4 +64,4 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-agentrt_print_ok("  [platform] test_mkdir_recursive: R-09-87 configured")
+airy_print_ok("  [platform] test_mkdir_recursive: R-09-87 configured")

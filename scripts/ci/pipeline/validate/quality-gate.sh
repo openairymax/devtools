@@ -193,20 +193,23 @@ gate_cross_repo() {
 # Gate 6: 圈复杂度检查 (P0.19.6)
 # ============================================================================
 gate_complexity() {
-    section "Gate 6: Complexity Check (lizard v1.23.0)"
+    section "Gate 6: Complexity Check (P0.19.6, lizard v1.23.0)"
 
     local complexity_script="${SCRIPT_DIR}/complexity-check.sh"
     if [ -x "$complexity_script" ]; then
-        log_info "Running complexity check..."
-        if bash "$complexity_script" 2>&1 | tail -30; then
+        # CI 门禁使用增量模式：仅检查 PR 中新增/修改函数的违规
+        # 已有 FAIL 函数在 CCN_LONG_TAIL_REMEDIATION.md 长尾治理计划中跟踪，不阻塞
+        # 全量扫描由开发者手动运行: ./complexity-check.sh
+        log_info "Running incremental complexity check (CCN_BASE_REF=${CCN_BASE_REF:-HEAD})..."
+        if bash "$complexity_script" --incremental 2>&1 | tail -50; then
             check_gate "Complexity" 0
         else
             local cx_exit=$?
             if [ $cx_exit -eq 2 ]; then
-                log_warn "Complexity check: warnings found (CCN 16-25)"
+                log_warn "Complexity check: new WARN-level functions found (CCN ${CCN_PASS:-15}-${CCN_WARN:-25})"
                 check_gate "Complexity" 2
             else
-                log_err "Complexity check: failures found (CCN > 25)"
+                log_err "Complexity check: new FAIL/BLOCK-level functions found (CCN > ${CCN_WARN:-25})"
                 check_gate "Complexity" 1
             fi
         fi

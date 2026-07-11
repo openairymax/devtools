@@ -65,9 +65,9 @@ static int g_tests_failed = 0;
  * ============================================================================ */
 static int init_cupolas_framework(void)
 {
-    agentrt_error_t error = AGENTRT_OK;
+    airy_err_t error = AIRY_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTRT_OK) {
+    if (ret != AIRY_OK) {
         TEST_FAIL("cupolas_init", "initialization failed");
         return -1;
     }

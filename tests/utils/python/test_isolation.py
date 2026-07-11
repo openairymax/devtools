@@ -61,7 +61,7 @@ class TestIsolationManager:
         env_id = f"{test_name}_{uuid.uuid4().hex[:8]}"
 
         with self.lock:
-            temp_dir = Path(tempfile.mkdtemp(prefix=f"agentrt_test_{env_id}_"))
+            temp_dir = Path(tempfile.mkdtemp(prefix=f"airy_test_{env_id}_"))
             self.temp_dirs[env_id] = temp_dir
 
             original_env = {}
@@ -372,7 +372,7 @@ class DatabaseIsolator:
     """数据库隔离器"""
 
     def __init__(self, base_dir: Path = None):
-        self.base_dir = base_dir or Path(tempfile.gettempdir()) / "agentrt_test_dbs"
+        self.base_dir = base_dir or Path(tempfile.gettempdir()) / "airy_test_dbs"
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self._connections: Dict[str, sqlite3.Connection] = {}
 

@@ -38,11 +38,11 @@ static int metrics_recorded = 0;
  * @brief 创建模拟指标
  */
 static mock_metric_t* mock_metric_create(const char* name, const char* unit, metric_type_t type) {
-    mock_metric_t* m = (mock_metric_t*)AGENTRT_MALLOC(sizeof(mock_metric_t));
+    mock_metric_t* m = (mock_metric_t*)AIRY_MALLOC(sizeof(mock_metric_t));
     if (!m) return NULL;
     
-    m->name = name ? AGENTRT_STRDUP(name) : NULL;
-    m->unit = unit ? AGENTRT_STRDUP(unit) : NULL;
+    m->name = name ? AIRY_STRDUP(name) : NULL;
+    m->unit = unit ? AIRY_STRDUP(unit) : NULL;
     m->value = 0.0;
     m->type = type;
     
@@ -56,9 +56,9 @@ static mock_metric_t* mock_metric_create(const char* name, const char* unit, met
 static void mock_metric_destroy(mock_metric_t* m) {
     if (!m) return;
     
-    if (m->name) AGENTRT_FREE(m->name);
-    if (m->unit) AGENTRT_FREE(m->unit);
-    AGENTRT_FREE(m);
+    if (m->name) AIRY_FREE(m->name);
+    if (m->unit) AIRY_FREE(m->unit);
+    AIRY_FREE(m);
 }
 
 /**
@@ -88,13 +88,13 @@ static int mock_metric_record(mock_metric_t* m, double value) {
 static void test_metric_lifecycle(void** state) {
     mock_metric_t* m = mock_metric_create("test_counter", "ops", METRIC_TYPE_COUNTER);
     
-    AGENTRT_TEST_ASSERT_PTR_NOT_NULL(m);
-    AGENTRT_TEST_ASSERT_STRING_EQUAL("test_counter", m->name);
-    AGENTRT_TEST_ASSERT_STRING_EQUAL("ops", m->unit);
-    AGENTRT_TEST_ASSERT_INT_EQUAL(METRIC_TYPE_COUNTER, (int)m->type);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(0.0, m->value);
+    AIRY_TEST_ASSERT_PTR_NOT_NULL(m);
+    AIRY_TEST_ASSERT_STRING_EQUAL("test_counter", m->name);
+    AIRY_TEST_ASSERT_STRING_EQUAL("ops", m->unit);
+    AIRY_TEST_ASSERT_INT_EQUAL(METRIC_TYPE_COUNTER, (int)m->type);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(0.0, m->value);
     
-    AGENTRT_TEST_ASSERT_INT_EQ(1, metrics_created);
+    AIRY_TEST_ASSERT_INT_EQ(1, metrics_created);
     
     mock_metric_destroy(m);
 }
@@ -107,15 +107,15 @@ static void test_counter_metric(void** state) {
     
     // 记录多次值
     mock_metric_record(counter, 1.0);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(1.0, counter->value);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(1.0, counter->value);
     
     mock_metric_record(counter, 5.0);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(6.0, counter->value);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(6.0, counter->value);
     
     mock_metric_record(counter, 10.0);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(16.0, counter->value);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(16.0, counter->value);
     
-    AGENTRT_TEST_ASSERT_INT_EQ(3, metrics_recorded);
+    AIRY_TEST_ASSERT_INT_EQ(3, metrics_recorded);
     
     mock_metric_destroy(counter);
 }
@@ -128,13 +128,13 @@ static void test_gauge_metric(void** state) {
     
     // 记录值（应该覆盖）
     mock_metric_record(gauge, 10.0);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(10.0, gauge->value);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(10.0, gauge->value);
     
     mock_metric_record(gauge, 25.0);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(25.0, gauge->value);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(25.0, gauge->value);
     
     mock_metric_record(gauge, 5.0);
-    AGENTRT_TEST_ASSERT_DOUBLE_EQUAL(5.0, gauge->value);
+    AIRY_TEST_ASSERT_DOUBLE_EQUAL(5.0, gauge->value);
     
     mock_metric_destroy(gauge);
 }
@@ -153,18 +153,18 @@ static void test_multiple_metrics(void** state) {
         
         metric_type_t type = (i % 2 == 0) ? METRIC_TYPE_COUNTER : METRIC_TYPE_GAUGE;
         metrics[i] = mock_metric_create(name, "unit", type);
-        AGENTRT_TEST_ASSERT_PTR_NOT_NULL(metrics[i]);
+        AIRY_TEST_ASSERT_PTR_NOT_NULL(metrics[i]);
     }
     
-    AGENTRT_TEST_ASSERT_INT_EQ(num_metrics, metrics_created);
+    AIRY_TEST_ASSERT_INT_EQ(num_metrics, metrics_created);
     
     // 记录值
     for (int i = 0; i < num_metrics; i++) {
         int ret = mock_metric_record(metrics[i], (double)i);
-        AGENTRT_TEST_ASSERT_SUCCESS(ret);
+        AIRY_TEST_ASSERT_SUCCESS(ret);
     }
     
-    AGENTRT_TEST_ASSERT_INT_EQ(num_metrics, metrics_recorded);
+    AIRY_TEST_ASSERT_INT_EQ(num_metrics, metrics_recorded);
     
     // 清理
     for (int i = 0; i < num_metrics; i++) {
@@ -183,17 +183,17 @@ static void test_metric_metadata(void** state) {
         METRIC_TYPE_HISTOGRAM
     );
     
-    AGENTRT_TEST_ASSERT_PTR_NOT_NULL(m);
-    AGENTRT_TEST_ASSERT_STRING_EQUAL("http_requests_duration_seconds", m->name);
+    AIRY_TEST_ASSERT_PTR_NOT_NULL(m);
+    AIRY_TEST_ASSERT_STRING_EQUAL("http_requests_duration_seconds", m->name);
     
     // 验证元数据完整性
     bool has_name = (m->name != NULL && strlen(m->name) > 0);
     bool has_unit = (m->unit != NULL && strlen(m->unit) > 0);
     bool valid_type = (m->type >= METRIC_TYPE_COUNTER && m->type <= METRIC_TYPE_HISTOGRAM);
     
-    AGENTRT_TEST_ASSERT_TRUE(has_name);
-    AGENTRT_TEST_ASSERT_TRUE(has_unit);
-    AGENTRT_TEST_ASSERT_TRUE(valid_type);
+    AIRY_TEST_ASSERT_TRUE(has_name);
+    AIRY_TEST_ASSERT_TRUE(has_unit);
+    AIRY_TEST_ASSERT_TRUE(valid_type);
     
     mock_metric_destroy(m);
 }
@@ -204,19 +204,19 @@ static void test_metric_metadata(void** state) {
 static void test_null_metric_handling(void** state) {
     // NULL名称
     mock_metric_t* m1 = mock_metric_create(NULL, "unit", METRIC_TYPE_COUNTER);
-    AGENTRT_TEST_ASSERT_PTR_NOT_NULL(m1);
-    AGENTRT_TEST_ASSERT_NULL(m1->name);
+    AIRY_TEST_ASSERT_PTR_NOT_NULL(m1);
+    AIRY_TEST_ASSERT_NULL(m1->name);
     mock_metric_destroy(m1);
     
     // NULL单位
     mock_metric_t* m2 = mock_metric_create("name", NULL, METRIC_TYPE_GAUGE);
-    AGENTRT_TEST_ASSERT_PTR_NOT_NULL(m2);
-    AGENTRT_TEST_ASSERT_NULL(m2->unit);
+    AIRY_TEST_ASSERT_PTR_NOT_NULL(m2);
+    AIRY_TEST_ASSERT_NULL(m2->unit);
     mock_metric_destroy(m2);
     
     // 记录到NULL指标
     int ret = mock_metric_record(NULL, 42.0);
-    AGENTRT_TEST_ASSERT_FALSE(ret == 0);
+    AIRY_TEST_ASSERT_FALSE(ret == 0);
 }
 
 /**

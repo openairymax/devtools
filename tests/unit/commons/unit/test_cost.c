@@ -23,13 +23,13 @@
 static int passed_tests = 0, failed_tests = 0;
 
 static int test_cost_estimate(void) {
-    agentrt_cost_estimator_t* estimator = agentrt_cost_estimator_create(NULL);
+    airy_cost_estimator_t* estimator = airy_cost_estimator_create(NULL);
     if (!estimator) { printf("  Cost estimate: Skipped\n"); return 0; }
     
-    double cost = agentrt_cost_estimator_estimate(estimator, "gpt-4", 100, 50);
+    double cost = airy_cost_estimator_estimate(estimator, "gpt-4", 100, 50);
     printf("  Cost estimate: $%.6f\n", cost);
     
-    agentrt_cost_estimator_destroy(estimator);
+    airy_cost_estimator_destroy(estimator);
     return 0;
 }
 

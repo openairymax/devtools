@@ -14,8 +14,8 @@ AgentRT 交互式 CLI
 - 分页输出
 
 Usage:
-    from agentrt_scripts.toolkit.cli import AgentOSCLI
-    from agentrt_scripts.toolkit.logger import ProgressBar, Spinner, Table, Color, Style
+    from airy_scripts.toolkit.cli import AgentOSCLI
+    from airy_scripts.toolkit.logger import ProgressBar, Spinner, Table, Color, Style
 
     cli = AgentOSCLI()
     cli.info("Starting process...")

@@ -80,17 +80,17 @@ static int g_tests_failed = 0;
 /* ============================================================================
  * 辅助: 创建 MemoryRovol 句柄
  * ============================================================================ */
-static agentrt_memoryrov_handle_t *create_memoryrov_handle(void)
+static airy_memoryrov_handle_t *create_memoryrov_handle(void)
 {
-    agentrt_memoryrov_config_t *cfg = NULL;
-    agentrt_error_t err = agentrt_memoryrov_config_default(&cfg);
-    if (err != AGENTRT_OK || cfg == NULL)
+    airy_memoryrov_config_t *cfg = NULL;
+    airy_err_t err = airy_memoryrov_config_default(&cfg);
+    if (err != AIRY_OK || cfg == NULL)
         return NULL;
 
-    agentrt_memoryrov_handle_t *handle = NULL;
-    err = agentrt_memoryrov_init(cfg, &handle);
-    agentrt_memoryrov_config_free(cfg);
-    if (err != AGENTRT_OK)
+    airy_memoryrov_handle_t *handle = NULL;
+    err = airy_memoryrov_init(cfg, &handle);
+    airy_memoryrov_config_free(cfg);
+    if (err != AIRY_OK)
         return NULL;
 
     return handle;
@@ -99,20 +99,20 @@ static agentrt_memoryrov_handle_t *create_memoryrov_handle(void)
 /* ============================================================================
  * 辅助: 创建 L2 特征层
  * ============================================================================ */
-static agentrt_layer2_feature_t *create_l2_feature(void)
+static airy_layer2_feature_t *create_l2_feature(void)
 {
-    agentrt_layer2_feature_config_t config;
+    airy_layer2_feature_config_t config;
     memset(&config, 0, sizeof(config));
-    config.index_path    = "/tmp/agentrt_test_l2_embedding";
+    config.index_path    = "/tmp/airy_test_l2_embedding";
     config.embedding_model = "test_model";
     config.dimension     = EMBEDDING_DIM;
-    config.index_type    = AGENTRT_INDEX_FLAT;
+    config.index_type    = AIRY_INDEX_FLAT;
     config.hnsw_m        = 16;
     config.ivf_nlist     = 100;
 
-    agentrt_layer2_feature_t *l2 = NULL;
-    agentrt_error_t err = agentrt_layer2_feature_create(&config, &l2);
-    if (err != AGENTRT_OK)
+    airy_layer2_feature_t *l2 = NULL;
+    airy_err_t err = airy_layer2_feature_create(&config, &l2);
+    if (err != AIRY_OK)
         return NULL;
 
     return l2;
@@ -121,16 +121,16 @@ static agentrt_layer2_feature_t *create_l2_feature(void)
 /* ============================================================================
  * 辅助: 创建向量存储
  * ============================================================================ */
-static agentrt_vector_store_t *create_vector_store(void)
+static airy_vector_store_t *create_vector_store(void)
 {
-    agentrt_vector_store_config_t config;
+    airy_vector_store_config_t config;
     memset(&config, 0, sizeof(config));
-    config.db_path   = "/tmp/agentrt_test_vector_store.db";
+    config.db_path   = "/tmp/airy_test_vector_store.db";
     config.dimension = EMBEDDING_DIM;
 
-    agentrt_vector_store_t *store = NULL;
-    agentrt_error_t err = agentrt_vector_store_create(&config, &store);
-    if (err != AGENTRT_OK)
+    airy_vector_store_t *store = NULL;
+    airy_err_t err = airy_vector_store_create(&config, &store);
+    if (err != AIRY_OK)
         return NULL;
 
     return store;
@@ -258,7 +258,7 @@ TEST(int08_1_exact_match_recall)
 {
     printf("    --- Exact Match Recall Verification ---\n");
 
-    agentrt_layer2_feature_t *l2 = create_l2_feature();
+    airy_layer2_feature_t *l2 = create_l2_feature();
     TEST_ASSERT(l2 != NULL);
 
     /* 1. 添加文本记录 */
@@ -284,8 +284,8 @@ TEST(int08_1_exact_match_recall)
         snprintf(id_buf, sizeof(id_buf), "exact_doc_%zu", i);
         doc_ids[i] = strdup(id_buf);
 
-        agentrt_error_t err = agentrt_layer2_feature_add(l2, doc_ids[i], documents[i]);
-        TEST_ASSERT(err == AGENTRT_OK);
+        airy_err_t err = airy_layer2_feature_add(l2, doc_ids[i], documents[i]);
+        TEST_ASSERT(err == AIRY_OK);
     }
     printf("    Added %zu documents to L2 feature layer\n", num_docs);
 
@@ -296,10 +296,10 @@ TEST(int08_1_exact_match_recall)
         float *scores = NULL;
         size_t result_count = 0;
 
-        agentrt_error_t err = agentrt_layer2_feature_search(
+        airy_err_t err = airy_layer2_feature_search(
             l2, documents[i], TOP_K, &result_ids, &scores, &result_count);
 
-        if (err == AGENTRT_OK && result_count > 0) {
+        if (err == AIRY_OK && result_count > 0) {
             /* 检查第一个结果是否是自身 */
             int found_self = 0;
             for (size_t j = 0; j < result_count; j++) {
@@ -327,10 +327,10 @@ TEST(int08_1_exact_match_recall)
 
     /* 3. 清理 */
     for (size_t i = 0; i < num_docs; i++) {
-        agentrt_layer2_feature_remove(l2, doc_ids[i]);
+        airy_layer2_feature_remove(l2, doc_ids[i]);
         free(doc_ids[i]);
     }
-    agentrt_layer2_feature_destroy(l2);
+    airy_layer2_feature_destroy(l2);
 }
 
 /* ============================================================================
@@ -346,7 +346,7 @@ TEST(int08_2_similar_vector_recall)
 {
     printf("    --- Similar Vector Recall Verification ---\n");
 
-    agentrt_layer2_feature_t *l2 = create_l2_feature();
+    airy_layer2_feature_t *l2 = create_l2_feature();
     TEST_ASSERT(l2 != NULL);
 
     /* 1. 添加原始文档 */
@@ -379,9 +379,9 @@ TEST(int08_2_similar_vector_recall)
     size_t num_pairs = sizeof(test_pairs) / sizeof(test_pairs[0]);
 
     for (size_t i = 0; i < num_pairs; i++) {
-        agentrt_error_t err = agentrt_layer2_feature_add(
+        airy_err_t err = airy_layer2_feature_add(
             l2, test_pairs[i].id, test_pairs[i].original);
-        TEST_ASSERT(err == AGENTRT_OK);
+        TEST_ASSERT(err == AIRY_OK);
     }
     printf("    Added %zu documents\n", num_pairs);
 
@@ -392,11 +392,11 @@ TEST(int08_2_similar_vector_recall)
         float *scores = NULL;
         size_t result_count = 0;
 
-        agentrt_error_t err = agentrt_layer2_feature_search(
+        airy_err_t err = airy_layer2_feature_search(
             l2, test_pairs[i].similar_query, TOP_K,
             &result_ids, &scores, &result_count);
 
-        if (err == AGENTRT_OK && result_count > 0) {
+        if (err == AIRY_OK && result_count > 0) {
             int found = 0;
             for (size_t j = 0; j < result_count; j++) {
                 if (result_ids[j] && strcmp(result_ids[j], test_pairs[i].id) == 0) {
@@ -424,9 +424,9 @@ TEST(int08_2_similar_vector_recall)
 
     /* 3. 清理 */
     for (size_t i = 0; i < num_pairs; i++) {
-        agentrt_layer2_feature_remove(l2, test_pairs[i].id);
+        airy_layer2_feature_remove(l2, test_pairs[i].id);
     }
-    agentrt_layer2_feature_destroy(l2);
+    airy_layer2_feature_destroy(l2);
 }
 
 /* ============================================================================
@@ -441,7 +441,7 @@ TEST(int08_3_dissimilar_vector_rejection)
 {
     printf("    --- Dissimilar Vector Rejection Verification ---\n");
 
-    agentrt_layer2_feature_t *l2 = create_l2_feature();
+    airy_layer2_feature_t *l2 = create_l2_feature();
     TEST_ASSERT(l2 != NULL);
 
     /* 1. 添加特定主题文档（AI/机器学习） */
@@ -457,8 +457,8 @@ TEST(int08_3_dissimilar_vector_rejection)
     for (size_t i = 0; i < num_ai; i++) {
         char id_buf[64];
         snprintf(id_buf, sizeof(id_buf), "ai_doc_%zu", i);
-        agentrt_error_t err = agentrt_layer2_feature_add(l2, id_buf, ai_docs[i]);
-        TEST_ASSERT(err == AGENTRT_OK);
+        airy_err_t err = airy_layer2_feature_add(l2, id_buf, ai_docs[i]);
+        TEST_ASSERT(err == AIRY_OK);
     }
     printf("    Added %zu AI-related documents\n", num_ai);
 
@@ -487,10 +487,10 @@ TEST(int08_3_dissimilar_vector_rejection)
         float *scores = NULL;
         size_t result_count = 0;
 
-        agentrt_error_t err = agentrt_layer2_feature_search(
+        airy_err_t err = airy_layer2_feature_search(
             l2, unrelated_queries[i], TOP_K, &result_ids, &scores, &result_count);
 
-        if (err == AGENTRT_OK && result_count > 0 && scores != NULL) {
+        if (err == AIRY_OK && result_count > 0 && scores != NULL) {
             unrelated_total_score += (double)scores[0];
             unrelated_count++;
             printf("    Unrelated query[%zu]: top score=%.3f\n", i, scores[0]);
@@ -507,10 +507,10 @@ TEST(int08_3_dissimilar_vector_rejection)
         float *scores = NULL;
         size_t result_count = 0;
 
-        agentrt_error_t err = agentrt_layer2_feature_search(
+        airy_err_t err = airy_layer2_feature_search(
             l2, related_queries[i], TOP_K, &result_ids, &scores, &result_count);
 
-        if (err == AGENTRT_OK && result_count > 0 && scores != NULL) {
+        if (err == AIRY_OK && result_count > 0 && scores != NULL) {
             related_total_score += (double)scores[0];
             related_count++;
             printf("    Related query[%zu]: top score=%.3f\n", i, scores[0]);
@@ -536,9 +536,9 @@ TEST(int08_3_dissimilar_vector_rejection)
     for (size_t i = 0; i < num_ai; i++) {
         char id_buf[64];
         snprintf(id_buf, sizeof(id_buf), "ai_doc_%zu", i);
-        agentrt_layer2_feature_remove(l2, id_buf);
+        airy_layer2_feature_remove(l2, id_buf);
     }
-    agentrt_layer2_feature_destroy(l2);
+    airy_layer2_feature_destroy(l2);
 }
 
 /* ============================================================================
@@ -554,29 +554,29 @@ TEST(int08_4_multi_model_embedding_consistency)
     printf("    --- Multi-Model Embedding Consistency ---\n");
 
     /* 1. 创建模型 A 的 L2 特征层 */
-    agentrt_layer2_feature_config_t config_a;
+    airy_layer2_feature_config_t config_a;
     memset(&config_a, 0, sizeof(config_a));
-    config_a.index_path      = "/tmp/agentrt_test_l2_model_a";
+    config_a.index_path      = "/tmp/airy_test_l2_model_a";
     config_a.embedding_model = "model_a";
     config_a.dimension       = EMBEDDING_DIM;
-    config_a.index_type      = AGENTRT_INDEX_FLAT;
+    config_a.index_type      = AIRY_INDEX_FLAT;
 
-    agentrt_layer2_feature_t *l2_a = NULL;
-    agentrt_error_t err = agentrt_layer2_feature_create(&config_a, &l2_a);
-    TEST_ASSERT(err == AGENTRT_OK);
+    airy_layer2_feature_t *l2_a = NULL;
+    airy_err_t err = airy_layer2_feature_create(&config_a, &l2_a);
+    TEST_ASSERT(err == AIRY_OK);
     TEST_ASSERT(l2_a != NULL);
 
     /* 2. 创建模型 B 的 L2 特征层 */
-    agentrt_layer2_feature_config_t config_b;
+    airy_layer2_feature_config_t config_b;
     memset(&config_b, 0, sizeof(config_b));
-    config_b.index_path      = "/tmp/agentrt_test_l2_model_b";
+    config_b.index_path      = "/tmp/airy_test_l2_model_b";
     config_b.embedding_model = "model_b";
     config_b.dimension       = EMBEDDING_DIM;
-    config_b.index_type      = AGENTRT_INDEX_FLAT;
+    config_b.index_type      = AIRY_INDEX_FLAT;
 
-    agentrt_layer2_feature_t *l2_b = NULL;
-    err = agentrt_layer2_feature_create(&config_b, &l2_b);
-    TEST_ASSERT(err == AGENTRT_OK);
+    airy_layer2_feature_t *l2_b = NULL;
+    err = airy_layer2_feature_create(&config_b, &l2_b);
+    TEST_ASSERT(err == AIRY_OK);
     TEST_ASSERT(l2_b != NULL);
 
     printf("    Created L2 feature layers for model_a and model_b\n");
@@ -596,10 +596,10 @@ TEST(int08_4_multi_model_embedding_consistency)
         snprintf(id_a, sizeof(id_a), "model_a_doc_%zu", i);
         snprintf(id_b, sizeof(id_b), "model_b_doc_%zu", i);
 
-        err = agentrt_layer2_feature_add(l2_a, id_a, docs[i]);
-        TEST_ASSERT(err == AGENTRT_OK);
-        err = agentrt_layer2_feature_add(l2_b, id_b, docs[i]);
-        TEST_ASSERT(err == AGENTRT_OK);
+        err = airy_layer2_feature_add(l2_a, id_a, docs[i]);
+        TEST_ASSERT(err == AIRY_OK);
+        err = airy_layer2_feature_add(l2_b, id_b, docs[i]);
+        TEST_ASSERT(err == AIRY_OK);
     }
     printf("    Added %zu documents to both models\n", num_docs);
 
@@ -613,14 +613,14 @@ TEST(int08_4_multi_model_embedding_consistency)
     float *scores_b = NULL;
     size_t count_b = 0;
 
-    err = agentrt_layer2_feature_search(l2_a, query, TOP_K,
+    err = airy_layer2_feature_search(l2_a, query, TOP_K,
                                          &ids_a, &scores_a, &count_a);
-    TEST_ASSERT(err == AGENTRT_OK);
+    TEST_ASSERT(err == AIRY_OK);
     TEST_ASSERT(count_a > 0);
 
-    err = agentrt_layer2_feature_search(l2_b, query, TOP_K,
+    err = airy_layer2_feature_search(l2_b, query, TOP_K,
                                          &ids_b, &scores_b, &count_b);
-    TEST_ASSERT(err == AGENTRT_OK);
+    TEST_ASSERT(err == AIRY_OK);
     TEST_ASSERT(count_b > 0);
 
     printf("    Model A: %zu results, top score=%.3f\n",
@@ -637,8 +637,8 @@ TEST(int08_4_multi_model_embedding_consistency)
     if (count_a > 0 && ids_a[0] != NULL) {
         float *vec = NULL;
         size_t dim = 0;
-        err = agentrt_layer2_feature_get_vector_by_id(l2_a, ids_a[0], &vec, &dim);
-        if (err == AGENTRT_OK && vec != NULL) {
+        err = airy_layer2_feature_get_vector_by_id(l2_a, ids_a[0], &vec, &dim);
+        if (err == AIRY_OK && vec != NULL) {
             printf("    Model A: retrieved vector for '%s', dim=%zu\n", ids_a[0], dim);
             TEST_ASSERT(dim == EMBEDDING_DIM);
             free(vec);
@@ -655,11 +655,11 @@ TEST(int08_4_multi_model_embedding_consistency)
         char id_a[64], id_b[64];
         snprintf(id_a, sizeof(id_a), "model_a_doc_%zu", i);
         snprintf(id_b, sizeof(id_b), "model_b_doc_%zu", i);
-        agentrt_layer2_feature_remove(l2_a, id_a);
-        agentrt_layer2_feature_remove(l2_b, id_b);
+        airy_layer2_feature_remove(l2_a, id_a);
+        airy_layer2_feature_remove(l2_b, id_b);
     }
-    agentrt_layer2_feature_destroy(l2_a);
-    agentrt_layer2_feature_destroy(l2_b);
+    airy_layer2_feature_destroy(l2_a);
+    airy_layer2_feature_destroy(l2_b);
 }
 
 /* ============================================================================
@@ -677,7 +677,7 @@ TEST(int08_5_recall_under_load)
 {
     printf("    --- Recall Under Load (10,000 vectors) ---\n");
 
-    agentrt_layer2_feature_t *l2 = create_l2_feature();
+    airy_layer2_feature_t *l2 = create_l2_feature();
     TEST_ASSERT(l2 != NULL);
 
     /* 1. 批量添加文档 */
@@ -704,15 +704,15 @@ TEST(int08_5_recall_under_load)
                  "with improved accuracy and efficiency metrics",
                  categories[i % 10], i, categories[(i + 3) % 10]);
 
-        agentrt_error_t err = agentrt_layer2_feature_add(l2, all_ids[i], content);
-        if (err != AGENTRT_OK) {
+        airy_err_t err = airy_layer2_feature_add(l2, all_ids[i], content);
+        if (err != AIRY_OK) {
             printf("    Failed to add doc %d: err=%d\n", i, (int)err);
         }
     }
 
     /* 验证 L2 统计 */
     size_t l2_count = 0;
-    agentrt_layer2_feature_stats(l2, &l2_count);
+    airy_layer2_feature_stats(l2, &l2_count);
     printf("    L2 feature layer: %zu vectors indexed\n", l2_count);
     TEST_ASSERT(l2_count > 0);
 
@@ -741,10 +741,10 @@ TEST(int08_5_recall_under_load)
         float *scores = NULL;
         size_t result_count = 0;
 
-        agentrt_error_t err = agentrt_layer2_feature_search(
+        airy_err_t err = airy_layer2_feature_search(
             l2, content, TOP_K, &result_ids, &scores, &result_count);
 
-        if (err == AGENTRT_OK && result_count > 0) {
+        if (err == AIRY_OK && result_count > 0) {
             for (size_t j = 0; j < result_count; j++) {
                 if (result_ids[j] && strcmp(result_ids[j], all_ids[idx]) == 0) {
                     recalled++;
@@ -764,12 +764,12 @@ TEST(int08_5_recall_under_load)
     /* 3. 清理 */
     for (int i = 0; i < LOAD_DOC_COUNT; i++) {
         if (all_ids[i]) {
-            agentrt_layer2_feature_remove(l2, all_ids[i]);
+            airy_layer2_feature_remove(l2, all_ids[i]);
             free(all_ids[i]);
         }
     }
     free(all_ids);
-    agentrt_layer2_feature_destroy(l2);
+    airy_layer2_feature_destroy(l2);
 }
 
 /* ============================================================================

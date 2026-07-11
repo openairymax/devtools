@@ -38,10 +38,10 @@ static int passed_tests = 0;
 static int failed_tests = 0;
 
 static int test_log_levels(void) {
-    AGENTRT_LOG_ERROR("Test error message");
-    AGENTRT_LOG_WARN("Test warning message");
-    AGENTRT_LOG_INFO("Test info message");
-    AGENTRT_LOG_DEBUG("Test debug message");
+    AIRY_LOG_ERROR("Test error message");
+    AIRY_LOG_WARN("Test warning message");
+    AIRY_LOG_INFO("Test info message");
+    AIRY_LOG_DEBUG("Test debug message");
     
     printf("  Log levels: OK\n");
     return 0;
@@ -50,8 +50,8 @@ static int test_log_levels(void) {
 static int test_trace_id(void) {
     const char* trace_id = "test-trace-123";
     
-    agentrt_log_set_trace_id(trace_id);
-    const char* retrieved = agentrt_log_get_trace_id();
+    airy_log_set_trace_id(trace_id);
+    const char* retrieved = airy_log_get_trace_id();
     
     TEST_ASSERT(retrieved != NULL, "Trace ID should not be NULL");
     TEST_ASSERT(strcmp(retrieved, trace_id) == 0, "Trace ID should match");

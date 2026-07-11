@@ -382,7 +382,7 @@ class ConfigInitializer:
 
         backup_file = os.path.join(
             output_path,
-            f"agentrt_config_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"
+            f"airy_config_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"
         )
 
         import tarfile

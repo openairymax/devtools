@@ -29,9 +29,9 @@ int main(void) {
     {
         /* 创建一个简单的任务JSON */
         const char* task_json = "{\"nodes\": [{\"id\": \"task1\", \"depends_on\": []}]}";
-        agentrt_error_t err = agentrt_sys_task_submit(task_json, strlen(task_json));
+        airy_error_t err = airy_sys_task_submit(task_json, strlen(task_json));
 
-        if (err != AGENTRT_SUCCESS) {
+        if (err != AIRY_SUCCESS) {
             printf("    基本任务提交失败: %d\n", err);
             return 1;
         }
@@ -45,9 +45,9 @@ int main(void) {
         /* 创建一个可能导致问题的依赖�?*/
         /* 注意：这里只是一个示例，实际可能需要更复杂的图来触发边界情�?*/
         const char* task_json = "{\"nodes\": [{\"id\": \"task1\", \"depends_on\": []}, {\"id\": \"task2\", \"depends_on\": [\"0\"]}]}";
-        agentrt_error_t err = agentrt_sys_task_submit(task_json, strlen(task_json));
+        airy_error_t err = airy_sys_task_submit(task_json, strlen(task_json));
 
-        if (err != AGENTRT_SUCCESS) {
+        if (err != AIRY_SUCCESS) {
             printf("    带依赖任务提交失�? %d\n", err);
             return 1;
         }
@@ -59,15 +59,15 @@ int main(void) {
     printf("  测试3：无效输入测�?..\n");
     {
         /* NULL指针测试 */
-        agentrt_error_t err = agentrt_sys_task_submit(NULL, 0);
-        if (err != AGENTRT_EINVAL) {
+        airy_error_t err = airy_sys_task_submit(NULL, 0);
+        if (err != AIRY_EINVAL) {
             printf("    NULL输入应该返回EINVAL，实际返�? %d\n", err);
             return 1;
         }
 
         /* 无效JSON测试 */
         const char* invalid_json = "{invalid json";
-        err = agentrt_sys_task_submit(invalid_json, strlen(invalid_json));
+        err = airy_sys_task_submit(invalid_json, strlen(invalid_json));
         /* 可能返回解析错误，至少不应该崩溃 */
         printf("    无效JSON处理测试通过（返回码: %d）\n", err);
     }
