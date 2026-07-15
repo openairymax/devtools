@@ -1,6 +1,6 @@
 /**
  * @file test_security_audit.c
- * @brief AgentOS 安全审计测试套件 (P2-C03)
+ * @brief AgentRT 安全审计测试套件 (P2-C03)
  *
  * 验证安全规范合规性：
  * - SEC-017: 桩函数禁令（0 violations）
@@ -467,7 +467,7 @@ static void sec_audit_comprehensive_rating(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS 安全审计测试套件 (P2-C03)\n");
+    printf("  AgentRT 安全审计测试套件 (P2-C03)\n");
     printf("========================================\n");
 
     sec_audit_stub_functions();

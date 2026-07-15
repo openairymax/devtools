@@ -1,6 +1,6 @@
 /**
  * @file test_heapstore_e2e.c
- * @brief AgentOS HeapStore 端到端集成测试
+ * @brief AgentRT HeapStore 端到端集成测试
  *
  * 验证 HeapStore 存储系统从初始化到数据读写的完整链路：
  * - CRUD 全生命周期：创建 → 写入 → 读取 → 更新 → 删除 → 验证
@@ -909,7 +909,7 @@ static void e2e_scenario_8_circuit_breaker(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS HeapStore E2E 集成测试套件\n");
+    printf("  AgentRT HeapStore E2E 集成测试套件\n");
     printf("  覆盖: CRUD / Batch / Registry / IPC\n");
     printf("        Token / Persistence / Cross-Subsystem / Circuit\n");
     printf("========================================\n");

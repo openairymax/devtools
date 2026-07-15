@@ -1,6 +1,6 @@
 /**
  * @file test_performance_benchmarks.c
- * @brief AgentOS 性能基准测试框架 (P2-C02)
+ * @brief AgentRT 性能基准测试框架 (P2-C02)
  *
  * 覆盖关键性能场景：
  * - 内存分配/释放延迟与吞吐量
@@ -499,7 +499,7 @@ static void test_benchmark_concurrent(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS 性能基准测试框架 (P2-C02)\n");
+    printf("  AgentRT 性能基准测试框架 (P2-C02)\n");
     printf("========================================\n");
 
     test_benchmark_memory();

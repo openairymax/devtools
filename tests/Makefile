@@ -1,4 +1,4 @@
-# AgentOS 测试模块 Makefile
+# AgentRT 测试模块 Makefile
 # Version: 0.1.0
 # Last updated: 2026-03-22
 
@@ -8,7 +8,7 @@
 
 # 默认目标
 help:
-	@echo "AgentOS 测试模块命令:"
+	@echo "AgentRT 测试模块命令:"
 	@echo ""
 	@echo "环境设置:"
 	@echo "  install      - 安装测试依赖"

@@ -10,9 +10,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 的对应关系
+## 与 agentrt/ 的对应关系
 
-| 测试目录 | 对应的 agentos/ 模块 | 测试框架 |
+| 测试目录 | 对应的 agentrt/ 模块 | 测试框架 |
 |----------|---------------------|----------|
 | `unit/atoms/corekern/` | `agentrt/atoms/corekern/` | CMocka — 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
 | `unit/atoms/coreloopthree/` | `agentrt/atoms/coreloopthree/` | CMocka + pytest — 三环运行时（认知环/执行环/学习环） |
@@ -184,7 +184,7 @@ pytest -v -m "security"
 pytest -v -n auto
 
 # 运行并生成覆盖率报告
-pytest -v --cov=agentos --cov-report=html
+pytest -v --cov=agentrt --cov-report=html
 ```
 
 ### 使用 ctest（C 测试）
@@ -215,7 +215,7 @@ cd build && ctest -R security
 
 测试覆盖率通过 `.coveragerc` 配置采集规则，支持 `codecov.yml` 上传至 Codecov 平台。覆盖率目标按模块划分：
 
-| agentos/ 模块 | 单元测试 | 集成测试 | 安全测试 | 基准测试 |
+| agentrt/ 模块 | 单元测试 | 集成测试 | 安全测试 | 基准测试 |
 |--------------|---------|---------|---------|---------|
 | `atoms/corekern/` | ✅ CMocka | ✅ CMocka | — | ✅ C |
 | `atoms/coreloopthree/` | ✅ CMocka | ✅ pytest | — | — |

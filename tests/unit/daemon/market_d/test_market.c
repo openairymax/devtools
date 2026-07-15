@@ -19,7 +19,7 @@ int test_service_create_destroy() {
 
     // 配置市场服务
     market_config_t manager = {
-        .registry_url = "http://registry.agentos.org",
+        .registry_url = "http://registry.agentrt.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
         .cache_ttl_ms = 300000,
@@ -54,7 +54,7 @@ int test_register_agent() {
 
     // 配置市场服务
     market_config_t manager = {
-        .registry_url = "http://registry.agentos.org",
+        .registry_url = "http://registry.agentrt.org",
         .storage_path = "./test_market",
         .sync_interval_ms = 60000,
         .cache_ttl_ms = 300000,

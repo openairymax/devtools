@@ -135,9 +135,9 @@ spec:
             - name: AGENTRT_METRICS_PORT
               value: "9090"
             - name: AGENTRT_LOG_LEVEL
-              value: {{ .Values.agentosConfig.logLevel | quote }}
+              value: {{ .Values.agentrtConfig.logLevel | quote }}
             - name: AGENTRT_DEPLOY_ENV
-              value: {{ .Values.agentosConfig.deployEnv | quote }}
+              value: {{ .Values.agentrtConfig.deployEnv | quote }}
             - name: AGENTRT_COREKERN_HOST
               value: {{ include "agentrt.fullname" . }}-corekern
             - name: AGENTRT_CORELOOPTHREE_HOST
@@ -159,11 +159,11 @@ spec:
             - name: AGENTRT_POSTGRES_HOST
               value: {{ .Release.Name }}-postgresql
             - name: AGENTRT_MCP_ENABLED
-              value: {{ .Values.agentosConfig.mcpEnabled | quote }}
+              value: {{ .Values.agentrtConfig.mcpEnabled | quote }}
             - name: AGENTRT_A2A_ENABLED
-              value: {{ .Values.agentosConfig.a2aEnabled | quote }}
+              value: {{ .Values.agentrtConfig.a2aEnabled | quote }}
             - name: AGENTRT_OPENAI_ENABLED
-              value: {{ .Values.agentosConfig.openaiEnabled | quote }}
+              value: {{ .Values.agentrtConfig.openaiEnabled | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "agentrt.fullname" . }}-config

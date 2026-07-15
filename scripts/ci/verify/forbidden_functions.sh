@@ -7,7 +7,14 @@
 # =============================================================================
 set -euo pipefail
 
-PROJECT_ROOT="${1:-$(cd "$(dirname "$0")/../../.." && pwd)}"
+PROJECT_ROOT="${1:-$(cd "$(dirname "$0")/../../../.." && pwd)}"
+
+# 验证 PROJECT_ROOT 指向伞仓根（必须包含 agentrt/ 目录）
+if [[ ! -d "${PROJECT_ROOT}/agentrt" ]]; then
+    echo "ERROR: agentrt/ not found under PROJECT_ROOT=${PROJECT_ROOT}" >&2
+    echo "       PROJECT_ROOT must be the airymaxhub root directory." >&2
+    exit 1
+fi
 
 # 颜色输出
 RED='\033[0;31m'
@@ -30,7 +37,7 @@ log_info(){ echo -e "[INFO] $*"; }
 _scan_lines() {
     local pattern="$1" check_cmd="$2"
     shift 2
-    grep -rn "$pattern" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    grep -rn "$pattern" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r line; do
             eval "$check_cmd"
         done
@@ -63,7 +70,7 @@ check_ban_sec00_unbounded_scanf() {
                 log_warn "  -> $line"
             done
         fi
-    done < <(find "${PROJECT_ROOT}/agentos" -name "*.c" -print0 2>/dev/null)
+    done < <(find "${PROJECT_ROOT}/agentrt" -name "*.c" -print0 2>/dev/null)
     if [[ $hits -eq 0 ]]; then
         log_ok "BAN-SEC-00: No unbounded scanf(\"%s\") patterns found"
     else
@@ -93,7 +100,7 @@ check_ban_151() {
                 ((hits++)) || true
             fi
         fi
-    done < <(find "${PROJECT_ROOT}/agentos" -name "*.c" -not -path "*/tests/*" -not -path "*/examples/*" -print0 2>/dev/null)
+    done < <(find "${PROJECT_ROOT}/agentrt" -name "*.c" -not -path "*/tests/*" -not -path "*/examples/*" -print0 2>/dev/null)
     if [[ $hits -eq 0 ]]; then
         log_ok "BAN-151: All MALLOC functions have cleanup paths"
     else
@@ -108,7 +115,7 @@ check_ban_152() {
     log_info "BAN-152: Checking C89 variable declarations in cleanup blocks..."
     local hits=0
     # 检测 goto cleanup 之后是否有变量声明（C99风格）
-    hits=$(grep -rn 'goto cleanup' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    hits=$(grep -rn 'goto cleanup' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r line; do
         file=$(echo "$line" | cut -d: -f1)
         lineno=$(echo "$line" | cut -d: -f2)
@@ -144,7 +151,7 @@ check_ban_153() {
             log_warn "BAN-153: $file avg $avg_returns returns/function (>5)"
             ((hits++)) || true
         fi
-    done < <(find "${PROJECT_ROOT}/agentos" -name "*.c" -not -path "*/tests/*" -not -path "*/examples/*" -print0 2>/dev/null)
+    done < <(find "${PROJECT_ROOT}/agentrt" -name "*.c" -not -path "*/tests/*" -not -path "*/examples/*" -print0 2>/dev/null)
     if [[ $hits -eq 0 ]]; then
         log_ok "BAN-153: Average return points per function ≤5"
     else
@@ -183,7 +190,7 @@ check_ban_154() {
             details="$details  -> $file:$lineno $content\n"
         fi
     done < <(grep -rn '\bmemcpy\b\|\bmemmove\b\|\bmemset\b' \
-        --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+        --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/")
 
     if [[ $hits -eq 0 ]]; then
@@ -222,7 +229,7 @@ check_ban_155() {
             ((unsafe_hits++)) || true
             log_warn "BAN-155: $file:$lineno strncpy without guaranteed null termination"
         fi
-    done < <(grep -rn '\bstrncpy\b' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    done < <(grep -rn '\bstrncpy\b' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/")
 
     if [[ $hits -eq 0 ]]; then
@@ -240,7 +247,7 @@ check_ban_155() {
 check_ban_156() {
     log_info "BAN-156: Checking sprintf usage..."
     local hits=0
-    hits=$(grep -rn '\bsprintf\b' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    hits=$(grep -rn '\bsprintf\b' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | grep -v 'AGENTRT_SNPRINTF' | wc -l) || true
     hits=${hits:-0}
     if [[ $hits -eq 0 ]]; then
@@ -257,7 +264,7 @@ check_ban_157() {
     log_info "BAN-157: Checking hardcoded buffer sizes..."
     local hits=0
     # 检测 snprintf(buf, 数字, ...) 而不是 snprintf(buf, sizeof(buf), ...)
-    hits=$(grep -rn '\bsnprintf\b.*,\s*\d+\s*,' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    hits=$(grep -rn '\bsnprintf\b.*,\s*\d+\s*,' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | wc -l) || true
     hits=${hits:-0}
     if [[ $hits -eq 0 ]]; then
@@ -274,7 +281,7 @@ check_ban_158() {
     log_info "BAN-158: Checking input length validation..."
     local hits=0
     # 检测 strlen/strcmp 调用前是否有 NULL 检查
-    hits=$(grep -rl '\bstrlen\b\|\bstrcmp\b\|\bstrncmp\b' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    hits=$(grep -rl '\bstrlen\b\|\bstrcmp\b\|\bstrncmp\b' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r file; do
         if grep -q '\bstrlen\b\|\bstrcmp\b' "$file" 2>/dev/null; then
             if ! grep -q 'NULL' "$file" 2>/dev/null; then
@@ -298,7 +305,7 @@ check_ban_159_162() {
 
     # BAN-159: fd泄漏（open/creat后无close）
     local fd_hits=0
-    fd_hits=$(grep -rl '\bopen\b\|\bcreat\b\|\bsocket\b\|\baccept\b' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    fd_hits=$(grep -rl '\bopen\b\|\bcreat\b\|\bsocket\b\|\baccept\b' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r file; do
         local opens closes
         opens=$(grep -c '\bopen\b\|\bcreat\b\|\bsocket\b\|\baccept\b' "$file" 2>/dev/null || echo "0")
@@ -318,7 +325,7 @@ check_ban_159_162() {
 
     # BAN-160: malloc/free配对
     local alloc_hits=0
-    alloc_hits=$(grep -rl 'AGENTRT_MALLOC\|AGENTRT_CALLOC' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    alloc_hits=$(grep -rl 'AGENTRT_MALLOC\|AGENTRT_CALLOC' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r file; do
         local allocs frees
         allocs=$(grep -c 'AGENTRT_MALLOC\|AGENTRT_CALLOC' "$file" 2>/dev/null || echo "0")
@@ -338,7 +345,7 @@ check_ban_159_162() {
 
     # BAN-161: fopen/fclose配对
     local file_hits=0
-    file_hits=$(grep -rl '\bfopen\b' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    file_hits=$(grep -rl '\bfopen\b' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r file; do
         local opens closes
         opens=$(grep -c '\bfopen\b' "$file" 2>/dev/null || echo "0")
@@ -358,7 +365,7 @@ check_ban_159_162() {
 
     # BAN-162: pthread_create/pthread_join配对
     local thread_hits=0
-    thread_hits=$(grep -rl 'pthread_create' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    thread_hits=$(grep -rl 'pthread_create' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r file; do
         local creates joins
         creates=$(grep -c 'pthread_create' "$file" 2>/dev/null || echo "0")
@@ -387,7 +394,7 @@ check_ban_163_168() {
     # BAN-163: 所有权注释覆盖检查
     # 检查返回指针的函数是否有 @ownership 注释
     local ban163_no_comment=0
-    ban163_no_comment=$(grep -rP '^\s*\w+\s*\*\s*\w+\s*\(' --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    ban163_no_comment=$(grep -rP '^\s*\w+\s*\*\s*\w+\s*\(' --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r line; do
         file=$(echo "$line" | cut -d: -f1)
         func=$(echo "$line" | cut -d: -f2-)
@@ -408,7 +415,7 @@ check_ban_163_168() {
     # BAN-164: _take 后缀检查
     log_info "BAN-164: Checking _take suffix for ownership transfer functions..."
     local ban164_no_take=0
-    ban164_no_take=$(grep -rP '@ownership\s+transfers' --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    ban164_no_take=$(grep -rP '@ownership\s+transfers' --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | wc -l) || true
     ban164_no_take=${ban164_no_take:-0}
     # 简化：仅统计 @ownership transfers 注释数量（完整检查需人工审计）
@@ -420,7 +427,7 @@ check_ban_163_168() {
 
     # BAN-165: AGENTRT_FREE 后置 NULL 检查
     local ban165_no_null=0
-    ban165_no_null=$(grep -rc 'AGENTRT_FREE(' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    ban165_no_null=$(grep -rc 'AGENTRT_FREE(' --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | grep -v ":0$" | wc -l) || true
     ban165_no_null=${ban165_no_null:-0}
     # 简化：统计使用 AGENTRT_FREE 的文件数（完整 NULL 后置检查需人工审计）
@@ -433,7 +440,7 @@ check_ban_163_168() {
     # BAN-166: 禁止多级指针传递（>2级）
     log_info "BAN-166: Checking multi-level pointer usage..."
     local ban166_multi_ptr=0
-    ban166_multi_ptr=$(grep -rP '\w+\s*\*{3,}\s*\w+' --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    ban166_multi_ptr=$(grep -rP '\w+\s*\*{3,}\s*\w+' --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | grep -v '//' | wc -l) || true
     ban166_multi_ptr=${ban166_multi_ptr:-0}
     if [[ $ban166_multi_ptr -eq 0 ]]; then
@@ -447,7 +454,7 @@ check_ban_163_168() {
     log_info "BAN-167: Checking bare pointer cross-module usage..."
     # 检查 #include 跨模块引用中是否有 void* 裸指针
     local ban167_bare=0
-    ban167_bare=$(grep -rP 'void\s*\*' --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    ban167_bare=$(grep -rP 'void\s*\*' --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | grep -v 'typedef' | grep -v 'agentrt_' | wc -l) || true
     ban167_bare=${ban167_bare:-0}
     if [[ $ban167_bare -le 5 ]]; then
@@ -460,7 +467,7 @@ check_ban_163_168() {
     # BAN-168: 引用计数函数命名规范
     log_info "BAN-168: Checking refcount naming convention..."
     if grep -rq 'refcount_create\|refcount_destroy\|refcount_acquire\|refcount_release' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-168: Refcount functions follow naming convention"
     else
         log_info "BAN-168: No refcount functions found (non-blocking)"
@@ -483,7 +490,7 @@ check_ban_169_174() {
     # BAN-169: OOM 处理函数实现检查
     log_info "BAN-169: Checking OOM handler implementation..."
     if grep -rq 'oom_handler\|agentrt_oom_determine_response\|agentrt_oom_handle' \
-        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-169: OOM handler interfaces defined"
     else
         log_warn "BAN-169: OOM handler not found (expected in Phase 2.5)"
@@ -493,7 +500,7 @@ check_ban_169_174() {
     # BAN-170: 关键路径预分配检查
     log_info "BAN-170: Checking critical path pre-allocation..."
     if grep -rq 'pre_alloc\|prealloc\|emergency_pool\|reserve_pool\|critical_pool' \
-        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-170: Pre-allocation patterns found"
     else
         log_info "BAN-170: Pre-allocation not yet implemented (expected Phase 2.5)"
@@ -502,7 +509,7 @@ check_ban_169_174() {
     # BAN-171: 降级处理器注册检查
     log_info "BAN-171: Checking degradation handler registration..."
     if grep -rq 'degradation_handler\|on_degrade\|on_restore\|agentrt_register_degradation' \
-        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-171: Degradation handler interfaces defined"
     else
         log_info "BAN-171: Degradation handlers not yet implemented (expected Phase 2.5)"
@@ -511,7 +518,7 @@ check_ban_169_174() {
     # BAN-172: 内存水位检查
     log_info "BAN-172: Checking memory watermark checks..."
     if grep -rq 'watermark\|memory_watermark\|agentrt_memory_check_watermark\|memory_pressure' \
-        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-172: Memory watermark checks found"
     else
         log_info "BAN-172: Watermark checks not yet implemented (expected Phase 2.5)"
@@ -520,7 +527,7 @@ check_ban_169_174() {
     # BAN-173: 内存统计上报
     log_info "BAN-173: Checking memory stats reporting..."
     if grep -rq 'memory_stats_extended\|agentrt_check_leaks_scheduled\|leak_suspected' \
-        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-173: Extended memory stats found"
     else
         log_info "BAN-173: Extended stats not yet implemented (expected Phase 2.5)"
@@ -529,7 +536,7 @@ check_ban_169_174() {
     # BAN-174: 优雅降级机制
     log_info "BAN-174: Checking graceful degradation..."
     if grep -rq 'agentrt_oom_degrade\|graceful_degradation\|degrade_to\|reduce_functionality' \
-        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
+        --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentrt/" 2>/dev/null; then
         log_ok "BAN-174: Graceful degradation interfaces found"
     else
         log_info "BAN-174: Graceful degradation not yet implemented (expected Phase 2.5)"
@@ -618,7 +625,7 @@ check_ban_175_180() {
     # 检查 pipeline 是否存在断路点
     local pipeline_gaps=0
     grep -rq 'pipeline\|event_queue\|data_flow\|message_bus' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null && ((pipeline_gaps++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null && ((pipeline_gaps++)) || true
     if [[ $pipeline_gaps -ge 1 ]]; then
         log_ok "BAN-179: Data flow pipeline interfaces found"
     else
@@ -629,7 +636,7 @@ check_ban_175_180() {
     log_info "BAN-180: Checking lifecycle constraints..."
     local lifecycle_pairs=0
     # 检查 create/destroy 配对
-    grep -rP '_create\b' --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null | grep -v "/tests/" | while IFS= read -r line; do
+    grep -rP '_create\b' --include="*.h" "${PROJECT_ROOT}/agentrt/" 2>/dev/null | grep -v "/tests/" | while IFS= read -r line; do
         file=$(echo "$line" | cut -d: -f1)
         func_name=$(echo "$line" | grep -oP '\w+_create' | head -1)
         if [[ -n "$func_name" ]]; then

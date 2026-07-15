@@ -1,4 +1,4 @@
-# AgentOS Linux 依赖清单
+# AgentRT Linux 依赖清单
 # 用于 Ubuntu 22.04 / 24.04 CI 环境
 # 格式: package_name=version 或仅包名（使用默认最新）
 

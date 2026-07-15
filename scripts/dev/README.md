@@ -11,21 +11,21 @@
 - **BAN-33 源外构建**：所有构建脚本严格遵循 BAN-33 规则，构建产物输出到独立构建目录，不污染源码树
 - **三平台覆盖**：核心脚本同时提供 Bash（Linux/macOS）和 PowerShell（Windows）两种实现
 - **交互式引导**：环境配置脚本采用交互式菜单，自动检测系统环境并给出最优配置建议
-- **统一 CLI 入口**：`agentos` 命令行工具提供服务管理、智能体管理、任务管理等一站式操作
+- **统一 CLI 入口**：`agentrt` 命令行工具提供服务管理、智能体管理、任务管理等一站式操作
 
 > **版本**：v0.1.0
 > **平台**：Linux / macOS / Windows (PowerShell)
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| scripts/dev/ 模块 | 支持的 agentos/ 模块 | 用途 |
+| scripts/dev/ 模块 | 支持的 agentrt/ 模块 | 用途 |
 |-------------------|---------------------|------|
 | `build/build.sh` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 跨平台自动化构建（BAN-33 源外构建） |
 | `build/install.sh` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 自动化安装（Linux/macOS） |
 | `build/install.ps1` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 自动化安装（Windows） |
 | `setup/setup.sh` | 全部模块 | 交互式开发环境配置（Linux/macOS） |
 | `setup/setup.ps1` | 全部模块 | 开发环境配置（Windows PowerShell） |
-| `cli/agentos` | `daemons/`, `manager/`, `openlab/` | 统一 CLI 命令行入口（服务管理/智能体管理/任务管理） |
+| `cli/agentrt` | `daemons/`, `manager/`, `openlab/` | 统一 CLI 命令行入口（服务管理/智能体管理/任务管理） |
 | `cmake/windows_preinclude.h` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助配置（Windows MSVC 兼容性头） |
 | `cmake/Sanitizers.cmake` | `atoms/`, `commons/`, `cupolas/` | CMake Sanitizers 配置（ASan/MSan/UBSan） |
 | `docs/Doxyfile` | 全部模块 | Doxygen 文档生成配置 |
@@ -58,7 +58,7 @@ dev/
 │   ├── setup.sh                   #   交互式开发环境配置（Linux/macOS）
 │   └── setup.ps1                  #   开发环境配置（Windows PowerShell）
 ├── cli/                           # CLI 入口
-│   └── agentos                    #   统一 CLI 命令行入口（服务管理/智能体管理/任务管理）
+│   └── agentrt                    #   统一 CLI 命令行入口（服务管理/智能体管理/任务管理）
 ├── cmake/                         # CMake 辅助配置（2 个文件）
 │   ├── windows_preinclude.h       #   Windows MSVC 兼容性预包含头（WIN32_LEAN_AND_MEAN 等）
 │   └── Sanitizers.cmake           #   CMake Sanitizers 配置（ASan/MSan/UBSan）
@@ -105,7 +105,7 @@ dev/
 
 ### cli/ — CLI 入口
 
-- **agentos**：统一 CLI 命令行入口，提供以下子命令：
+- **agentrt**：统一 CLI 命令行入口，提供以下子命令：
   - `service`：服务管理（start/stop/restart/status）
   - `agent`：智能体管理（list/create/delete/configure）
   - `task`：任务管理（submit/cancel/status/list）
@@ -182,21 +182,21 @@ chmod +x scripts/dev/setup/setup.sh
 
 ```bash
 # 查看帮助
-scripts/dev/cli/agentos --help
+scripts/dev/cli/agentrt --help
 
 # 服务管理
-scripts/dev/cli/agentos service start
-scripts/dev/cli/agentos service stop
-scripts/dev/cli/agentos service restart
-scripts/dev/cli/agentos service status
+scripts/dev/cli/agentrt service start
+scripts/dev/cli/agentrt service stop
+scripts/dev/cli/agentrt service restart
+scripts/dev/cli/agentrt service status
 
 # 智能体管理
-scripts/dev/cli/agentos agent list
-scripts/dev/cli/agentos agent create --name my-agent
+scripts/dev/cli/agentrt agent list
+scripts/dev/cli/agentrt agent create --name my-agent
 
 # 任务管理
-scripts/dev/cli/agentos task submit --agent my-agent
-scripts/dev/cli/agentos task list
+scripts/dev/cli/agentrt task submit --agent my-agent
+scripts/dev/cli/agentrt task list
 ```
 
 ### 快速启动与验证
@@ -228,7 +228,7 @@ python scripts/dev/utils/fixes/add_error_push_ex.py
 | `build/install.ps1` | PowerShell 5.1+, CMake 3.20+, MSVC 2019+ | Windows 安装依赖 Visual Studio 工具链 |
 | `setup/setup.sh` | Bash 4.0+ | 环境配置脚本自动检测并安装所需依赖 |
 | `setup/setup.ps1` | PowerShell 5.1+ | Windows 环境配置依赖 Chocolatey 或 Scoop 包管理器 |
-| `cli/agentos` | Bash 4.0+ | CLI 工具为纯 Shell 脚本实现 |
+| `cli/agentrt` | Bash 4.0+ | CLI 工具为纯 Shell 脚本实现 |
 | `cmake/windows_preinclude.h` | MSVC 2019+ | 预包含头仅在使用 MSVC 编译器时生效 |
 | `cmake/Sanitizers.cmake` | CMake 3.20+, Clang/GCC | Sanitizers 需要 Clang 或 GCC 编译器支持 |
 | `docs/Doxyfile` | Doxygen 1.9+ | 文档生成需要安装 Doxygen 工具 |

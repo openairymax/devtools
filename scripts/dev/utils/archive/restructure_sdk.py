@@ -2,7 +2,7 @@
 """
 AgentRT Python SDK 重构脚本
 
-此脚本用于自动化重构 agentos 包结构，实现高度模块化设计。
+此脚本用于自动化重构 agentrt 包结构，实现高度模块化设计。
 
 功能:
 1. 创建新的目录结构
@@ -30,7 +30,7 @@ class SDKRestructurer:
         初始化重构器
 
         Args:
-            base_path: agentos 包的基础路径
+            base_path: agentrt 包的基础路径
         """
         self.base_path = Path(base_path)
         self.backup_path = self.base_path.parent / "airy_backup"
@@ -289,7 +289,7 @@ featuring:
     - Asynchronous programming support
 
 Quick Start:
-    >>> from agentos import AgentRT
+    >>> from agentrt import AgentRT
     >>> client = AgentRT(endpoint="http://localhost:18789")
     >>> 
     >>> # Submit a task
@@ -304,7 +304,7 @@ Example:
     ...     with session:
     ...         result = client.execute_skill("my_skill", {"param": "value"})
 
-For more information, see the documentation at https://agentos.dev
+For more information, see the documentation at https://agentrt.dev
 """
 
 __version__ = "0.1.0"
@@ -333,7 +333,7 @@ if not check_python_version():
 
 # Import exceptions
 from .exceptions import (
-    AgentOSError,
+    AgentRTError,
     InitializationError,
     ValidationError,
     NetworkError,
@@ -423,14 +423,14 @@ __all__ = [
     "check_python_version",
     
     # Exceptions
-    "AgentOSError",
+    "AgentRTError",
     "InitializationError",
     "ValidationError",
     "NetworkError",
     "TimeoutError",
     "TelemetryError",
     "TaskError",
-    "AgentOSMemoryError",
+    "AgentRTMemoryError",
     "SessionError",
     "SkillError",
     
@@ -586,7 +586,7 @@ __all__ = [
             print(f"\n📦 备份位置：{self.backup_path}")
             print("\n新架构:")
             print("""
-agentos/
+agentrt/
 ├── __init__.py          # 公共API 导出
 ├── _version.py          # 版本信息
 ├── exceptions.py        # 异常体系

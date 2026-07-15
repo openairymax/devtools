@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 制品打包与部署脚本
+# AgentRT 制品打包与部署脚本
 # 功能：构建产物归档、Docker镜像构建、发布包生成
 # Version: 0.1.0
 
@@ -10,7 +10,7 @@ set -euo pipefail
 # 路径定义
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
 
 ###############################################################################
 # 错误处理
@@ -52,10 +52,10 @@ extract_version() {
         return
     fi
 
-    # 从 pyproject.toml 提取
-    if [[ -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
+    # 从 pyproject.toml 提取（位于 sdk/sdk-python/ 下）
+    if [[ -f "${PROJECT_ROOT}/sdk/sdk-python/pyproject.toml" ]]; then
         local ver
-        ver=$(grep '^version' "${PROJECT_ROOT}/pyproject.toml" | head -1 | sed 's/.*version.*= *"\([^"]*\)".*/\1/')
+        ver=$(grep '^version' "${PROJECT_ROOT}/sdk/sdk-python/pyproject.toml" | head -1 | sed 's/.*version.*= *"\([^"]*\)".*/\1/')
         if [[ -n "$ver" ]]; then
             echo "${ver}.${BUILD_NUMBER}"
             return
@@ -85,7 +85,7 @@ parse_args() {
 
 show_help() {
     cat << 'EOF'
-AgentOS Artifact Deployment Script v2.0.0
+AgentRT Artifact Deployment Script v2.0.0
 
 Usage: ./deploy-artifacts.sh [OPTIONS]
 
@@ -213,7 +213,7 @@ collect_binaries() {
 # 3. Docker 镜像构建
 ###############################################################################
 build_docker_images() {
-    local docker_dir="${PROJECT_ROOT}/deploy/docker"
+    local docker_dir="${PROJECT_ROOT}/products/docker"
 
     if [[ ! -d "$docker_dir" ]]; then
         log_warn "Docker directory not found: $docker_dir"
@@ -227,7 +227,7 @@ build_docker_images() {
 
     local version
     version=$(extract_version)
-    local image_base="${DOCKER_REGISTRY}/agentos"
+    local image_base="${DOCKER_REGISTRY}/agentrt"
 
     log_info "Building Docker images..."
 
@@ -274,7 +274,7 @@ generate_metadata() {
     cat > "$meta_file" << EOF
 {
     "timestamp": "$(date -Iseconds)",
-    "project": "AgentOS",
+    "project": "AgentRT",
     "version": "${version}",
     "build_number": "${BUILD_NUMBER}",
     "artifacts": {
@@ -285,8 +285,8 @@ generate_metadata() {
     "docker": {
         "registry": "${DOCKER_REGISTRY}",
         "images": [
-            "${DOCKER_REGISTRY}/agentos:kernel-${version}",
-            "${DOCKER_REGISTRY}/agentos:service-${version}"
+            "${DOCKER_REGISTRY}/agentrt:kernel-${version}",
+            "${DOCKER_REGISTRY}/agentrt:service-${version}"
         ]
     },
     "environment": {
@@ -306,7 +306,7 @@ EOF
 main() {
     parse_args "$@"
 
-    log_info "AgentOS Artifact Deployer v2.0.0"
+    log_info "AgentRT Artifact Deployer v2.0.0"
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
     local version
     version=$(extract_version)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
-# AgentOS 环境验证脚本
+# AgentRT 环境验证脚本
 # 用于检查开发和运行环境的完整性
 # 版本：v0.1.0
 # 最后更新：2026-03-20
@@ -188,7 +188,7 @@ check_project_structure() {
     echo -e "\n${BLUE}检查项目结构...${NC}"
 
     # 检查关键目录
-    DIRS=("atoms" "daemon" "cupolas" "toolkit" "manager" "scripts" "paper" "tests")
+    DIRS=("atoms" "daemons" "cupolas" "toolkit" "manager" "scripts" "paper" "tests")
     for dir in "${DIRS[@]}"; do
         if [ -d "$dir" ]; then
             print_check "目录：$dir" "PASS"
@@ -279,7 +279,7 @@ show_summary() {
         echo "您现在可以："
         echo "  1. 运行 ./quickstart.sh 快速体验"
         echo "  2. 运行 make build 构建项目"
-        echo "  3. 查看 agentos/manuals/ 中的文档"
+        echo "  3. 查看 agentrt/manuals/ 中的文档"
         echo ""
         exit 0
     fi
@@ -294,7 +294,7 @@ print_info() {
 main() {
     echo ""
     echo "=========================================="
-    echo "  AgentOS 环境验证工具"
+    echo "  AgentRT 环境验证工具"
     echo "  版本：v0.1.0"
     echo "=========================================="
 

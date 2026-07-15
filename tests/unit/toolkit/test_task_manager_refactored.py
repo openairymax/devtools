@@ -13,9 +13,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
 from utils.python.base_test import BaseTestCase
 
-from agentos.modules.task.manager import TaskManager
-from agentos.types import TaskStatus
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER
+from agentrt.modules.task.manager import TaskManager
+from agentrt.types import TaskStatus
+from agentrt.exceptions import AgentRTError, CODE_MISSING_PARAMETER
 
 
 class TestTaskManager(BaseTestCase):
@@ -49,7 +49,7 @@ class TestTaskManager(BaseTestCase):
         """测试空任务描述抛出异常"""
         mgr = TaskManager(self.mock_client, self.config)
         
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             mgr.submit("")
         
         self.assert_error_code(exc_info.value, CODE_MISSING_PARAMETER)
@@ -133,7 +133,7 @@ class TestTaskManagerErrorHandling(BaseTestCase):
             status_code=500
         )
         
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             mgr.submit("test task")
         
         self.assert_error_code(exc_info.value, "0x000C")

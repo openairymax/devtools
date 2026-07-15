@@ -1,7 +1,7 @@
 ﻿# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
-# AgentOS SDK One-Click Build Verification Script (Windows PowerShell)
+# AgentRT SDK One-Click Build Verification Script (Windows PowerShell)
 # Runs: tsc --noEmit + cargo build + go build ./... + pytest
 # Output: 4 status lines (PASS/FAIL) + error summary
 # Exit code: 0 if all pass, 1 if any fail
@@ -10,10 +10,10 @@ $ErrorActionPreference = "Continue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
 
-$TsDir = Join-Path $RootDir "agentos\toolkit\typescript"
-$RustDir = Join-Path $RootDir "agentos\toolkit\rust"
-$GoDir = Join-Path $RootDir "agentos\toolkit\go"
-$PythonDir = Join-Path $RootDir "agentos\toolkit\python"
+$TsDir = Join-Path $RootDir "agentrt\toolkit\typescript"
+$RustDir = Join-Path $RootDir "agentrt\toolkit\rust"
+$GoDir = Join-Path $RootDir "agentrt\toolkit\go"
+$PythonDir = Join-Path $RootDir "agentrt\toolkit\python"
 
 $script:Pass = 0
 $script:Fail = 0
@@ -56,7 +56,7 @@ function Run-Check {
 }
 
 Write-Host "========================================"
-Write-Host "  AgentOS SDK Build Verification"
+Write-Host "  AgentRT SDK Build Verification"
 Write-Host "========================================"
 Write-Host ""
 

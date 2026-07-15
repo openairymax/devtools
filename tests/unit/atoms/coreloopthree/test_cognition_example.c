@@ -44,9 +44,9 @@ void test_integer_comparison() {
 void test_string_comparison() {
     TEST_CASE_START(test_string_comparison);
 
-    const char *expected = "AgentOS";
+    const char *expected = "AgentRT";
     char actual[20];
-    strcpy(actual, "AgentOS");
+    strcpy(actual, "AgentRT");
 
     TEST_ASSERT_EQUAL_STRING(expected, actual, "strings should be equal");
 
@@ -79,7 +79,7 @@ void test_error_code_check() {
 
 int main(int argc, char *argv[]) {
     printf("============================================================\n");
-    printf("AgentOS Cognition Engine Unit Tests\n");
+    printf("AgentRT Cognition Engine Unit Tests\n");
     printf("Using test_macros.h assertion framework\n");
     printf("============================================================\n");
 

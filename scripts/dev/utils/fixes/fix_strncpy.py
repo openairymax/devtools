@@ -1,7 +1,7 @@
 import re, glob
 
 fixed = 0
-for f in sorted(glob.glob('agentos/**/*.c', recursive=True)):
+for f in sorted(glob.glob('agentrt/**/*.c', recursive=True)):
     if '/test_' in f or '/tests/' in f:
         continue
     try:

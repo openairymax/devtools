@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
-# AgentOS SDK One-Click Build Verification Script
+# AgentRT SDK One-Click Build Verification Script
 # Runs: tsc --noEmit + cargo build + go build ./... + pytest
 # Usage:
 #   ./verify_sdks.sh              # Interactive mode
@@ -95,7 +95,7 @@ preflight_check() {
 }
 
 echo "========================================"
-echo "  AgentOS SDK Build Verification"
+echo "  AgentRT SDK Build Verification"
 echo "========================================"
 echo ""
 

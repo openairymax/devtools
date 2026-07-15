@@ -1,6 +1,6 @@
 /**
  * @file test_heapstore_trace.c
- * @brief AgentOS 数据分区追踪存储单元测试
+ * @brief AgentRT 数据分区追踪存储单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
@@ -166,7 +166,7 @@ static void test_trace_stats(void) {
 }
 
 int main(void) {
-    printf("=== AgentOS heapstore Trace Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore Trace Unit Tests ===\n\n");
 
     test_trace_init_shutdown();
     test_trace_write_span();

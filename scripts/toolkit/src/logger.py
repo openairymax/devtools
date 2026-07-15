@@ -116,7 +116,7 @@ class OutputFormatter:
 class Logger:
     LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40}
 
-    def __init__(self, name: str = "agentos",
+    def __init__(self, name: str = "agentrt",
                  level: str = "INFO",
                  use_color: bool = True):
         self.name = name

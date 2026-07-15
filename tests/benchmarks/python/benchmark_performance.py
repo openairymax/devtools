@@ -116,7 +116,7 @@ def main():
         ("Protocol translate MCP", lambda: jsonrpc("protocol.translate", {"protocol": "mcp", "method": "tools/list"})),
         ("Protocol translate A2A", lambda: jsonrpc("protocol.translate", {"protocol": "a2a", "method": "agent/discover"})),
         ("Service discovery", lambda: jsonrpc("service.discovery.discover", {"service_name": "gateway"})),
-        ("Config get", lambda: jsonrpc("config.get", {"key": "agentos.version"})),
+        ("Config get", lambda: jsonrpc("config.get", {"key": "agentrt.version"})),
         ("Health check", lambda: http_post("/jsonrpc", {"jsonrpc": "2.0", "id": "1", "method": "health.check"})),
     ]
 

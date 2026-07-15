@@ -15,11 +15,11 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
 > **注**：Docker 容器化部署已迁移至 `deploy/docker/`，详见 [deploy/docker/README.md](../../deploy/docker/README.md)。
 
-| scripts/ops/ 模块 | 对应的 agentos/ 模块 | 用途 |
+| scripts/ops/ 模块 | 对应的 agentrt/ 模块 | 用途 |
 |-------------------|---------------------|------|
 | `bin/agentrt-bootstrap.sh` | `daemons/`, `gateway/` | 按 DAG 层级顺序一键启动所有 daemon |
 | `bin/quickstart.sh` | 全部模块 | 5 分钟快速创建示例 Agent 项目 |

@@ -127,7 +127,7 @@ TEST(int06_1_l1_raw_write_read)
     printf("    Provider created and initialized\n");
 
     /* 2. 写入第一条记录: 文本数据 */
-    const char *text_data = "AgentOS is an open-source operating system for AI agents.";
+    const char *text_data = "AgentRT is an open-source operating system for AI agents.";
     char *record_id_1 = NULL;
     ASSERT_OK(provider->write_raw(provider, text_data, strlen(text_data),
                                   "{\"type\":\"text\",\"source\":\"test\"}", &record_id_1));
@@ -635,7 +635,7 @@ TEST(int06_6_full_stack_write_query_verify)
 
     /* 3. 批量写入记录 */
     const char *documents[] = {
-        "AgentOS provides a unified runtime for autonomous AI agents",
+        "AgentRT provides a unified runtime for autonomous AI agents",
         "The memory subsystem supports L1 raw storage and L2 feature indexing",
         "Cupolas security framework enforces sandboxing and entitlements",
         "The gateway handles JSON-RPC and HTTP protocol translation",
@@ -652,7 +652,7 @@ TEST(int06_6_full_stack_write_query_verify)
     for (size_t i = 0; i < num_docs; i++) {
         char meta[128];
         snprintf(meta, sizeof(meta),
-                 "{\"doc_id\":%zu,\"source\":\"full_stack_test\",\"component\":\"agentos\"}", i);
+                 "{\"doc_id\":%zu,\"source\":\"full_stack_test\",\"component\":\"agentrt\"}", i);
         ASSERT_OK(provider->write_raw(provider, documents[i], strlen(documents[i]),
                                       meta, &doc_ids[i]));
         ASSERT_TRUE(doc_ids[i] != NULL);

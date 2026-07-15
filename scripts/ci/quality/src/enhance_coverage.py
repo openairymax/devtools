@@ -63,11 +63,11 @@ class CoverageAnalyzer:
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.source_dirs = [
-            project_root / "agentos" / "atoms" / "corekern",
-            project_root / "agentos" / "atoms" / "coreloopthree",
-            project_root / "agentos" / "atoms" / "memoryrovol",
-            project_root / "agentos" / "commons",
-            project_root / "agentos" / "daemon",
+            project_root / "agentrt" / "atoms" / "corekern",
+            project_root / "agentrt" / "atoms" / "coreloopthree",
+            project_root / "agentrt" / "atoms" / "memoryrovol",
+            project_root / "agentrt" / "commons",
+            project_root / "agentrt" / "daemons",
         ]
         self.test_dir = project_root / "tests"
 
@@ -175,7 +175,7 @@ class CoverageAnalyzer:
         
         for func in metrics.uncovered_functions[:5]:
             suggestion = TestGap(
-                file_path=f"agentos/{metrics.module_name}/src/*.c",
+                file_path=f"agentrt/{metrics.module_name}/src/*.c",
                 function_name=func,
                 line_range=(1, 100),  # 占位值
                 gap_type="untested",

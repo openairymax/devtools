@@ -1,4 +1,4 @@
-# AgentOS macOS 依赖清单
+# AgentRT macOS 依赖清单
 # 使用 Homebrew 安装
 # 格式: package_name@version 或仅包名
 

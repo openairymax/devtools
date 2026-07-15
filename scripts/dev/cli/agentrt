@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 """
-AgentOS Unified CLI - 统一命令行入口
+AgentRT Unified CLI - 统一命令行入口
 
 Usage:
     agentrt <command> [options] [arguments]
@@ -87,8 +87,8 @@ BLUE = "\033[34m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
 
-GATEWAY_URL = os.environ.get("AGENTOS_ENDPOINT", "http://localhost:18789")
-API_KEY = os.environ.get("AGENTOS_API_KEY", "")
+GATEWAY_URL = os.environ.get("AGENTRT_ENDPOINT", "http://localhost:18789")
+API_KEY = os.environ.get("AGENTRT_API_KEY", "")
 
 
 def print_header(text: str):
@@ -147,7 +147,7 @@ def jsonrpc_request(method: str, params: Optional[Dict] = None) -> Dict:
 
 
 def cmd_service_list(args):
-    print_header("AgentOS Services")
+    print_header("AgentRT Services")
     result = jsonrpc_request("service.list")
     if "error" in result:
         print_error(f"Failed to list services: {result['error']}")
@@ -171,7 +171,7 @@ def cmd_service_list(args):
 
 
 def cmd_service_health(args):
-    print_header("AgentOS Health Check")
+    print_header("AgentRT Health Check")
     result = api_request("GET", "/health")
     if "error" in result:
         print_error(f"Health check failed: {result['error']}")
@@ -190,7 +190,7 @@ def cmd_service_health(args):
 
 
 def cmd_agent_list(args):
-    print_header("AgentOS Agents")
+    print_header("AgentRT Agents")
     result = jsonrpc_request("agent.list")
     if "error" in result:
         print_error(f"Failed to list agents: {result['error']}")
@@ -214,7 +214,7 @@ def cmd_agent_list(args):
 
 
 def cmd_task_list(args):
-    print_header("AgentOS Tasks")
+    print_header("AgentRT Tasks")
     result = jsonrpc_request("task.list")
     if "error" in result:
         print_error(f"Failed to list tasks: {result['error']}")
@@ -238,7 +238,7 @@ def cmd_task_list(args):
 
 
 def cmd_protocol_list(args):
-    print_header("AgentOS Protocol Adapters")
+    print_header("AgentRT Protocol Adapters")
     result = api_request("GET", "/api/v1/protocols/adapters")
     if "error" in result:
         print_info("Backend not available, showing default protocols:")
@@ -599,7 +599,7 @@ def cmd_protocol_transform(args):
 
     sample_data = {
         ("jsonrpc", "mcp"): {
-            "input": '{"jsonrpc":"2.0","method":"tool.execute","params":{"name":"web_search","query":"AgentOS"},"id":1}',
+            "input": '{"jsonrpc":"2.0","method":"tool.execute","params":{"name":"web_search","query":"AgentRT"},"id":1}',
             "output_desc": "tool.execute → tools/call (params → arguments mapping)",
         },
         ("jsonrpc", "openai"): {
@@ -717,14 +717,14 @@ def cmd_config_set(args):
 
 
 def cmd_version(args):
-    print(f"{BOLD}AgentOS{RESET} v2.1.0")
+    print(f"{BOLD}AgentRT{RESET} v2.1.0")
     print(f"  Gateway: {GATEWAY_URL}")
     print(f"  Protocols: JSON-RPC 2.0, MCP v1.0, A2A v0.3, OpenAI API, OpenJiuwen (binary)")
     return 0
 
 
 def cmd_status(args):
-    print_header("AgentOS System Status")
+    print_header("AgentRT System Status")
 
     result = api_request("GET", "/health")
     if "error" in result:
@@ -746,7 +746,7 @@ def cmd_status(args):
 
 
 def cmd_dev_doctor(args):
-    print_header("AgentOS Diagnostics")
+    print_header("AgentRT Diagnostics")
     errors = 0
 
     import shutil
@@ -801,7 +801,7 @@ def cmd_dev_doctor(args):
 def _get_heapstore_root():
     """获取 heapstore 数据根目录"""
     return os.environ.get(
-        "AGENTOS_HEAPSTORE_ROOT",
+        "AGENTRT_HEAPSTORE_ROOT",
         os.path.join(os.path.expanduser("~"), ".agentrt", "heapstore")
     )
 
@@ -1000,7 +1000,7 @@ def cmd_db_backup(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="agentrt",
-        description="AgentOS Unified CLI - 统一命令行工具"
+        description="AgentRT Unified CLI - 统一命令行工具"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

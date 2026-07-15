@@ -9,7 +9,14 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="${1:-$(cd "$(dirname "$0")/../../.." && pwd)}"
+PROJECT_ROOT="${1:-$(cd "$(dirname "$0")/../../../.." && pwd)}"
+
+# 验证 PROJECT_ROOT 指向伞仓根（必须包含 agentrt/ 目录）
+if [[ ! -d "${PROJECT_ROOT}/agentrt" ]]; then
+    echo "ERROR: agentrt/ not found under PROJECT_ROOT=${PROJECT_ROOT}" >&2
+    echo "       PROJECT_ROOT must be the airymaxhub root directory." >&2
+    exit 1
+fi
 REPORT_FILE=""
 FIX_MODE=false
 
@@ -36,7 +43,7 @@ log_warn()  { echo -e "${YELLOW}[REVIEW]${NC} $*"; }
 log_err()   { echo -e "${RED}[VIOLATION]${NC} $*"; }
 
 echo "================================================================"
-echo "  AgentOS Dynamic memcpy/memmove/memset Scanner (SEC-11)"
+echo "  AgentRT Dynamic memcpy/memmove/memset Scanner (SEC-11)"
 echo "  Project: ${PROJECT_ROOT}"
 echo "  Mode:   $( $FIX_MODE && echo 'AUTO-FIX' || echo 'SCAN-ONLY' )"
 echo "================================================================"
@@ -124,7 +131,7 @@ while IFS= read -r -d '' file; do
                 ;;
         esac
     done < <(grep -rn '\bmemcpy\b\|\bmemmove\b\|\bmemset\b' "$file" 2>/dev/null || true)
-done < <(find "${PROJECT_ROOT}/agentos" -name "*.c" -print0 2>/dev/null)
+done < <(find "${PROJECT_ROOT}/agentrt" -name "*.c" -print0 2>/dev/null)
 
 # =========================================================================
 # 汇总报告
@@ -143,7 +150,7 @@ if [[ -n "$REPORT_FILE" ]]; then
     {
         echo '{'
         echo '  "timestamp": "'$(date -Iseconds)'",'
-        echo '  "project": "AgentOS",'
+        echo '  "project": "AgentRT",'
         echo '  "version": "0.1.0",'
         echo '  "scan_type": "dynamic_memcpy",'
         echo '  "results": {'

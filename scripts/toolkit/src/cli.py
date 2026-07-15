@@ -14,10 +14,10 @@ AgentRT 交互式 CLI
 - 分页输出
 
 Usage:
-    from airy_scripts.toolkit.cli import AgentOSCLI
+    from airy_scripts.toolkit.cli import AgentRTCLI
     from airy_scripts.toolkit.logger import ProgressBar, Spinner, Table, Color, Style
 
-    cli = AgentOSCLI()
+    cli = AgentRTCLI()
     cli.info("Starting process...")
     cli.success("Operation completed")
 """
@@ -38,7 +38,7 @@ from .logger import (
 )
 
 
-class AgentOSCLI:
+class AgentRTCLI:
     """AgentRT CLI 主类 - 增强的用户交互体验"""
 
     def __init__(self, verbose: bool = False):
@@ -129,6 +129,6 @@ class AgentOSCLI:
         return Spinner(message)
 
 
-# Note: For full system diagnostics, use scripts.toolkit.AgentOSDoctor
+# Note: For full system diagnostics, use scripts.toolkit.AgentRTDoctor
 # The InteractiveDoctor class has been migrated to toolkit/doctor.py
 # to provide comprehensive 8-category health checking with JSON output.

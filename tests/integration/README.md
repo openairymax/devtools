@@ -14,9 +14,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| tests/integration/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
+| tests/integration/ 目录 | 对应的 agentrt/ 模块 | 测试内容 |
 |-------------------------|---------------------|----------|
 | `c/` | `atoms/`, `commons/`, `gateway/` | C 层端到端核心集成与协议兼容性 |
 | `python/` | `daemons/`, `gateway/`, `heapstore/` | Python 层端到端工作流与协议兼容性 |
@@ -118,7 +118,7 @@ pytest tests/integration/ -v -n auto -m integration
 
 ## 测试场景
 
-| 场景 | 涉及的 agentos/ 模块 | 验证目标 | 测试文件 |
+| 场景 | 涉及的 agentrt/ 模块 | 验证目标 | 测试文件 |
 |------|---------------------|----------|---------|
 | **端到端核心** | `atoms/` → `daemons/` → `gateway/` | 完整请求链路 | `c/test_e2e_core.c`, `python/test_e2e_workflows.py` |
 | **协议兼容** | `gateway/`, `protocols/` | HTTP/WS/Stdio → JSON-RPC 2.0 转换 | `c/test_protocol_compatibility.c`, `python/test_protocol_compatibility.py` |
@@ -132,7 +132,7 @@ pytest tests/integration/ -v -n auto -m integration
 
 ## 测试覆盖说明
 
-| agentos/ 模块 | 集成测试文件 | 测试框架 | 覆盖范围 |
+| agentrt/ 模块 | 集成测试文件 | 测试框架 | 覆盖范围 |
 |--------------|------------|---------|---------|
 | `atoms/corekern/` | `c/test_e2e_core.c` | CMocka | 内核 IPC → 任务调度 → 内存管理完整链路 |
 | `atoms/coreloopthree/` | `coreloopthree/` | pytest | 认知-执行联动、记忆演化、三环协调 |

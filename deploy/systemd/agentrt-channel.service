@@ -19,7 +19,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=@AGENTOS_RUNTIME_DIR@
+ReadWritePaths=@AGENTRT_RUNTIME_DIR@
 LimitNPROC=512
 
 [Install]

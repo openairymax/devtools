@@ -14,9 +14,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| tests/benchmarks/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
+| tests/benchmarks/ 目录 | 对应的 agentrt/ 模块 | 测试内容 |
 |------------------------|---------------------|----------|
 | `c/` | `atoms/`, `commons/` | C 语言性能基准测试（内核/公共库性能指标） |
 | `python/` | `daemons/`, `commons/` | Python 性能基准测试（守护进程/公共库性能指标） |
@@ -127,7 +127,7 @@ pytest tests/benchmarks/ --benchmark-only --benchmark-json=benchmark_results.jso
 
 ## 性能测试维度
 
-| 维度 | 对应的 agentos/ 模块 | 关键指标 | 测试文件 |
+| 维度 | 对应的 agentrt/ 模块 | 关键指标 | 测试文件 |
 |------|---------------------|----------|---------|
 | **内核性能** | `atoms/corekern/` | IPC 延迟、任务调度开销、内存分配耗时 | `atoms/atoms_benchmarks.c`, `c/test_performance_benchmarks.c` |
 | **认知性能** | `atoms/coreloopthree/` | 三环吞吐量、认知-执行联动延迟 | `atoms/atoms_benchmarks.c` |
@@ -141,7 +141,7 @@ pytest tests/benchmarks/ --benchmark-only --benchmark-json=benchmark_results.jso
 
 ## 测试覆盖说明
 
-| agentos/ 模块 | 基准测试文件 | 测试框架 | 覆盖范围 |
+| agentrt/ 模块 | 基准测试文件 | 测试框架 | 覆盖范围 |
 |--------------|------------|---------|---------|
 | `atoms/corekern/` | `atoms/atoms_benchmarks.c`, `c/test_performance_benchmarks.c` | C (CMocka) | IPC 延迟、内存分配、任务调度 |
 | `atoms/coreloopthree/` | `atoms/atoms_benchmarks.c` | C | 三环吞吐量、协调延迟 |

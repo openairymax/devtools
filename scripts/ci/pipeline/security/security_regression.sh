@@ -1,5 +1,5 @@
 #!/bin/bash
-# AgentOS Security Regression Test - Team B Safety Net
+# AgentRT Security Regression Test - Team B Safety Net
 # Validates: compilation (0e0w) + flawfinder L4 threshold + cppcheck 0e + security_check CRITICAL=0
 set -euo pipefail
 
@@ -32,14 +32,14 @@ cleanup() {
 trap cleanup EXIT
 
 echo "╔══════════════════════════════════════════════════╗"
-echo "║   AgentOS Security Regression Test - Team B     ║"
+echo "║   AgentRT Security Regression Test - Team B     ║"
 echo "║   $(date '+%Y-%m-%d %H:%M:%S')                       ║"
 echo "╚══════════════════════════════════════════════════╝"
 
 section "1. Clean Build (Compilation)"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
-if cmake "$AGENTRT_ROOT/agentos" > /dev/null 2>&1; then
+if cmake "$AGENTRT_ROOT/agentrt" > /dev/null 2>&1; then
     CMAKE_OUTPUT=$(cmake --build . 2>&1 || true)
     ERROR_COUNT=$(echo "$CMAKE_OUTPUT" | grep -c "error:" || true)
     WARNING_COUNT=$(echo "$CMAKE_OUTPUT" | grep -c "warning:" || true)
@@ -63,7 +63,7 @@ else
 fi
 
 section "2. flawfinder Security Scan (Level 4)"
-cd "$AGENTRT_ROOT/agentos"
+cd "$AGENTRT_ROOT/agentrt"
 L4_HITS=$(flawfinder --minlevel 4 atoms/ commons/ cupolas/ 2>&1 | grep -c "\[4\]" || true)
 L4_THRESHOLD=10
 
@@ -123,12 +123,12 @@ if [ "$MEMORYROV_PATH_CHECK" -ge 1 ]; then pass "storage.c: Memory path validati
 
 section "6. Python SDK Syntax Validation"
 PYTHON_FILES=(
-    "$AGENTRT_ROOT/sdk/python/agentos/exceptions.py"
-    "$AGENTRT_ROOT/sdk/python/agentos/agent.py"
-    "$AGENTRT_ROOT/sdk/python/agentos/task.py"
-    "$AGENTRT_ROOT/sdk/python/agentos/protocol.py"
-    "$AGENTRT_ROOT/sdk/python/agentos/client/client.py"
-    "$AGENTRT_ROOT/sdk/python/agentos/session.py"
+    "$AGENTRT_ROOT/sdk/python/agentrt/exceptions.py"
+    "$AGENTRT_ROOT/sdk/python/agentrt/agent.py"
+    "$AGENTRT_ROOT/sdk/python/agentrt/task.py"
+    "$AGENTRT_ROOT/sdk/python/agentrt/protocol.py"
+    "$AGENTRT_ROOT/sdk/python/agentrt/client/client.py"
+    "$AGENTRT_ROOT/sdk/python/agentrt/session.py"
 )
 PYTHON_FAIL=0
 PYTHON_FOUND=0

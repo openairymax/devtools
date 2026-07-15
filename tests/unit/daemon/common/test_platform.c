@@ -91,7 +91,7 @@ static void test_strlcpy(void) {
     printf("  test_strlcpy...\n");
 
     char dest[32];
-    const char* src = "Hello, AgentOS!";
+    const char* src = "Hello, AgentRT!";
 
     size_t len = airy_strlcpy(dest, sizeof(dest), src);
     assert(strcmp(dest, src) == 0);

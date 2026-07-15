@@ -17,9 +17,9 @@ Comprehensive system health checker with 8 diagnostic categories:
 - Performance (resource thresholds)
 
 Usage:
-    from scripts.toolkit import AgentOSDoctor
+    from scripts.toolkit import AgentRTDoctor
 
-    doctor = AgentOSDoctor()
+    doctor = AgentRTDoctor()
     doctor.run_all_checks()
     doctor.print_report()
 """
@@ -328,13 +328,13 @@ class ConfigurationChecker(BaseChecker):
     """Configuration file validation"""
 
     CONFIG_FILES = {
-        "agentos.conf": ["version", "log_level"],
+        "agentrt.conf": ["version", "log_level"],
         "logging.conf": ["level", "format"]
     }
 
     def check_config_files(self) -> List[CheckResult]:
         results = []
-        config_dir = os.path.expanduser("~/.agentos")
+        config_dir = os.path.expanduser("~/.agentrt")
         for fname, required_fields in self.CONFIG_FILES.items():
             fpath = os.path.join(config_dir, fname)
             if not os.path.exists(fpath):
@@ -371,7 +371,7 @@ class SecurityChecker(BaseChecker):
         return [self.check_file_permissions()]
 
 
-class AgentOSDoctor:
+class AgentRTDoctor:
     """
     Main diagnostic orchestrator.
 
@@ -481,7 +481,7 @@ def main():
     )
 
     parser.add_argument("--category", "-c", action="append",
-                        choices=[c[0] for c in AgentOSDoctor.CHECKERS],
+                        choices=[c[0] for c in AgentRTDoctor.CHECKERS],
                         help="Run specific check category (repeatable)")
     parser.add_argument("--format", "-f", choices=["text", "json"],
                         default="text", help="Output format")
@@ -492,7 +492,7 @@ def main():
 
     args = parser.parse_args()
 
-    doctor = AgentOSDoctor()
+    doctor = AgentRTDoctor()
     report = doctor.run_all_checks(categories=args.category)
 
     if args.json_output:

@@ -1,6 +1,6 @@
-# AgentOS Windows Setup Script
+# AgentRT Windows Setup Script
 # Version: 0.1.0
-# Description: Windows development environment setup and build script for AgentOS
+# Description: Windows development environment setup and build script for AgentRT
 # Compatible with: Windows 10/11, PowerShell 5.1+
 
 param(
@@ -35,7 +35,7 @@ function Test-Command {
 
 if ($Help) {
     Write-Host @"
-AgentOS Windows Setup Script
+AgentRT Windows Setup Script
 ============================
 
 Usage: .\setup.ps1 [options]
@@ -58,7 +58,7 @@ Examples:
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║     AgentOS Windows Setup Script v1.0    ║" -ForegroundColor Green
+Write-Host "║     AgentRT Windows Setup Script v1.0    ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 
@@ -172,7 +172,7 @@ try {
 Write-Header "Step 4: Building Project"
 
 $configArg = "--config", $BuildType
-$buildTarget = if ($Test) { "ALL_BUILD" } else { "AgentOS" }
+$buildTarget = if ($Test) { "ALL_BUILD" } else { "AgentRT" }
 
 Write-Host "[INFO] Building target: $buildTarget ($BuildType)..." -ForegroundColor Yellow
 Write-Host "[CMD] cmake --build . --config $BuildType --target $buildTarget" -ForegroundColor Gray
@@ -224,5 +224,5 @@ For more information, see docs/BUILD.md
 "@ -ForegroundColor White
 
 Write-Host ""
-Write-Host "🎉 AgentOS Windows setup completed successfully!" -ForegroundColor Green
+Write-Host "🎉 AgentRT Windows setup completed successfully!" -ForegroundColor Green
 Write-Host ""

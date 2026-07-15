@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AgentOS 统一依赖安装脚本
+# AgentRT 统一依赖安装脚本
 # 支持平台: Linux (Ubuntu/Debian), macOS, Windows (MSYS2/Git Bash)
 # 特性: 重试机制、错误处理、版本验证、缓存感知
 
@@ -118,52 +118,6 @@ verify_linux_deps() {
     return 0
 }
 
-# ==================== tiktoken 存根创建 ====================
-create_tiktoken_stub() {
-    log_info "=== 创建 tiktoken 存根 ==="
-    
-    local stub_dir="/usr/local/lib/pkgconfig"
-    local stub_file="${stub_dir}/tiktoken.pc"
-    
-    # 检查是否已有存根
-    if [ -f "$stub_file" ]; then
-        log_ok "tiktoken 存根已存在"
-        return 0
-    fi
-    
-    # 创建目录
-    sudo mkdir -p "$stub_dir"
-    
-    # 创建 .pc 文件
-    cat << 'PC_EOF' | sudo tee "$stub_file" > /dev/null
-prefix=/usr/local
-exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
-includedir=${prefix}/include
-
-Name: tiktoken
-Description: Tokenizer library (CI stub for AgentOS)
-Version: 0.5.2
-URL: https://github.com/openai/tiktoken
-Libs: -L${libdir} -ltiktoken
-Cflags: -I${includedir}
-PC_EOF
-    
-    # 创建空桩库
-    local tmp_src=$(mktemp /tmp/tiktoken_stub_XXXX.c)
-    local tmp_obj=$(mktemp /tmp/tiktoken_stub_XXXX.o)
-    
-    echo 'void tiktoken_init(void) {}' > "$tmp_src"
-    if command -v gcc &>/dev/null; then
-        gcc -c "$tmp_src" -o "$tmp_obj" 2>/dev/null || true
-        ar rcs /usr/local/lib/libtiktoken.a "$tmp_obj" 2>/dev/null || true
-    fi
-    
-    rm -f "$tmp_src" "$tmp_obj"
-    
-    log_ok "tiktoken 存根创建完成 ($stub_file)"
-}
-
 # ==================== macOS 依赖安装 ====================
 install_macos_deps() {
     log_info "=== 安装 macOS 系统依赖 ==="
@@ -188,44 +142,7 @@ install_macos_deps() {
     # Python
     retry_cmd "brew install python@3.11"
     
-    # 创建 tiktoken 存根
-    create_tiktoken_stub_macos
-    
     verify_macos_deps
-}
-
-create_tiktoken_stub_macos() {
-    log_info "=== 创建 macOS tiktoken 存根 ==="
-    
-    local stub_dir="/usr/local/lib/pkgconfig"
-    local stub_file="${stub_dir}/tiktoken.pc"
-    
-    if [ -f "$stub_file" ]; then
-        log_ok "tiktoken 存根已存在"
-        return 0
-    fi
-    
-    sudo mkdir -p "$stub_dir"
-    
-    cat << 'PC_EOF' | sudo tee "$stub_file" > /dev/null
-prefix=/usr/local
-exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
-includedir=${prefix}/include
-
-Name: tiktoken
-Description: Tokenizer library (CI stub for AgentOS)
-Version: 0.5.2
-Libs: -L${libdir} -ltiktoken
-Cflags: -I${includedir}
-PC_EOF
-    
-    echo 'void tiktoken_init(void) {}' > /tmp/tiktoken_stub.c
-    cc -c /tmp/tiktoken_stub.c -o /tmp/tiktoken_stub.o 2>/dev/null || true
-    sudo ar rcs /usr/local/lib/libtiktoken.a /tmp/tiktoken_stub.o 2>/dev/null || true
-    rm -f /tmp/tiktoken_stub.c /tmp/tiktoken_stub.o
-    
-    log_ok "macOS tiktoken 存根创建完成"
 }
 
 verify_macos_deps() {
@@ -262,7 +179,7 @@ install_windows_deps() {
 # ==================== 主流程 ====================
 main() {
     log_info "========================================="
-    log_info "AgentOS 依赖安装脚本"
+    log_info "AgentRT 依赖安装脚本"
     log_info "项目路径: ${PROJECT_ROOT}"
     log_info "操作系统: ${OS}"
     log_info "========================================="
@@ -270,7 +187,6 @@ main() {
     case "$OS" in
         linux)
             install_linux_deps
-            create_tiktoken_stub
             ;;
         macos)
             install_macos_deps

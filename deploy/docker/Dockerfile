@@ -4,7 +4,7 @@
 # Version: 0.1.1
 #
 # 多阶段构建，支持所有 16 个 daemon 的统一运行时镜像。
-# 通过 AGENTOS_SERVICE_NAME 环境变量选择启动的 daemon。
+# 通过 AGENTRT_SERVICE_NAME 环境变量选择启动的 daemon。
 
 # ==========================================================================
 # 阶段1: 构建阶段 — 编译所有 daemon 二进制文件
@@ -65,16 +65,16 @@ FROM alpine:3.19 AS runtime
 LABEL maintainer="SPHARX Team <devops@spharx.cn>"
 LABEL description="AgentRT Multi-Daemon Runtime"
 LABEL version="${BUILD_VERSION}"
-LABEL org.opencontainers.image.source="https://github.com/spharx/agentos"
+LABEL org.opencontainers.image.source="https://github.com/spharx/agentrt"
 LABEL org.opencontainers.image.title="AgentRT Runtime"
 LABEL org.opencontainers.image.vendor="SPHARX"
 
 # 默认环境变量
-ENV AGENTOS_VERSION=${BUILD_VERSION} \
-    AGENTOS_LOG_LEVEL=INFO \
-    AGENTOS_TEST_MODE=0 \
-    AGENTOS_CONFIG_PATH=/etc/agentrt/agentrt.yaml \
-    AGENTOS_DEPLOY_ENV=production
+ENV AGENTRT_VERSION=${BUILD_VERSION} \
+    AGENTRT_LOG_LEVEL=INFO \
+    AGENTRT_TEST_MODE=0 \
+    AGENTRT_CONFIG_PATH=/etc/agentrt/agentrt.yaml \
+    AGENTRT_DEPLOY_ENV=production
 
 RUN apk add --no-cache \
     libmicrohttpd \
@@ -90,10 +90,10 @@ RUN apk add --no-cache \
     libstdc++ \
     protobuf-c \
     bash && \
-    addgroup -g 1000 agentos && \
-    adduser -u 1000 -G agentos -s /bin/sh -D agentos && \
-    mkdir -p /var/log/agentos /var/run/agentos /etc/agentrt && \
-    chown -R agentos:agentos /var/log/agentos /var/run/agentos /etc/agentrt
+    addgroup -g 1000 agentrt && \
+    adduser -u 1000 -G agentrt -s /bin/sh -D agentrt && \
+    mkdir -p /var/log/agentrt /var/run/agentrt /etc/agentrt && \
+    chown -R agentrt:agentrt /var/log/agentrt /var/run/agentrt /etc/agentrt
 
 # 从构建阶段复制安装文件
 COPY --from=builder /install/ /
@@ -102,11 +102,11 @@ COPY --from=builder /install/ /
 COPY deploy/docker/entrypoint.sh /usr/local/bin/agentrt-entrypoint.sh
 RUN chmod +x /usr/local/bin/agentrt-entrypoint.sh
 
-USER agentos
-WORKDIR /home/agentos
+USER agentrt
+WORKDIR /home/agentrt
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:${AGENTOS_SERVICE_PORT:-8080}/healthz || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${AGENTRT_SERVICE_PORT:-8080}/healthz || exit 1
 
 EXPOSE 8080 8081 9090
 

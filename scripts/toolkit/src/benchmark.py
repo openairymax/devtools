@@ -54,7 +54,7 @@ class BenchmarkSuite:
     python_version: str = ""
 
 
-class AgentOSBenchmark:
+class AgentRTBenchmark:
     """AgentRT performance benchmark framework"""
 
     def __init__(self, iterations: int = 1000, warmup: int = 100):
@@ -194,7 +194,7 @@ def main():
     parser.add_argument("-f", "--format", choices=["text","json","csv"], default="text")
     args = parser.parse_args()
     
-    bench = AgentOSBenchmark(iterations=args.iterations, warmup=args.warmup)
+    bench = AgentRTBenchmark(iterations=args.iterations, warmup=args.warmup)
     suite = bench.run_all_suites()
     fmt = OutputFormat(args.format)
     

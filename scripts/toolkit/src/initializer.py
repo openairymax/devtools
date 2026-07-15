@@ -30,9 +30,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-DEFAULT_CONFIG_DIR = os.path.expanduser("~/.agentos")
+DEFAULT_CONFIG_DIR = os.path.expanduser("~/.agentrt")
 CONFIG_DIRS = [
-    os.path.expanduser("~/.agentos"),
+    os.path.expanduser("~/.agentrt"),
     "/etc/agentrt",
     os.path.join(os.getcwd(), "manager")
 ]
@@ -48,8 +48,8 @@ class ConfigTemplate:
 
 
 DEFAULT_CONFIGS = {
-    "agentos.conf": ConfigTemplate(
-        name="agentos.conf",
+    "agentrt.conf": ConfigTemplate(
+        name="agentrt.conf",
         description="AgentRT main configuration",
         content="""# AgentRT Main Configuration
 # Version: 0.1.0
@@ -57,8 +57,8 @@ DEFAULT_CONFIGS = {
 # System
 version = "0.1.0"
 log_level = "info"
-data_dir = "${HOME}/.agentos/data"
-run_dir = "/var/run/agentos"
+data_dir = "${HOME}/.agentrt/data"
+run_dir = "/var/run/agentrt"
 
 # Kernel
 kernel.threads = 4
@@ -84,7 +84,7 @@ security.max_memory_per_agent = "64M"
 logging.level = "info"
 logging.format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 logging.output = "stdout"
-logging.file = "${HOME}/.agentos/logs/agentos.log"
+logging.file = "${HOME}/.agentrt/logs/agentrt.log"
 
 # Telemetry
 telemetry.enabled = true
@@ -107,7 +107,7 @@ date_format = "%Y-%m-%d %H:%M:%S"
 
 # Output
 output = "stdout"
-file = "${HOME}/.agentos/logs/agentos.log"
+file = "${HOME}/.agentrt/logs/agentrt.log"
 
 # Rotation
 rotation.enabled = true
@@ -251,7 +251,7 @@ blocked_patterns = ["..", "~", "$", "`"]
 # Audit
 [audit]
 enabled = true
-log_file = "${HOME}/.agentos/logs/audit.log"
+log_file = "${HOME}/.agentrt/logs/audit.log"
 log_all_syscalls = false
 log_failed_only = true
 """,
@@ -346,7 +346,7 @@ class ConfigInitializer:
             return False
 
         overrides = env_configs[env]
-        config_path = os.path.join(self.config_dir, "agentos.conf")
+        config_path = os.path.join(self.config_dir, "agentrt.conf")
 
         if not os.path.exists(config_path):
             print("Please run --init first")
@@ -433,7 +433,7 @@ def main():
     parser.add_argument("--output", type=str,
                         help="Output directory for backup")
     parser.add_argument("--dir", type=str,
-                        help="Configuration directory (default: ~/.agentos)")
+                        help="Configuration directory (default: ~/.agentrt)")
     parser.add_argument("--force", action="store_true",
                         help="Force overwrite existing files")
     parser.add_argument("--list", action="store_true",
@@ -482,7 +482,7 @@ def main():
         return 0 if initializer.generate_env_config(args.env) else 1
 
     if args.backup:
-        output = args.output or os.path.expanduser("~/.agentos/backups")
+        output = args.output or os.path.expanduser("~/.agentrt/backups")
         return 0 if initializer.backup_configs(output) else 1
 
     if args.restore:

@@ -124,7 +124,7 @@ class SyscallContractValidator:
 
 class ConfigContractValidator:
     REQUIRED_FIELDS = {
-        "agentos.conf": ["version", "log_level", "data_dir"],
+        "agentrt.conf": ["version", "log_level", "data_dir"],
         "logging.conf": ["level", "format", "output"],
         "memory.conf": ["max_memory", "gc_threshold"]
     }

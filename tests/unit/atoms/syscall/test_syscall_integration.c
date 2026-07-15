@@ -45,8 +45,8 @@ static void test_task_full_workflow(void) {
     /* 提交任务 */
     char* task_id = NULL;
     err = airy_sys_task_submit(
-        "分析AgentOS架构设计原则", 
-        strlen("分析AgentOS架构设计原则"), 
+        "分析AgentRT架构设计原则", 
+        strlen("分析AgentRT架构设计原则"), 
         5000, 
         &task_id);
     
@@ -239,7 +239,7 @@ static void test_edge_cases(void) {
     if (result) AIRY_FREE(result);
     
     /* Unicode 输入 */
-    const char* unicode_input = "中文测试 🎉 AgentOS 架构";
+    const char* unicode_input = "中文测试 🎉 AgentRT 架构";
     err = airy_sys_task_submit(unicode_input, strlen(unicode_input), 100, &result);
     TEST_ASSERT(err == AIRY_SUCCESS || err != AIRY_EINVAL,
                 "Unicode 字符处理");

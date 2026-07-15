@@ -32,7 +32,7 @@ static void test_logger_init_shutdown(void) {
     printf("  test_logger_init_shutdown...\n");
 
     airy_logger_config_t config = {
-        .name = "test_agentos",
+        .name = "test_agentrt",
         .level = LOG_LEVEL_DEBUG,
         .targets = NULL,
         .target_count = 0,
@@ -76,7 +76,7 @@ static void test_logger_macros(void) {
     printf("  test_logger_macros...\n");
 
     airy_logger_config_t config = {
-        .name = "test_agentos",
+        .name = "test_agentrt",
         .level = LOG_LEVEL_DEBUG,
         .targets = NULL,
         .target_count = 0,

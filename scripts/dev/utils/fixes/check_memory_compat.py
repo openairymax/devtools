@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan for files using AGENTOS memory macros but missing memory_compat.h include."""
+"""Scan for files using AGENTRT memory macros but missing memory_compat.h include."""
 
 import re
 import os
@@ -25,15 +25,15 @@ def check_file(fpath):
     has_error_h = '#include "error.h"' in content or '#include <error.h>' in content
     
     if not has_include:
-        return f'missing memory_compat.h (uses AGENTOS memory macros, has_error_h={has_error_h})'
+        return f'missing memory_compat.h (uses AGENTRT memory macros, has_error_h={has_error_h})'
     
     return None
 
 # Scan protocols and gateway
 files_to_check = []
 for root_dir in [
-    os.path.join(BASE_DIR, 'agentos', 'protocols'),
-    os.path.join(BASE_DIR, 'agentos', 'gateway'),
+    os.path.join(BASE_DIR, 'agentrt', 'protocols'),
+    os.path.join(BASE_DIR, 'agentrt', 'gateway'),
 ]:
     for dirpath, _, filenames in os.walk(root_dir):
         for fname in filenames:

@@ -169,6 +169,6 @@ ingress:
       hosts:
         - agentrt.example.com
 
-agentosConfig:
+agentrtConfig:
   logLevel: info
   deployEnv: production

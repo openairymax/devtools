@@ -6,16 +6,16 @@
 #   target_link_libraries(my_target PRIVATE AgentRT::atoms)
 #
 # AgentRT atoms is a header-only INTERFACE library; headers are installed
-# under ${PACKAGE_PREFIX_DIR}/include/agentos.
+# under ${PACKAGE_PREFIX_DIR}/include/agentrt.
 
 @PACKAGE_INIT@
 
 set(AgentRT_VERSION "@PROJECT_VERSION@")
 
 # Include directories for the header-only atoms interface.
-set_and_check(AgentRT_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include/agentos")
+set_and_check(AgentRT_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include/agentrt")
 
-# Backwards-compatible alias variables.
+# Standard CMake variable aliases (singular form).
 set(AgentRT_LIBRARIES "")
 set(AgentRT_INCLUDE_DIR "${AgentRT_INCLUDE_DIRS}")
 

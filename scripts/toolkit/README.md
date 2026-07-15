@@ -16,9 +16,9 @@
 > **版本**：v0.1.0
 > **状态**：✅ 正式版，API 已稳定。
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| toolkit/ 模块 | 对应的 agentos/ 模块 | 用途 |
+| toolkit/ 模块 | 对应的 agentrt/ 模块 | 用途 |
 |---------------|---------------------|------|
 | `initializer.py` | `commons/`, `daemons/` | 配置初始化器（默认配置/完整性验证/环境特定配置/备份恢复） |
 | `doctor.py` | `commons/`, `daemons/`, `manager/` | 系统健康诊断（8 大类别：系统/Python/构建/项目/配置/网络/安全/性能） |

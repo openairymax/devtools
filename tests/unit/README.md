@@ -14,9 +14,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| tests/unit/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
+| tests/unit/ 目录 | 对应的 agentrt/ 模块 | 测试内容 |
 |------------------|---------------------|----------|
 | `atoms/corekern/` | `agentrt/atoms/corekern/` | 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
 | `atoms/coreloopthree/` | `agentrt/atoms/coreloopthree/` | 三环核心运行时（认知环/执行环/学习环、协调器、多数投票） |
@@ -265,7 +265,7 @@ pytest tests/unit/ -v -n auto
 
 ## 测试覆盖说明
 
-| agentos/ 模块 | 测试文件数 | 测试类型 | 关键验证点 |
+| agentrt/ 模块 | 测试文件数 | 测试类型 | 关键验证点 |
 |--------------|-----------|----------|-----------|
 | `atoms/corekern/` | 7 | CMocka | IPC 通信、内存分配/释放、任务调度、定时器精度 |
 | `atoms/coreloopthree/` | 11 | CMocka | 认知环推理、执行环动作、学习环更新、协调器同步、多数投票 |

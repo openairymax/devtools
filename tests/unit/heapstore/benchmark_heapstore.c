@@ -1,6 +1,6 @@
 /**
  * @file benchmark_heapstore.c
- * @brief AgentOS 数据分区性能基准测试
+ * @brief AgentRT 数据分区性能基准测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
@@ -279,7 +279,7 @@ static void benchmark_stats_operations(void) {
 
 int main(void) {
     printf("===========================================\n");
-    printf("   AgentOS heapstore Performance Benchmark\n");
+    printf("   AgentRT heapstore Performance Benchmark\n");
     printf("===========================================\n");
     printf("Iterations per test: %d\n", BENCHMARK_ITERATIONS);
     printf("===========================================\n");

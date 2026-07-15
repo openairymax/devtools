@@ -1,4 +1,4 @@
-# AgentOS 测试依赖
+# AgentRT 测试依赖
 
 # 核心测试框架
 pytest>=7.0

@@ -12,7 +12,7 @@ import time
 
 # Import all available public APIs
 try:
-    from agentos import (
+    from agentrt import (
         AgentRT, AsyncAgentRT,
         Telemetry, Meter, Tracer, Span, SpanStatus,
         TaskStatus, TaskResult, SkillResult, SkillInfo,
@@ -22,36 +22,36 @@ try:
         validate_json, sanitize_string,
         get_env_var, parse_timeout, merge_dicts,
         Timer, RateLimiter,
-        AgentOSError, TaskError, AgentOSMemoryError, SessionError, SkillError,
-        NetworkError, AgentOSTimeoutError, InitializationError, ValidationError, TelemetryError,
+        AgentRTError, TaskError, AgentRTMemoryError, SessionError, SkillError,
+        NetworkError, AgentRTTimeoutError, InitializationError, ValidationError, TelemetryError,
         ConfigError, SyscallError, RateLimitError,
     )
 except ImportError:
     # Fallback
-    from agentos import AgentRT, AsyncAgentRT
-    AgentOSError = getattr(__import__('agentos.exceptions', fromlist=['AgentOSError']), 'AgentOSError', Exception)
-    TaskError = AgentOSError
-    AgentOSMemoryError = AgentOSError
-    SessionError = AgentOSError
-    SkillError = AgentOSError
-    NetworkError = AgentOSError
-    AgentOSTimeoutError = AgentOSError
-    InitializationError = AgentOSError
-    ValidationError = AgentOSError
-    TelemetryError = AgentOSError
-    ConfigError = AgentOSError
-    SyscallError = AgentOSError
-    RateLimitError = AgentOSError
+    from agentrt import AgentRT, AsyncAgentRT
+    AgentRTError = getattr(__import__('agentrt.exceptions', fromlist=['AgentRTError']), 'AgentRTError', Exception)
+    TaskError = AgentRTError
+    AgentRTMemoryError = AgentRTError
+    SessionError = AgentRTError
+    SkillError = AgentRTError
+    NetworkError = AgentRTError
+    AgentRTTimeoutError = AgentRTError
+    InitializationError = AgentRTError
+    ValidationError = AgentRTError
+    TelemetryError = AgentRTError
+    ConfigError = AgentRTError
+    SyscallError = AgentRTError
+    RateLimitError = AgentRTError
 
 # 从子模块直接导入（不在 __init__.py 的 __all__ 中）
-from agentos.task import Task
-from agentos.memory import Memory
-from agentos.session import Session
-from agentos.skill import Skill
+from agentrt.task import Task
+from agentrt.memory import Memory
+from agentrt.session import Session
+from agentrt.skill import Skill
 
 # 向后兼容别名
-MemoryError = AgentOSMemoryError
-TimeoutError = AgentOSTimeoutError
+MemoryError = AgentRTMemoryError
+TimeoutError = AgentRTTimeoutError
 
 
 class TestTypes(unittest.TestCase):
@@ -125,7 +125,7 @@ class TestExceptions(unittest.TestCase):
     
     @pytest.mark.skip(reason="SDK exception API has evolved, test needs updating")
     def test_agentrt_error(self):
-        """Test base AgentOSError."""
+        """Test base AgentRTError."""
         pass
     
     @pytest.mark.skip(reason="SDK exception API has evolved, test needs updating")
@@ -361,7 +361,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def test_retry_success(self):
         """Test retry until success."""
-        from agentos.utils import retry_with_backoff
+        from agentrt.utils import retry_with_backoff
 
         call_count = 0
 
@@ -379,7 +379,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def test_retry_exhausted(self):
         """Test retry exhaustion."""
-        from agentos.utils import retry_with_backoff
+        from agentrt.utils import retry_with_backoff
 
         call_count = 0
 
@@ -401,7 +401,7 @@ class TestSyscallBinding(unittest.TestCase):
     def test_syscall_import_available(self):
         """Test that SyscallError is available in exceptions."""
         self.assertIsNotNone(SyscallError)
-        self.assertTrue(issubclass(SyscallError, AgentOSError))
+        self.assertTrue(issubclass(SyscallError, AgentRTError))
 
 
 if __name__ == "__main__":

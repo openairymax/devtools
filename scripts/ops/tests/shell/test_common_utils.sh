@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 通用工具函数测试
+# AgentRT 通用工具函数测试
 
 # 加载测试框架
 AGENTRT_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -168,7 +168,7 @@ run_all_tests() {
     )
 
     echo "=========================================="
-    echo "  AgentOS commons Utils Tests"
+    echo "  AgentRT commons Utils Tests"
     echo "=========================================="
     echo ""
 

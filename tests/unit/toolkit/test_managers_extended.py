@@ -15,7 +15,7 @@ MemoryManager, and SkillManager classes with focus on:
 
 遵循 ARCHITECTURAL_PRINCIPLES.md 的 E-8（可测试性原则）。
 
-Run with: pytest tests/test_managers_extended.py -v --cov=agentos.modules --cov-report=term-missing
+Run with: pytest tests/test_managers_extended.py -v --cov=agentrt.modules --cov-report=term-missing
 """
 
 import pytest
@@ -29,19 +29,19 @@ import os
 # 添加父目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agentos.client.client import APIClient, APIResponse
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
-from agentos.types.common import (
+from agentrt.client.client import APIClient, APIResponse
+from agentrt.exceptions import AgentRTError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
+from agentrt.types.common import (
     Task, TaskStatus, TaskResult,
     Session, SessionStatus,
     Memory, MemoryLayer, MemorySearchResult,
     Skill, SkillStatus, SkillResult, SkillInfo,
     ListOptions, PaginationOptions
 )
-from agentos.modules.task.manager import TaskManager
-from agentos.modules.session.manager import SessionManager
-from agentos.modules.memory.manager import MemoryManager, MemoryWriteItem
-from agentos.modules.skill.manager import SkillManager, SkillExecuteRequest
+from agentrt.modules.task.manager import TaskManager
+from agentrt.modules.session.manager import SessionManager
+from agentrt.modules.memory.manager import MemoryManager, MemoryWriteItem
+from agentrt.modules.skill.manager import SkillManager, SkillExecuteRequest
 
 
 # ============================================================================
@@ -146,17 +146,17 @@ class TestTaskManagerBoundaryConditions:
 
     def test_submit_with_none_description(self, task_manager):
         """测试None任务描述"""
-        with pytest.raises((AgentOSError, TypeError)):
+        with pytest.raises((AgentRTError, TypeError)):
             task_manager.submit(None)
 
     def test_get_with_none_id(self, task_manager):
         """测试None任务ID"""
-        with pytest.raises((AgentOSError, TypeError)):
+        with pytest.raises((AgentRTError, TypeError)):
             task_manager.get(None)
 
     def test_cancel_with_none_id(self, task_manager):
         """测试None任务ID取消"""
-        with pytest.raises((AgentOSError, TypeError)):
+        with pytest.raises((AgentRTError, TypeError)):
             task_manager.cancel(None)
 
 
@@ -179,7 +179,7 @@ class TestTaskManagerErrorPaths:
         
         mock_api.post.side_effect = requests.exceptions.Timeout()
         
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             task_manager.submit("timeout test")
         
         assert "timeout" in str(exc_info.value).lower() or "连接" in str(exc_info.value).lower() or "超时" in str(exc_info.value)
@@ -191,7 +191,7 @@ class TestTaskManagerErrorPaths:
             error={"code": 500, "message": "Internal Server Error"}
         )
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             task_manager.submit("server error test")
 
     def test_api_not_found_error(self, task_manager, mock_api):
@@ -201,7 +201,7 @@ class TestTaskManagerErrorPaths:
             error={"code": 404, "message": "Task not found"}
         )
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             task_manager.get("nonexistent_task")
 
     def test_malformed_response(self, task_manager, mock_api):
@@ -209,14 +209,14 @@ class TestTaskManagerErrorPaths:
         mock_api.post.return_value = {"invalid": "format"}  # 不是APIResponse
         
         # 应该抛出异常或返回None
-        with pytest.raises((AgentOSError, AttributeError, TypeError)):
+        with pytest.raises((AgentRTError, AttributeError, TypeError)):
             task_manager.submit("malformed response")
 
     def test_empty_response_data(self, task_manager, mock_api):
         """测试空响应数据"""
         mock_api.post.return_value = APIResponse(success=True, data=None)
         
-        with pytest.raises((AgentOSError, TypeError, KeyError)):
+        with pytest.raises((AgentRTError, TypeError, KeyError)):
             task_manager.submit("empty response")
 
     def test_invalid_task_status(self, task_manager, mock_api):
@@ -238,14 +238,14 @@ class TestTaskManagerMockIsolation:
     @pytest.fixture
     def isolated_task_manager(self):
         """完全隔离的TaskManager实例"""
-        with patch('agentos.modules.task.manager.APIClient') as MockClient:
+        with patch('agentrt.modules.task.manager.APIClient') as MockClient:
             mock_client = MockClient.return_value
             mock_client.post = MagicMock()
             mock_client.get = MagicMock()
             mock_client.put = MagicMock()
             mock_client.delete = MagicMock()
             
-            from agentos.modules.task.manager import TaskManager
+            from agentrt.modules.task.manager import TaskManager
             mgr = TaskManager(client=mock_client)
             yield mgr, mock_client
 
@@ -345,7 +345,7 @@ class TestSessionManagerBoundaryConditions:
 
     def test_create_with_empty_user_id(self, session_manager):
         """测试空用户ID创建会话"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             session_manager.create("")
         assert "用户ID" in str(exc_info.value)
 
@@ -388,7 +388,7 @@ class TestSessionManagerErrorPaths:
         
         mock_api.post.side_effect = requests.exceptions.ConnectionError()
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             session_manager.create("user_123")
 
     def test_get_nonexistent_session(self, session_manager, mock_api):
@@ -398,7 +398,7 @@ class TestSessionManagerErrorPaths:
             error={"code": 404, "message": "Session not found"}
         )
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             session_manager.get("nonexistent_session")
 
     def test_set_context_on_closed_session(self, session_manager, mock_api):
@@ -417,7 +417,7 @@ class TestSessionManagerErrorPaths:
         assert session.status == SessionStatus.CLOSED
         
         # 尝试设置上下文应该失败
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             session_manager.set_context("sess_123", "key", "value")
 
 
@@ -527,7 +527,7 @@ class TestMemoryManagerErrorPaths:
         
         mock_api.post.side_effect = requests.exceptions.Timeout()
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             memory_manager.write("test content", MemoryLayer.L1)
 
     def test_search_invalid_layer(self, memory_manager, mock_api):
@@ -538,7 +538,7 @@ class TestMemoryManagerErrorPaths:
         )
         
         # 使用无效的层级
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             memory_manager.search_by_layer("query", "INVALID_LAYER")
 
     def test_write_invalid_layer(self, memory_manager, mock_api):
@@ -549,7 +549,7 @@ class TestMemoryManagerErrorPaths:
         )
         
         # 尝试写入无效层级
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             memory_manager.write("content", "INVALID_LAYER")
 
 
@@ -626,7 +626,7 @@ class TestSkillManagerErrorPaths:
             error={"code": 404, "message": "Skill not found"}
         )
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             skill_manager.load("nonexistent_skill")
 
     def test_execute_unloaded_skill(self, skill_manager, mock_api):
@@ -636,7 +636,7 @@ class TestSkillManagerErrorPaths:
             error={"code": 400, "message": "Skill not loaded"}
         )
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             skill_manager.execute("unloaded_skill", {})
 
     def test_execute_with_invalid_input(self, skill_manager, mock_api):
@@ -646,7 +646,7 @@ class TestSkillManagerErrorPaths:
             error={"code": 400, "message": "Invalid input"}
         )
         
-        with pytest.raises(AgentOSError):
+        with pytest.raises(AgentRTError):
             skill_manager.execute("skill_123", None)
 
 
@@ -664,8 +664,8 @@ class TestConcurrentScenarios:
 
     def test_concurrent_task_and_session_operations(self, mock_api):
         """测试并发任务和会话操作"""
-        from agentos.modules.task.manager import TaskManager
-        from agentos.modules.session.manager import SessionManager
+        from agentrt.modules.task.manager import TaskManager
+        from agentrt.modules.session.manager import SessionManager
         
         task_mgr = TaskManager(mock_api)
         session_mgr = SessionManager(mock_api)

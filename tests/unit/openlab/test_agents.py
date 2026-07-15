@@ -13,8 +13,8 @@ import pytest
 import sys
 from pathlib import Path
 
-# 添加agentos到路径
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "agentos" / "openlab"))
+# 添加agentrt到路径
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "agentrt" / "openlab"))
 
 # openlab 子模块结构: ecosystem/openlab/openlab/
 # openlab.contrib.* 模块尚未实现，测试跳过

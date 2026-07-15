@@ -14,9 +14,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| resources/ 组件 | 支持的 agentos/ 模块 | 用途 |
+| resources/ 组件 | 支持的 agentrt/ 模块 | 用途 |
 |-----------------|---------------------|------|
 | `demos/phase3_technology_demo.py` | 全部模块 | 第三阶段技术演示（服务框架/基准测试/工具链/开源治理） |
 | `images/AgentRT-desktop-preview.gif` | 全部模块 | 桌面端预览动图，用于 README 和宣传材料 |

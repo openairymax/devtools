@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 模块构建脚本
+# AgentRT 模块构建脚本
 # 支持：多模块并行构建、多构建类型、增量构建、缓存感知
 # Version: 0.1.0
 
@@ -10,7 +10,7 @@ set -euo pipefail
 # 路径定义
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../../library"
 
 ###############################################################################
@@ -39,16 +39,16 @@ BUILD_DIR="${AGENTRT_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
 
 # 模块定义（含源码路径和 CMake 选项）
 declare -A MODULE_SOURCES=(
-    [daemon]="agentos/daemon"
-    [atoms]="agentos/atoms"
-    [commons]="agentos/commons"
-    [cupolas]="agentos/cupolas"
-    [gateway]="agentos/gateway"
-    [heapstore]="agentos/heapstore"
+    [daemons]="agentrt/daemons"
+    [atoms]="agentrt/atoms"
+    [commons]="agentrt/commons"
+    [cupolas]="agentrt/cupolas"
+    [gateway]="agentrt/gateway"
+    [heapstore]="agentrt/heapstore"
 )
 
 declare -A MODULE_CMAKE_OPTIONS=(
-    [daemon]="-DBUILD_TESTS=ON -DENABLE_LLM_DUMMY=ON"
+    [daemons]="-DBUILD_TESTS=ON -DENABLE_LLM_DUMMY=ON"
     [atoms]="-DBUILD_TESTS=ON"
     [commons]="-DBUILD_TESTS=ON"
     [cupolas]="-DBUILD_TESTS=ON"
@@ -81,13 +81,13 @@ parse_args() {
 
 show_help() {
     cat << 'EOF'
-AgentOS Module Build Script v2.0.0
+AgentRT Module Build Script v2.0.0
 
 Usage: ./build-module.sh [OPTIONS]
 
 Options:
     -m, --module NAME     Target module (default: all)
-                           Values: daemon, atoms, commons, cupolas,
+                           Values: daemons, atoms, commons, cupolas,
                                    gateway, heapstore, all
     -t, --type TYPE       Build type (default: Release)
                            Values: Debug, Release, RelWithDebInfo, MinSizeRel
@@ -101,7 +101,7 @@ Options:
 
 Examples:
     ./build-module.sh                          # Build all modules
-    ./build-module.sh -m daemon                # Build daemon only
+    ./build-module.sh -m daemons               # Build daemons only
     ./build-module.sh -t Debug -j8             # Debug, 8 parallel
     ./build-module.sh -m atoms -c              # Clean build atoms
 EOF
@@ -184,13 +184,13 @@ build_module() {
     local source_dir="${PROJECT_ROOT}/${MODULE_SOURCES[$module]}"
 
     if [[ ! -d "$source_dir" ]]; then
-        log_warn "Source directory not found for '$module': $source_dir, skipping"
-        return 0
+        log_error "Source directory not found for '$module': $source_dir"
+        return 1
     fi
 
     if [[ ! -f "${source_dir}/CMakeLists.txt" ]]; then
-        log_warn "No CMakeLists.txt found for '$module', skipping"
-        return 0
+        log_error "No CMakeLists.txt found for '$module': ${source_dir}/CMakeLists.txt"
+        return 1
     fi
 
     log_info "==========================================="
@@ -278,7 +278,7 @@ build_module() {
 main() {
     parse_args "$@"
 
-    log_info "AgentOS Build Script v2.0.0"
+    log_info "AgentRT Build Script v2.0.0"
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
 
     # 验证模块

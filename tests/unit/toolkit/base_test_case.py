@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, AsyncMock
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from agentos.client.client import APIClient, APIResponse
-from agentos.exceptions import AgentOSError
+from agentrt.client.client import APIClient, APIResponse
+from agentrt.exceptions import AgentRTError
 from tests.utils.python.mock_factory import UnifiedMockFactory, MockResponseConfig
 
 
@@ -254,7 +254,7 @@ class BaseTestCase:
         assert mock_method.call_count == call_count, \
             f"期望 {method.upper()} {path} 被调用 {call_count} 次，实际 {mock_method.call_count} 次"
     
-    def assert_error_code(self, error: AgentOSError, expected_code: str):
+    def assert_error_code(self, error: AgentRTError, expected_code: str):
         """
         断言错误码匹配
         

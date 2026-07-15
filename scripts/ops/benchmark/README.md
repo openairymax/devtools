@@ -15,9 +15,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| benchmark/ 组件 | 对应的 agentos/ 模块 | 用途 |
+| benchmark/ 组件 | 对应的 agentrt/ 模块 | 用途 |
 |-----------------|---------------------|------|
 | `benchmark_core.py` | `atoms/` | 测试框架核心（测试定义/执行/监控/结果收集） |
 | `statistics_engine.py` | `atoms/corekern/`, `atoms/coreloopthree/` | 统计计算引擎（分布拟合/显著性检验/回归分析） |

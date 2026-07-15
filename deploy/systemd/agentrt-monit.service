@@ -22,7 +22,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=@AGENTOS_RUNTIME_DIR@
+ReadWritePaths=@AGENTRT_RUNTIME_DIR@
 
 # 资源限制
 LimitNPROC=512

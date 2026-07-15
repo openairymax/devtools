@@ -1,6 +1,6 @@
 /**
  * @file test_e2e_core.c
- * @brief AgentOS 端到端集成测试套件 (P2-C01)
+ * @brief AgentRT 端到端集成测试套件 (P2-C01)
  *
  * 验证从用户请求到系统响应的完整链路：
  * - 核心初始化 → 服务创建 → 任务执行 → 资源释放
@@ -205,9 +205,9 @@ static void e2e_scenario_3_ipc_dispatcher_link(void)
     method_dispatcher_t* disp = method_dispatcher_create(16);
     TEST_ASSERT_NOT_NULL(disp, "Step 1: 方法分发器创建成功");
 
-    method_dispatcher_register(disp, "agentos.task.submit",
+    method_dispatcher_register(disp, "agentrt.task.submit",
                                ipc_e2e_handler, NULL);
-    method_dispatcher_register(disp, "agentos.memory.query",
+    method_dispatcher_register(disp, "agentrt.memory.query",
                                ipc_e2e_handler, NULL);
     TEST_ASSERT(1, "Step 2: 跨模块方法注册完成");
 
@@ -220,7 +220,7 @@ static void e2e_scenario_3_ipc_dispatcher_link(void)
     g_ipc_dispatched = 0;
     cJSON* req = cJSON_CreateObject();
     cJSON_AddStringToObject(req, "jsonrpc", "2.0");
-    cJSON_AddStringToObject(req, "method", "agentos.task.submit");
+    cJSON_AddStringToObject(req, "method", "agentrt.task.submit");
     cJSON_AddNumberToObject(req, "id", 1001);
     cJSON_AddObjectToObject(req, "params");
 
@@ -1092,7 +1092,7 @@ static void e2e_scenario_20_cache_lifecycle(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS 端到端集成测试套件\n");
+    printf("  AgentRT 端到端集成测试套件\n");
     printf("  P2-C01: 跨模块联动验证 (20 scenarios)\n");
     printf("========================================\n");
 

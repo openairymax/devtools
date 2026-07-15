@@ -1,4 +1,4 @@
-# AgentOS Scripts Dependencies
+# AgentRT Scripts Dependencies
 # Python version: >=3.10
 
 # Core dependencies

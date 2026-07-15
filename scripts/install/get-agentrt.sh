@@ -21,7 +21,7 @@ fail()  { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
 VERSION="${AGENTRT_VERSION:-0.1.1}"
 INSTALL_DIR="${AGENTRT_INSTALL_DIR:-$HOME/.agentrt}"
 BIN_DIR="${AGENTRT_BIN_DIR:-$HOME/.local/bin}"
-REPO_URL="https://github.com/spharx/agentrt"
+REPO_URL="https://atomgit.com/openairymax/airymaxhub"
 
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
@@ -108,11 +108,11 @@ info "Step 4/6: 构建 AgentRT..."
 
 cd "${INSTALL_DIR}/AgentRT"
 
-# 构建 C 核心
-if [ -f "CMakeLists.txt" ]; then
+# 构建 C 核心（CMakeLists.txt 在 agentrt/ 子目录下）
+if [ -f "agentrt/CMakeLists.txt" ]; then
     info "构建 C 核心引擎..."
     mkdir -p build && cd build
-    cmake .. -DCMAKE_BUILD_TYPE=Release 2>/dev/null || warn "CMake 配置失败"
+    cmake ../agentrt -DCMAKE_BUILD_TYPE=Release 2>/dev/null || warn "CMake 配置失败"
     make -j"$(nproc 2>/dev/null || echo 4)" 2>/dev/null || warn "C 构建失败"
     cd ..
 fi
@@ -194,7 +194,7 @@ echo -e "  2. 运行 Agent:"
 echo -e "     ${CYAN}cd my-first-agent && agentrt run \"你好，世界！\"${NC}"
 echo ""
 echo -e "  3. 或使用 QuickStart 脚本:"
-echo -e "     ${CYAN}${INSTALL_DIR}/AgentRT/scripts/ops/bin/quickstart.sh${NC}"
+echo -e "     ${CYAN}${INSTALL_DIR}/AgentRT/devtools/scripts/ops/bin/quickstart.sh${NC}"
 echo ""
 echo -e "  4. 查看文档:"
 echo -e "     ${CYAN}agentrt --help${NC}"

@@ -74,7 +74,7 @@ static void test_builtin_provider_write_get(void) {
     airy_error_t err = provider->init(provider, test_dir);
     TEST_ASSERT(err == AIRY_SUCCESS, "provider init succeeds");
 
-    const char* data = "Hello, AgentOS Memory Provider!";
+    const char* data = "Hello, AgentRT Memory Provider!";
     const char* metadata = "{\"source\":\"test\",\"type\":0}";
     char* record_id = NULL;
 
@@ -138,7 +138,7 @@ static void test_builtin_provider_query(void) {
     TEST_ASSERT(err == AIRY_SUCCESS, "provider init succeeds");
 
     const char* entries[] = {
-        "AgentOS is an intelligent agent operating system",
+        "AgentRT is an intelligent agent operating system",
         "Memory provider supports L1 through L4 layers",
         "CoreLoopThree handles cognition, execution, and memory",
         "The builtin provider uses file system storage",
@@ -302,7 +302,7 @@ static void test_builtin_provider_stats(void) {
 
 int main(void) {
     printf("============================================\n");
-    printf("  AgentOS Memory Provider Integration Tests\n");
+    printf("  AgentRT Memory Provider Integration Tests\n");
     printf("============================================\n\n");
 
     setup_test_dir();

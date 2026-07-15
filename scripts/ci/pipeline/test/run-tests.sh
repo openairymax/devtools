@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 测试运行脚本
+# AgentRT 测试运行脚本
 # 支持：CTest/pytest 双引擎、覆盖率收集、测试分类执行、超时控制
 # Version: 0.1.0
 
@@ -10,7 +10,7 @@ set -euo pipefail
 # 路径定义
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
 
 ###############################################################################
 # 颜色和日志
@@ -70,7 +70,7 @@ parse_args() {
 
 show_help() {
     cat << 'EOF'
-AgentOS Test Runner Script v2.0.0
+AgentRT Test Runner Script v2.0.0
 
 Usage: ./run-tests.sh [OPTIONS]
 
@@ -88,7 +88,7 @@ Options:
 
 Examples:
     ./run-tests.sh                        # Run all tests
-    ./run-tests.sh -m daemon              # Test daemon module only
+    ./run-tests.sh -m daemons             # Test daemons module only
     ./run-tests.sh --category unit         # Unit tests only
     ./run-tests.sh -c -v                  # Coverage + verbose
     ./run-tests.sh --pytest-only           # Python tests only
@@ -109,7 +109,7 @@ get_parallel_jobs() {
 get_ctest_modules() {
     local modules=()
     if [[ "$TEST_MODULE" == "all" ]]; then
-        modules=("daemon" "atoms" "commons")
+        modules=("daemons" "atoms" "commons")
     else
         IFS=',' read -ra modules <<< "$TEST_MODULE"
     fi
@@ -215,7 +215,7 @@ run_pytest() {
     log_info "pytest: Python Tests"
     log_info "==========================================="
 
-    local tests_dir="${PROJECT_ROOT}/tests"
+    local tests_dir="${PROJECT_ROOT}/agentrt/tests"
     if [[ ! -d "$tests_dir" ]]; then
         log_warn "Tests directory not found: $tests_dir"
         return 0
@@ -336,7 +336,7 @@ print_summary() {
 main() {
     parse_args "$@"
 
-    log_info "AgentOS Test Runner v2.0.0"
+    log_info "AgentRT Test Runner v2.0.0"
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "Module: ${TEST_MODULE}, Timeout: ${TEST_TIMEOUT}s"
 

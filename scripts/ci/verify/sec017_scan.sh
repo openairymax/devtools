@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 TOTAL_VIOLATIONS=0
 
 RED='\033[0;31m'
@@ -29,8 +29,9 @@ scan_directory() {
     echo "=========================================="
 
     if [ ! -d "$DIR" ]; then
-        echo -e "${YELLOW}⚠  Directory not found: $DIR${NC}"
-        return 0
+        echo -e "${RED}❌ FATAL: Directory not found: $DIR${NC}" >&2
+        echo "       PROJECT_ROOT=${PROJECT_ROOT} — scan target missing." >&2
+        exit 1
     fi
 
     echo ""
@@ -110,28 +111,28 @@ scan_directory() {
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   AgentOS SEC-017 Stub Function Scanner  ║"
+echo "║   AgentRT SEC-017 Stub Function Scanner  ║"
 echo "║   v8.1 (Precise) | $(date '+%Y-%m-%d %H:%M:%S')     ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
 case "$SCAN_TARGET" in
     daemon)
-        scan_directory "$PROJECT_ROOT/agentos/daemon" "Daemon Module"
+        scan_directory "$PROJECT_ROOT/agentrt/daemons" "Daemon Module"
         TOTAL_VIOLATIONS=$?
         ;;
     gateway)
-        scan_directory "$PROJECT_ROOT/agentos/gateway" "Gateway Module"
+        scan_directory "$PROJECT_ROOT/agentrt/gateway" "Gateway Module"
         TOTAL_VIOLATIONS=$?
         ;;
     cupolas)
-        scan_directory "$PROJECT_ROOT/agentos/cupolas" "Cupolas Module"
+        scan_directory "$PROJECT_ROOT/agentrt/cupolas" "Cupolas Module"
         TOTAL_VIOLATIONS=$?
         ;;
     all)
-        V1=0; scan_directory "$PROJECT_ROOT/agentos/daemon" "Daemon Module" || V1=$?
-        V2=0; scan_directory "$PROJECT_ROOT/agentos/gateway" "Gateway Module" || V2=$?
-        V3=0; scan_directory "$PROJECT_ROOT/agentos/cupolas" "Cupolas Module" || V3=$?
+        V1=0; scan_directory "$PROJECT_ROOT/agentrt/daemons" "Daemon Module" || V1=$?
+        V2=0; scan_directory "$PROJECT_ROOT/agentrt/gateway" "Gateway Module" || V2=$?
+        V3=0; scan_directory "$PROJECT_ROOT/agentrt/cupolas" "Cupolas Module" || V3=$?
         TOTAL_VIOLATIONS=$((V1 + V2 + V3))
         ;;
     *)

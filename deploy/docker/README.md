@@ -40,7 +40,7 @@ docker/
 | **development** | builder | 开发调试（含 gdb/valgrind/cppcheck） |
 
 **运行时特性**：
-- 非 root 用户 `agentos`（UID 1000）运行
+- 非 root 用户 `agentrt`（UID 1000）运行
 - 健康检查：`wget http://localhost:8080/health`
 - 暴露端口：8080（HTTP）/ 8081（WebSocket）/ 9090（Metrics）
 - 入口命令：`/usr/bin/gateway --manager /etc/agentrt/gateway/manager.yaml`

@@ -186,19 +186,19 @@ class SDKTestCase(BaseTestCase):
 
         # 导入SDK模块
         try:
-            from agentos import AgentRT, AsyncAgentRT
-            from agentos.exceptions import (
-                AgentOSError, NetworkError, TimeoutError as AgentOSTimeoutError,
-                TaskError, MemoryError as AgentOSMemoryError, SessionError, SkillError
+            from agentrt import AgentRT, AsyncAgentRT
+            from agentrt.exceptions import (
+                AgentRTError, NetworkError, TimeoutError as AgentRTTimeoutError,
+                TaskError, MemoryError as AgentRTMemoryError, SessionError, SkillError
             )
 
             self.AgentRT = AgentRT
             self.AsyncAgentRT = AsyncAgentRT
-            self.AgentOSError = AgentOSError
+            self.AgentRTError = AgentRTError
             self.NetworkError = NetworkError
-            self.AgentOSTimeoutError = AgentOSTimeoutError
+            self.AgentRTTimeoutError = AgentRTTimeoutError
             self.TaskError = TaskError
-            self.AgentOSMemoryError = AgentOSMemoryError
+            self.AgentRTMemoryError = AgentRTMemoryError
             self.SessionError = SessionError
             self.SkillError = SkillError
 
@@ -215,7 +215,7 @@ class SDKTestCase(BaseTestCase):
         Returns:
             模拟的客户端对象
         """
-        with patch('agentos.agent.requests.Session') as mock_session_class:
+        with patch('agentrt.agent.requests.Session') as mock_session_class:
             mock_session = Mock()
             mock_session_class.return_value = mock_session
 
@@ -241,7 +241,7 @@ class SDKTestCase(BaseTestCase):
         Returns:
             模拟的异步客户端对象
         """
-        with patch('agentos.agent.aiohttp.ClientSession') as mock_session_class:
+        with patch('agentrt.agent.aiohttp.ClientSession') as mock_session_class:
             mock_session = AsyncMock()
             mock_session_class.return_value = mock_session
 

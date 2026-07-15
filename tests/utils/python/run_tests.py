@@ -294,7 +294,7 @@ class CoverageReporter:
         try:
             result = subprocess.run([
                 sys.executable, '-m', 'pytest',
-                '--cov=agentos',
+                '--cov=agentrt',
                 '--cov-report=term-missing',
                 '--cov-report=html:coverage_html',
                 '--cov-report=xml:coverage.xml',

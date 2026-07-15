@@ -10,26 +10,26 @@ MemoryManager, and SkillManager classes.
 
 遵循 ARCHITECTURAL_PRINCIPLES.md 的 E-8（可测试性原则）。
 
-Run with: pytest tests/test_managers.py -v --cov=agentos.modules --cov-report=term-missing
+Run with: pytest tests/test_managers.py -v --cov=agentrt.modules --cov-report=term-missing
 """
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
-from agentos.client.client import APIClient, APIResponse
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
-from agentos.types.common import (
+from agentrt.client.client import APIClient, APIResponse
+from agentrt.exceptions import AgentRTError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
+from agentrt.types.common import (
     Task, TaskStatus, TaskResult,
     Session, SessionStatus,
     Memory, MemoryLayer, MemorySearchResult,
     Skill, SkillStatus, SkillResult, SkillInfo,
     ListOptions, PaginationOptions
 )
-from agentos.modules.task.manager import TaskManager
-from agentos.modules.session.manager import SessionManager
-from agentos.modules.memory.manager import MemoryManager, MemoryWriteItem
-from agentos.modules.skill.manager import SkillManager, SkillExecuteRequest
+from agentrt.modules.task.manager import TaskManager
+from agentrt.modules.session.manager import SessionManager
+from agentrt.modules.memory.manager import MemoryManager, MemoryWriteItem
+from agentrt.modules.skill.manager import SkillManager, SkillExecuteRequest
 
 
 class TestTaskManager:
@@ -66,7 +66,7 @@ class TestTaskManager:
 
     def test_submit_empty_description_raises_error(self, task_manager):
         """测试空任务描述抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             task_manager.submit("")
         assert "任务描述" in str(exc_info.value)
 
@@ -102,7 +102,7 @@ class TestTaskManager:
 
     def test_get_empty_id_raises_error(self, task_manager):
         """测试空任务ID抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             task_manager.get("")
         assert "任务ID" in str(exc_info.value)
 
@@ -136,7 +136,7 @@ class TestTaskManager:
             data={"task_id": "task_123", "status": "running", "description": "test"}
         )
         
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             task_manager.wait("task_123", timeout=0.1)
         assert exc_info.value.error_code == CODE_TASK_TIMEOUT
 
@@ -299,7 +299,7 @@ class TestSessionManager:
 
     def test_get_empty_id_raises_error(self, session_manager):
         """测试空会话ID抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             session_manager.get("")
         assert "会话ID" in str(exc_info.value)
 
@@ -316,13 +316,13 @@ class TestSessionManager:
 
     def test_set_context_empty_session_id_raises_error(self, session_manager):
         """测试空会话ID设置上下文抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             session_manager.set_context("", "key", "value")
         assert "会话ID" in str(exc_info.value)
 
     def test_set_context_empty_key_raises_error(self, session_manager):
         """测试空键设置上下文抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             session_manager.set_context("sess_123", "", "value")
         assert "上下文键" in str(exc_info.value)
 
@@ -510,7 +510,7 @@ class TestMemoryManager:
 
     def test_write_empty_content_raises_error(self, memory_manager):
         """测试空内容写入抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             memory_manager.write("", MemoryLayer.L1)
         assert "记忆内容" in str(exc_info.value)
 
@@ -555,7 +555,7 @@ class TestMemoryManager:
 
     def test_search_empty_query_raises_error(self, memory_manager):
         """测试空查询抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             memory_manager.search("")
         assert "搜索查询" in str(exc_info.value)
 
@@ -695,7 +695,7 @@ class TestSkillManager:
 
     def test_load_empty_id_raises_error(self, skill_manager):
         """测试空技能ID加载抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             skill_manager.load("")
         assert "技能ID" in str(exc_info.value)
 
@@ -795,7 +795,7 @@ class TestSkillManager:
 
     def test_register_empty_name_raises_error(self, skill_manager):
         """测试空名称注册抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             skill_manager.register("", "description", {})
         assert "技能名称" in str(exc_info.value)
 
@@ -888,7 +888,7 @@ class TestSkillManager:
 
     def test_search_empty_query_raises_error(self, skill_manager):
         """测试空查询搜索抛出异常"""
-        with pytest.raises(AgentOSError) as exc_info:
+        with pytest.raises(AgentRTError) as exc_info:
             skill_manager.search("")
         assert "搜索查询" in str(exc_info.value)
 

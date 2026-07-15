@@ -1,6 +1,6 @@
 /**
  * @file atoms_benchmarks.h
- * @brief AgentOS Atoms模块性能基准测试接口
+ * @brief AgentRT Atoms模块性能基准测试接口
  *
  * 提供标准化的性能基准测试接口，用于验证系统是否满足性能SLA要求：
  * - IPC延迟: <1μs

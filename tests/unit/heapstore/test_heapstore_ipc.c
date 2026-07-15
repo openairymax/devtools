@@ -1,6 +1,6 @@
 /**
  * @file test_heapstore_ipc.c
- * @brief AgentOS 数据分区 IPC 数据存储单元测试
+ * @brief AgentRT 数据分区 IPC 数据存储单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
@@ -191,7 +191,7 @@ static void test_ipc_multiple_channels(void) {
 }
 
 int main(void) {
-    printf("=== AgentOS heapstore IPC Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore IPC Unit Tests ===\n\n");
 
     test_ipc_init_shutdown();
     test_ipc_channel_crud();

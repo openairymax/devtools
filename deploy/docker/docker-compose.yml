@@ -46,8 +46,8 @@ services:
     # 配置文件挂载
     volumes:
       - ../manager:/etc/agentrt/gateway:ro
-      - gateway-logs:/var/log/agentos
-      - gateway-run:/var/run/agentos
+      - gateway-logs:/var/log/agentrt
+      - gateway-run:/var/run/agentrt
     
     # 依赖服务
     depends_on:

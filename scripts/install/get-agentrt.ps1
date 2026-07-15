@@ -1,6 +1,6 @@
 # AgentRT Installer Script (Windows)
 # Version: 0.1.1
-# Usage: Invoke-WebRequest -Uri https://raw.githubusercontent.com/spharx/agentrt/main/scripts/install/get-agentrt.ps1 | Invoke-Expression
+# Usage: Invoke-WebRequest -Uri https://atomgit.com/openairymax/airymaxhub/raw/main/devtools/scripts/install/get-agentrt.ps1 | Invoke-Expression
 #        or: .\get-agentrt.ps1
 
 param(
@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 if (-not $Version) { $Version = "0.1.1" }
 if (-not $InstallDir) { $InstallDir = "$env:USERPROFILE\.agentrt" }
 if (-not $BinDir) { $BinDir = "$env:USERPROFILE\.agentrt\bin" }
-$RepoUrl = "https://github.com/spharx/agentrt"
+$RepoUrl = "https://atomgit.com/openairymax/airymaxhub"
 
 # ── Helpers ───────────────────────────────────────────────
 function Write-Info  { Write-Host "[INFO] $args" -ForegroundColor Cyan }

@@ -1,6 +1,6 @@
 /**
  * @file atoms_benchmarks.c
- * @brief AgentOS Atoms模块性能基准测试实现
+ * @brief AgentRT Atoms模块性能基准测试实现
  *
  * 提供标准化的性能基准测试实现，验证系统是否满足性能SLA要求：
  * - IPC延迟: <1μs (1000ns)
@@ -363,7 +363,7 @@ int benchmark_run_all(const benchmark_config_t* config) {
     const benchmark_config_t* cfg = config ? config : &DEFAULT_CONFIG;
 
     printf("\n========================================\n");
-    printf("  AgentOS Atoms Performance Benchmarks\n");
+    printf("  AgentRT Atoms Performance Benchmarks\n");
     printf("========================================\n");
     printf("  Warmup: %lu | Tests: %lu\n",
            (unsigned long)cfg->warmup_iterations, (unsigned long)cfg->test_iterations);

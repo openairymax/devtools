@@ -1,23 +1,33 @@
 #!/bin/bash
-# AgentOS Setup Script
+# AgentRT Setup Script
 # Uses library/ for shared utilities
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="${SCRIPT_DIR}/library"
+LIB_DIR="${SCRIPT_DIR}/../../../ops/lib"
 
-source "${LIB_DIR}/common.sh" 2>/dev/null || {
-    echo "ERROR: Cannot load ${LIB_DIR}/common.sh"
+# 直接加载需要的库文件（ops/lib/ 下的 log.sh、error.sh、platform.sh）
+source "${LIB_DIR}/log.sh" 2>/dev/null || {
+    echo "ERROR: Cannot load ${LIB_DIR}/log.sh"
+    exit 1
+}
+source "${LIB_DIR}/error.sh" 2>/dev/null || {
+    echo "ERROR: Cannot load ${LIB_DIR}/error.sh"
+    exit 1
+}
+source "${LIB_DIR}/platform.sh" 2>/dev/null || {
+    echo "ERROR: Cannot load ${LIB_DIR}/platform.sh"
     exit 1
 }
 
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# setup.sh 位于 devtools/scripts/dev/setup/，需上溯 4 级到达 airymaxhub/
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
 print_header() {
     echo ""
     echo "========================================"
-    echo "  AgentOS Setup"
+    echo "  AgentRT Setup"
     echo "========================================"
     echo ""
 }
@@ -26,7 +36,7 @@ show_menu() {
     echo ""
     echo "Available options:"
     echo "  1) Install dependencies (vcpkg, Python packages)"
-    echo "  2) Build AgentOS (CMake)"
+    echo "  2) Build AgentRT (CMake)"
     echo "  3) Run tests"
     echo "  4) Full setup (all of the above)"
     echo "  5) Exit"
@@ -36,7 +46,7 @@ show_menu() {
 install_dependencies() {
     airy_log_info "Installing dependencies..."
     
-    OS=$(airy_platform_detect_os)
+    OS=$(airy_platform_detect)
     airy_log_info "Detected OS: $OS"
     
     if [ "$OS" = "linux" ]; then
@@ -77,7 +87,7 @@ install_dependencies() {
 }
 
 build_project() {
-    airy_log_info "Building AgentOS..."
+    airy_log_info "Building AgentRT..."
     
     BUILD_SCRIPT="${SCRIPT_DIR}/../../ci/pipeline/build/build-module.sh"
 
@@ -95,7 +105,7 @@ build_project() {
 run_tests() {
     airy_log_info "Running tests..."
     
-    TEST_SCRIPT="${SCRIPT_DIR}/tests/shell/test_framework.sh"
+    TEST_SCRIPT="${SCRIPT_DIR}/../../../ops/tests/shell/test_framework.sh"
     
     if [ -f "$TEST_SCRIPT" ]; then
         chmod +x "$TEST_SCRIPT"
@@ -104,7 +114,7 @@ run_tests() {
         airy_log_warn "Test script not found: $TEST_SCRIPT"
         airy_log_info "Running basic validation..."
         
-        if [ -f "${PROJECT_ROOT}/CMakeLists.txt" ]; then
+        if [ -f "${PROJECT_ROOT}/agentrt/CMakeLists.txt" ]; then
             airy_log_info "CMakeLists.txt exists"
         else
             airy_log_error "CMakeLists.txt not found!"

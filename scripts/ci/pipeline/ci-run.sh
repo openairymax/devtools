@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS CI 主编排脚本
+# AgentRT CI 主编排脚本
 # 统一入口：依赖安装 → 构建 → 测试 → 质量门禁 → 部署
 # Version: 0.1.0
 # Last updated: 2026-04-06
@@ -11,7 +11,7 @@ set -euo pipefail
 # 路径定义
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../library"
 CI_DIR="${SCRIPT_DIR}"
 
@@ -104,7 +104,7 @@ phase_prepare() {
     # 检测平台
     detect_platform
 
-    # 设置 pkg-config 路径（用于 tiktoken stub）
+    # 设置 pkg-config 路径
     export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
     # 输出环境信息
@@ -152,36 +152,7 @@ phase_deps() {
         return 1
     fi
 
-    # 创建 tiktoken 存根（如果不存在）
-    create_tiktoken_stub
-
     timer_stop "deps"
-}
-
-create_tiktoken_stub() {
-    local stub_file="/usr/local/lib/pkgconfig/tiktoken.pc"
-    if [[ -f "$stub_file" ]]; then
-        return 0
-    fi
-
-    log_info "Creating tiktoken CI stub..."
-    sudo mkdir -p "$(dirname "$stub_file")" 2>/dev/null || true
-
-    cat << 'EOF' | sudo tee "$stub_file" > /dev/null 2>/dev/null || true
-prefix=/usr/local
-exec_prefix=${prefix}
-libdir=${exec_prefix}/lib
-includedir=${prefix}/include
-
-Name: tiktoken
-Description: Tokenizer library (CI stub for AgentOS)
-Version: 0.5.2
-URL: https://github.com/openai/tiktoken
-Libs: -L${libdir} -ltiktoken
-Cflags: -I${includedir}
-EOF
-
-    log_ok "tiktoken stub created at $stub_file"
 }
 
 ###############################################################################
@@ -315,7 +286,8 @@ phase_quality() {
     if [[ -f "$quality_script" ]]; then
         chmod +x "$quality_script"
         if ! bash "$quality_script"; then
-            log_warn "Quality gate reported issues (non-blocking)"
+            log_error "Quality gate failed"
+            return 1
         fi
     else
         quality_checks_fallback
@@ -339,7 +311,7 @@ quality_checks_fallback() {
                 log_warn "Format issue: $file"
             fi
             ((fmt_count++)) || true
-        done < <(find "${PROJECT_ROOT}/agentos" \( -name "*.c" -o -name "*.h" \) \
+        done < <(find "${PROJECT_ROOT}/agentrt" \( -name "*.c" -o -name "*.h" \) \
             ! -path "*/tests/*" -print0 2>/dev/null)
 
         if [[ $format_issues -gt 0 ]]; then
@@ -440,7 +412,7 @@ package_artifacts_fallback() {
         --exclude='ci-artifacts' \
         --exclude='ci-logs' \
         -C "${PROJECT_ROOT}" \
-        agentos scripts toolkit vcpkg.json README.md LICENSE CHANGELOG.md CONTRIBUTING.md 2>/dev/null || true
+        agentrt scripts toolkit vcpkg.json README.md LICENSE CHANGELOG.md CONTRIBUTING.md 2>/dev/null || true
 
     if [[ -f "${CI_ARTIFACT_DIR}/${artifact_name}" ]]; then
         local size
@@ -484,7 +456,7 @@ EOF
 ###############################################################################
 show_help() {
     cat << 'EOF'
-AgentOS CI Main Orchestration Script v2.0.0
+AgentRT CI Main Orchestration Script v2.0.0
 
 Usage: ./ci-run.sh [OPTIONS]
 
@@ -547,7 +519,7 @@ parse_args() {
 ###############################################################################
 main() {
     log_info "========================================="
-    log_info "AgentOS CI Pipeline v2.0.0"
+    log_info "AgentRT CI Pipeline v2.0.0"
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S %Z')"
     log_info "========================================="
 

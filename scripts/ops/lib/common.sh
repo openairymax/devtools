@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 通用工具函数模块
-# 遵循 AgentOS 架构设计原则：接口最小化原则 (E-5)
+# AgentRT 通用工具函数模块
+# 遵循 AgentRT 架构设计原则：接口最小化原则 (E-5)
 
 ###############################################################################
 # 严格模式

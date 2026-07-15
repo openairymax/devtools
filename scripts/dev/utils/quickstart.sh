@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
-# AgentOS 一键快速启动脚本
-# 用于快速体验 AgentOS 核心功能 
+# AgentRT 一键快速启动脚本
+# 用于快速体验 AgentRT 核心功能 
 # 版本：v0.1.0
 # 最后更新：2026-03-20
 
@@ -139,14 +139,14 @@ run_example() {
         print_info "运行 Python 示例..."
         # 这里可以添加简单的 Python 示例代码
         python3 -c "
-print('AgentOS 快速体验')
+print('AgentRT 快速体验')
 print('=' * 40)
 print('✓ 环境检查通过')
 print('✓ 依赖安装完成')
 print('✓ 配置初始化成功')
 print('')
-print('AgentOS 已准备就绪!')
-print('详细文档请访问：https://docs.spharx.cn/agentos')
+print('AgentRT 已准备就绪!')
+print('详细文档请访问：https://docs.spharx.cn/agentrt')
 "
     fi
 
@@ -156,16 +156,16 @@ print('详细文档请访问：https://docs.spharx.cn/agentos')
 # 显示下一步指引
 show_next_steps() {
     echo ""
-    print_success "🎉 AgentOS 快速体验完成!"
+    print_success "🎉 AgentRT 快速体验完成!"
     echo ""
     echo "=========================================="
     echo "下一步:"
     echo "=========================================="
     echo ""
     echo "1. 查看文档:"
-    echo "   - 快速入门：agentos/manuals/guides/getting_started.md"
-    echo "   - 架构说明：agentos/manuals/architecture/"
-    echo "   - API 文档：agentos/manuals/api/"
+    echo "   - 快速入门：agentrt/manuals/guides/getting_started.md"
+    echo "   - 架构说明：agentrt/manuals/architecture/"
+    echo "   - API 文档：agentrt/manuals/api/"
     echo ""
     echo "2. 开始开发:"
     echo "   - 阅读 CONTRIBUTING.md 了解贡献流程"
@@ -178,8 +178,8 @@ show_next_steps() {
     echo "   - make clean     : 清理构建产物"
     echo ""
     echo "4. 获取支持:"
-    echo "   - Gitee Issues: https://gitee.com/spharx/agentos/issues"
-    echo "   - GitHub Issues: https://github.com/SpharxTeam/AgentOS/issues"
+    echo "   - Gitee Issues: https://gitee.com/spharx/agentrt/issues"
+    echo "   - GitHub Issues: https://github.com/SpharxTeam/AgentRT/issues"
     echo "   - 官方邮箱：support@spharx.cn"
     echo ""
     echo "=========================================="
@@ -189,7 +189,7 @@ show_next_steps() {
 main() {
     echo ""
     echo "=========================================="
-    echo "  AgentOS 快速启动脚本"
+    echo "  AgentRT 快速启动脚本"
     echo "  From data intelligence emerges"
     echo "=========================================="
     echo ""

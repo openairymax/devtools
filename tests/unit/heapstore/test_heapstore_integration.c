@@ -1,6 +1,6 @@
 /**
  * @file test_heapstore_integration.c
- * @brief AgentOS 数据分区集成测试
+ * @brief AgentRT 数据分区集成测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
@@ -270,7 +270,7 @@ static void test_config_reload(void) {
 }
 
 int main(void) {
-    printf("=== AgentOS heapstore Integration Tests ===\n\n");
+    printf("=== AgentRT heapstore Integration Tests ===\n\n");
 
     test_full_lifecycle();
     test_all_subsystems_init();

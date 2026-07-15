@@ -84,11 +84,11 @@ def check_cve(result: CheckResult) -> CheckResult:
     """Scan dependencies for known CVEs using grype or trivy."""
     if tool_available("grype"):
         tool = "grype"
-        cmd = ["grype", "dir:agentos/", "--output", "json", "--fail-on", THRESHOLD.lower()]
+        cmd = ["grype", "dir:agentrt/", "--output", "json", "--fail-on", THRESHOLD.lower()]
     elif tool_available("trivy"):
         tool = "trivy"
         cmd = ["trivy", "fs", "--security-checks", "vuln", "--severity", f"{THRESHOLD},CRITICAL",
-               "--format", "json", "agentos/"]
+               "--format", "json", "agentrt/"]
     else:
         result.skipped = True
         result.skip_reason = "grype/trivy not installed"
@@ -119,7 +119,7 @@ def check_c_static(result: CheckResult) -> CheckResult:
 
     # flawfinder
     if tool_available("flawfinder"):
-        proc = run_cmd(["flawfinder", "--minlevel", "3", "--quiet", "agentos/"], timeout=120)
+        proc = run_cmd(["flawfinder", "--minlevel", "3", "--quiet", "agentrt/"], timeout=120)
         if proc.returncode == 0 and proc.stdout.strip():
             findings.append(f"flawfinder: {len(proc.stdout.splitlines())} hits")
 
@@ -127,7 +127,7 @@ def check_c_static(result: CheckResult) -> CheckResult:
     if tool_available("cppcheck"):
         proc = run_cmd([
             "cppcheck", "--enable=all", "--suppress=missingIncludeSystem",
-            "--error-exitcode=0", "--quiet", "agentos/"
+            "--error-exitcode=0", "--quiet", "agentrt/"
         ], timeout=120)
         if proc.stdout.strip():
             high_count = len([l for l in proc.stdout.splitlines() if "(error)" in l.lower()])
@@ -149,7 +149,7 @@ def check_docker(result: CheckResult) -> CheckResult:
     dockerfile = PROJECT_ROOT / "deploy" / "docker" / "Dockerfile"
 
     if not dockerfile.exists():
-        dockerfile = PROJECT_ROOT / "agentos" / "gateway" / "docker" / "Dockerfile"
+        dockerfile = PROJECT_ROOT / "agentrt" / "gateway" / "docker" / "Dockerfile"
 
     if not dockerfile.exists():
         result.skipped = True
@@ -198,7 +198,7 @@ def check_secrets(result: CheckResult) -> CheckResult:
         for pattern, desc in patterns:
             try:
                 proc = subprocess.run(
-                    ["grep", "-rnPI", pattern, "agentos/"],
+                    ["grep", "-rnPI", pattern, "agentrt/"],
                     capture_output=True, text=True, timeout=30,
                     cwd=PROJECT_ROOT
                 )
@@ -219,7 +219,7 @@ def check_sbom(result: CheckResult) -> CheckResult:
 
     if tool_available("syft"):
         proc = run_cmd([
-            "syft", "dir:agentos/", "-o", f"spdx-json={sbom_path}"
+            "syft", "dir:agentrt/", "-o", f"spdx-json={sbom_path}"
         ], timeout=300)
         if proc.returncode == 0 and sbom_path.exists():
             result.status = "PASS"
@@ -246,7 +246,7 @@ def check_sensitive_data(result: CheckResult) -> CheckResult:
     for pattern, desc in sensitive_patterns:
         try:
             proc = subprocess.run(
-                ["grep", "-rnPI", pattern, "agentos/", "--include=*.py", "--include=*.yaml",
+                ["grep", "-rnPI", pattern, "agentrt/", "--include=*.py", "--include=*.yaml",
                  "--include=*.yml", "--include=*.json", "--include=*.env"],
                 capture_output=True, text=True, timeout=30,
                 cwd=PROJECT_ROOT
@@ -271,7 +271,7 @@ def check_license(result: CheckResult) -> CheckResult:
 
     if tool_available("license_finder"):
         proc = run_cmd(["license_finder", "report", "--format=json"], timeout=120,
-                       cwd=PROJECT_ROOT / "agentos")
+                       cwd=PROJECT_ROOT / "agentrt")
         if proc.returncode == 0:
             try:
                 data = json.loads(proc.stdout)

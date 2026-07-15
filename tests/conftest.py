@@ -25,14 +25,17 @@ from contextlib import contextmanager
 import pytest
 
 # 添加项目根目录到路径
-# 注意：agentos 的多个子包分布在 agentos/ 和 sdk/python/ 下
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "sdk" / "python"))
-sys.path.insert(0, str(PROJECT_ROOT / "agentos"))
+# 注意：agentrt 的多个子包分布在 agentrt/ 和 sdk/sdk-python/ 下
+# conftest.py 位于 airymaxhub/devtools/tests/，需上溯 3 级到达 airymaxhub/
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+DEVTOOLS_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "sdk" / "sdk-python"))
+sys.path.insert(0, str(PROJECT_ROOT / "agentrt"))
 # 添加 manager 和 openlab 子包路径（已移至 ecosystem/）
 sys.path.insert(0, str(PROJECT_ROOT / "ecosystem" / "manager"))
 sys.path.insert(0, str(PROJECT_ROOT / "ecosystem" / "openlab"))
-sys.path.insert(0, str(PROJECT_ROOT))
+# devtools/ 需在 sys.path 中以支持 from tests.utils.python.* 导入
+sys.path.insert(0, str(DEVTOOLS_ROOT))
 
 
 # ============================================================
@@ -48,8 +51,8 @@ class TestConfig:
     # 测试超时时间（秒）
     DEFAULT_TIMEOUT = 30
 
-    # 测试数据目录
-    TEST_DATA_DIR = PROJECT_ROOT / "tests" / "fixtures" / "data"
+    # 测试数据目录（位于 devtools/tests/utils/fixtures/data）
+    TEST_DATA_DIR = DEVTOOLS_ROOT / "tests" / "utils" / "fixtures" / "data"
 
     # 临时文件目录
     TEMP_DIR = Path(tempfile.gettempdir()) / "airy_tests"
@@ -339,7 +342,7 @@ def check_test_environment() -> Dict[str, bool]:
             results[f"module_{module}"] = False
 
     # 检查测试数据目录
-    results["test_data_dir"] = True  # TestConfig.TEST_DATA_DIR.exists()
+    results["test_data_dir"] = TestConfig.TEST_DATA_DIR.exists()
 
     # 检查临时目录权限
     try:
@@ -467,7 +470,7 @@ def sample_contract_data():
     """
     return {
         "schema_version": "1.0.0",
-        "agent_id": "com.agentos.test.v1",
+        "agent_id": "com.agentrt.test.v1",
         "agent_name": "Test Agent",
         "version": "1.0.0",
         "role": "software_engineer",
@@ -606,8 +609,8 @@ def project_info():
         "name": "AgentRT",
         "version": "0.1.0",
         "root": PROJECT_ROOT,
-        "tests_dir": PROJECT_ROOT / "tests",
-        "toolkit_dir": PROJECT_ROOT / "agentos" / "toolkit" / "python",
+        "tests_dir": DEVTOOLS_ROOT / "tests",
+        "toolkit_dir": PROJECT_ROOT / "sdk" / "sdk-python",
     }
 
 
@@ -624,7 +627,7 @@ def test_data_factory():
         TestDataFactory: 测试数据工厂实例
     """
     from tests.utils.python.data_generator import TestDataFactory
-    factory = TestDataFactory(str(PROJECT_ROOT / "tests" / "fixtures" / "data"))
+    factory = TestDataFactory(str(DEVTOOLS_ROOT / "tests" / "utils" / "fixtures" / "data"))
     return factory
 
 

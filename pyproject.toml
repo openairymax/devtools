@@ -28,7 +28,7 @@ classifiers = [
 include = [
     "ecosystem/manager/*.yaml",
     "scripts/**/*.py",
-    "agentos/manuals/**/*.md",
+    "agentrt/manuals/**/*.md",
 ]
 
 [tool.poetry.dependencies]
@@ -137,7 +137,7 @@ exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 100
-skip = ["atoms", "daemon", "build", "dist", ".venv"]
+skip = ["atoms", "daemons", "build", "dist", ".venv"]
 
 [tool.mypy]
 python_version = "3.9"
@@ -149,7 +149,7 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["agentrt/atoms/", "agentrt/daemon/", "build/", "dist/"]
+exclude = ["agentrt/atoms/", "agentrt/daemons/", "build/", "dist/"]
 
 [[tool.mypy.overrides]]
 module = "faiss.*"
@@ -171,7 +171,7 @@ python_functions = ["test_*"]
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["agentos"]
+source = ["agentrt"]
 omit = [
     "*/tests/*",
     "*/test_*",

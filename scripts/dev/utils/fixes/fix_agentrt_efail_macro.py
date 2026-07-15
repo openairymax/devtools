@@ -101,8 +101,8 @@ def fix_file(filepath):
 
 files_to_check = []
 for root_dir in [
-    os.path.join(BASE_DIR, 'agentos', 'protocols'),
-    os.path.join(BASE_DIR, 'agentos', 'gateway'),
+    os.path.join(BASE_DIR, 'agentrt', 'protocols'),
+    os.path.join(BASE_DIR, 'agentrt', 'gateway'),
 ]:
     for dirpath, _, filenames in os.walk(root_dir):
         for fname in filenames:

@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from base_test_case import BaseTestCase as SDKTestCase
 
 
-class TestAgentOSClient(SDKTestCase):
+class TestAgentRTClient(SDKTestCase):
     """AgentRT客户端测试"""
 
     def test_client_initialization(self):
@@ -40,7 +40,7 @@ class TestAgentOSClient(SDKTestCase):
         assert custom_client.endpoint == "http://custom:8080"
 
     def test_client_initialization_with_auth(self):
-        with patch('agentos.agent.requests.Session') as mock_session_class:
+        with patch('agentrt.agent.requests.Session') as mock_session_class:
             mock_session = Mock()
             mock_session_class.return_value = mock_session
 
@@ -77,13 +77,13 @@ class TestAgentOSClient(SDKTestCase):
     def test_submit_task_network_error(self):
         client = self.create_mock_client()
         client._session.post.side_effect = Exception("网络连接失败")
-        with pytest.raises((self.NetworkError, self.AgentOSError)):
+        with pytest.raises((self.NetworkError, self.AgentRTError)):
             client.submit_task("测试任务")
 
     def test_submit_task_timeout(self):
         client = self.create_mock_client()
         client._session.post.side_effect = TimeoutError("请求超时")
-        with pytest.raises((self.NetworkError, self.AgentOSTimeoutError)):
+        with pytest.raises((self.NetworkError, self.AgentRTTimeoutError)):
             client.submit_task("测试任务")
 
     def test_get_task_status(self):
@@ -127,7 +127,7 @@ class TestAgentOSClient(SDKTestCase):
         mock_response = self.create_mock_response(400, {"error": "无效的记忆内容"})
         mock_response.ok = False
         client._session.post.return_value = mock_response
-        with pytest.raises((self.AgentOSMemoryError, self.AgentOSError)):
+        with pytest.raises((self.AgentRTMemoryError, self.AgentRTError)):
             client.write_memory("", "L1")
 
     def test_search_memory(self):
@@ -198,11 +198,11 @@ class TestAgentOSClient(SDKTestCase):
     def test_error_handling_invalid_response(self):
         client = self.create_mock_client()
         client._session.get.return_value = None
-        with pytest.raises((self.AgentOSError, Exception)):
+        with pytest.raises((self.AgentRTError, Exception)):
             client.get_task_status("invalid_task")
 
 
-class TestAsyncAgentOSClient(SDKTestCase):
+class TestAsyncAgentRTClient(SDKTestCase):
     """异步AgentRT客户端测试"""
 
     def test_async_client_initialization(self):
@@ -274,7 +274,7 @@ class TestSDKIntegration(SDKTestCase):
             Exception("网络错误"),
             self.create_mock_response(200, {"task_id": "recovered_task"})
         ]
-        with pytest.raises((self.NetworkError, self.AgentOSError)):
+        with pytest.raises((self.NetworkError, self.AgentRTError)):
             client.submit_task("失败任务")
         task = client.submit_task("恢复任务")
         assert task.task_id == "recovered_task"

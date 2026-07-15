@@ -1,6 +1,6 @@
 /**
  * @file test_macros.h
- * @brief AgentOS C 单元测试断言宏定义
+ * @brief AgentRT C 单元测试断言宏定义
  * @version 0.1.0
  * @date 2026-04-04
  *

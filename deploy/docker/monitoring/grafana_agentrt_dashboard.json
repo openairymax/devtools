@@ -4,7 +4,7 @@
     "uid": "agentrt-overview",
     "title": "AgentRT Overview",
     "description": "AgentRT unified monitoring dashboard - service health, performance, and alerting",
-    "tags": ["agentos", "overview"],
+    "tags": ["agentrt", "overview"],
     "timezone": "browser",
     "schemaVersion": 38,
     "version": 1,
@@ -18,7 +18,7 @@
         "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
         "targets": [
           {
-            "expr": "up{job=~\"agentos.*\"}",
+            "expr": "up{job=~\"agentrt.*\"}",
             "legendFormat": "{{instance}}",
             "refId": "A"
           }

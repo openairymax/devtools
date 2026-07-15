@@ -62,7 +62,7 @@ class CheckpointManager:
         auto_compress: bool = False
     ):
         self.storage_dir = storage_dir or os.path.join(
-            os.path.expanduser("~"), ".agentos", "checkpoints"
+            os.path.expanduser("~"), ".agentrt", "checkpoints"
         )
         self.max_per_agent = max_checkpoints_per_agent
         self.auto_compress = auto_compress

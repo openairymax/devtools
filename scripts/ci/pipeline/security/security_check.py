@@ -199,7 +199,7 @@ def check_file(file_path: str) -> List[Finding]:
                     file_path=file_path, line_number=line_num, column=0,
                     severity=Severity.LOW, rule_id='SEC007',
                     message=f'Fragile relative include path ({depth} levels)',
-                    suggestion='Use <agentos/xxx.h> unified include path'
+                    suggestion='Use <agentrt/xxx.h> unified include path'
                 ))
 
         if PATH_TRAVERSAL_PATTERN.search(stripped):
@@ -297,7 +297,7 @@ def print_report(findings: List[Finding]):
 
 
 if __name__ == '__main__':
-    target = sys.argv[1] if len(sys.argv) > 1 else 'agentos'
+    target = sys.argv[1] if len(sys.argv) > 1 else 'agentrt'
     if not os.path.isabs(target):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         target = os.path.normpath(os.path.join(script_dir, '..', '..', '..', target))

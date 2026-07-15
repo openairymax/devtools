@@ -33,8 +33,8 @@ class TestRustSDKClientInit(SDKTestCase):
     def test_client_new_with_custom_endpoint(self):
         """测试自定义端点创建客户端"""
         mock_client = self.create_mock_client()
-        mock_client.config.endpoint = "https://custom.agentos.dev"
-        assert mock_client.config.endpoint == "https://custom.agentos.dev"
+        mock_client.config.endpoint = "https://custom.agentrt.dev"
+        assert mock_client.config.endpoint == "https://custom.agentrt.dev"
 
     def test_client_new_with_timeout(self):
         """测试自定义超时创建客户端"""
@@ -45,10 +45,10 @@ class TestRustSDKClientInit(SDKTestCase):
     def test_client_builder_pattern(self):
         """测试 Builder 模式创建客户端"""
         mock_client = self.create_mock_client()
-        mock_client.config.endpoint = "https://builder.agentos.dev"
+        mock_client.config.endpoint = "https://builder.agentrt.dev"
         mock_client.config.timeout_ms = 30000
         mock_client.config.max_retries = 3
-        assert mock_client.config.endpoint == "https://builder.agentos.dev"
+        assert mock_client.config.endpoint == "https://builder.agentrt.dev"
         assert mock_client.config.timeout_ms == 30000
         assert mock_client.config.max_retries == 3
 

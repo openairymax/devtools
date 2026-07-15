@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS Shell Script Testing Framework
+# AgentRT Shell Script Testing Framework
 # Based on bats-core unit test library
 
 ###############################################################################

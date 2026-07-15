@@ -98,7 +98,7 @@ class TestCognitionLayerIntegration:
             assert step["step"] == i + 1
             assert "action" in step
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_cognition_to_execution_flow(self, mock_session):
         """
         测试认知到执行的完整流程。
@@ -115,7 +115,7 @@ class TestCognitionLayerIntegration:
         mock_session.return_value = mock_session_instance
         mock_session_instance.post.return_value = mock_response
 
-        from agentos import AgentRT
+        from agentrt import AgentRT
 
         client = AgentRT()
 
@@ -189,7 +189,7 @@ class TestExecutionLayerIntegration:
         assert status["status"] in ["pending", "running", "completed", "failed"]
         assert 0 <= status["progress"] <= 100
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_execution_with_memory_context(self, mock_session):
         """
         测试带记忆上下文的执行。
@@ -222,7 +222,7 @@ class TestExecutionLayerIntegration:
             "status": "completed"
         }
 
-        from agentos import AgentRT
+        from agentrt import AgentRT
 
         client = AgentRT()
 
@@ -322,7 +322,7 @@ class TestMemoryLayerIntegration:
         assert result["evolved"] is True
         assert result["new_layer"] in ["L2", "L3", "L4"]
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_memory_integration_with_session(self, mock_session):
         """
         测试记忆与会话集成。
@@ -354,7 +354,7 @@ class TestMemoryLayerIntegration:
             ]
         }
 
-        from agentos import AgentRT
+        from agentrt import AgentRT
 
         client = AgentRT()
 
@@ -373,7 +373,7 @@ class TestEndToEndFlow:
     """端到端流程测试"""
 
     @pytest.mark.e2e
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_complete_task_flow(self, mock_session):
         """
         测试完整的任务流程。
@@ -402,7 +402,7 @@ class TestEndToEndFlow:
             {"memories": []}
         ]
 
-        from agentos import AgentRT
+        from agentrt import AgentRT
 
         client = AgentRT()
 
@@ -415,7 +415,7 @@ class TestEndToEndFlow:
         assert session is not None
 
     @pytest.mark.e2e
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_multi_task_coordination(self, mock_session):
         """
         测试多任务协调。
@@ -437,7 +437,7 @@ class TestEndToEndFlow:
             {"task_id": "task_003"}
         ]
 
-        from agentos import AgentRT
+        from agentrt import AgentRT
 
         client = AgentRT()
 

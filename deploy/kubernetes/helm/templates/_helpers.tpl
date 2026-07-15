@@ -72,14 +72,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       protocol: TCP
     {{- end }}
   env:
-    - name: AGENTOS_SERVICE_NAME
+    - name: AGENTRT_SERVICE_NAME
       value: {{ .name | quote }}
-    - name: AGENTOS_SERVICE_PORT
+    - name: AGENTRT_SERVICE_PORT
       value: {{ .service.port | quote }}
-    - name: AGENTOS_LOG_LEVEL
-      value: {{ .Values.agentosConfig.logLevel | quote }}
-    - name: AGENTOS_DEPLOY_ENV
-      value: {{ .Values.agentosConfig.deployEnv | quote }}
+    - name: AGENTRT_LOG_LEVEL
+      value: {{ .Values.agentrtConfig.logLevel | quote }}
+    - name: AGENTRT_DEPLOY_ENV
+      value: {{ .Values.agentrtConfig.deployEnv | quote }}
     {{- if .env }}
     {{- range $k, $v := .env }}
     - name: {{ $k }}

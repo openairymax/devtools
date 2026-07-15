@@ -23,7 +23,7 @@ int test_safe_strcpy_basic(void) {
     printf("  测试安全字符串复制基本功能...\n");
 
     char dest[TEST_BUFFER_SIZE];
-    const char* src = "Hello, AgentOS!";
+    const char* src = "Hello, AgentRT!";
 
     int result = airy_safe_strcpy(dest, sizeof(dest), src);
     if (result != 0) {

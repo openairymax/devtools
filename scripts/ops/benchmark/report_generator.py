@@ -63,7 +63,7 @@ class ReportTheme(Enum):
     """报告主题"""
     LIGHT = "light"
     DARK = "dark"
-    AGENTOS = "agentos"  # AgentRT品牌主题
+    AGENTRT = "agentrt"  # AgentRT品牌主题
 
 
 @dataclass
@@ -120,7 +120,7 @@ class ReportGenerator:
     
     def __init__(self, 
                  metadata: Optional[ReportMetadata] = None,
-                 theme: ReportTheme = ReportTheme.AGENTOS,
+                 theme: ReportTheme = ReportTheme.AGENTRT,
                  output_dir: Optional[Path] = None):
         
         self.metadata = metadata or ReportMetadata()
@@ -1060,7 +1060,7 @@ def example_usage():
     )
     
     # 创建报告生成器
-    generator = ReportGenerator(metadata=metadata, theme=ReportTheme.AGENTOS)
+    generator = ReportGenerator(metadata=metadata, theme=ReportTheme.AGENTRT)
     
     # 添加摘要部分（模拟数据）
     benchmark_results = [
@@ -1184,8 +1184,8 @@ def main():
     parser.add_argument(
         "--theme", "-t",
         type=str,
-        choices=["light", "dark", "agentos"],
-        default="agentos",
+        choices=["light", "dark", "agentrt"],
+        default="agentrt",
         help="报告主题"
     )
     

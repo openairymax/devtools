@@ -15,9 +15,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| tests/contract/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
+| tests/contract/ 目录 | 对应的 agentrt/ 模块 | 测试内容 |
 |---------------------|---------------------|----------|
 | `python/contract_test_generator.py` | `openlab/contrib/`, `daemons/` | 契约测试用例自动生成器（从接口定义自动生成测试代码） |
 | `python/test_agent_contracts.py` | `daemons/`, `openlab/` | Agent 接口契约验证（注册/发现/通信/生命周期） |
@@ -83,12 +83,12 @@ python tests/utils/python/run_tests.py --type contract
 pytest tests/contract/ -v -n auto -m contract
 
 # 生成覆盖率报告
-pytest tests/contract/ -v --cov=agentos --cov-report=html -m contract
+pytest tests/contract/ -v --cov=agentrt --cov-report=html -m contract
 ```
 
 ## 契约测试范围
 
-| 契约类型 | 对应的 agentos/ 模块 | 验证目标 | 测试文件 |
+| 契约类型 | 对应的 agentrt/ 模块 | 验证目标 | 测试文件 |
 |---------|---------------------|----------|---------|
 | **Agent 注册契约** | `daemons/`, `openlab/` | 注册接口参数、返回值、错误码 | `test_agent_contracts.py` |
 | **Agent 发现契约** | `daemons/`, `openlab/` | 发现接口查询参数、返回格式、分页 | `test_agent_contracts.py` |
@@ -101,7 +101,7 @@ pytest tests/contract/ -v --cov=agentos --cov-report=html -m contract
 
 ## 测试覆盖说明
 
-| agentos/ 模块 | 契约测试文件 | 测试框架 | 覆盖范围 |
+| agentrt/ 模块 | 契约测试文件 | 测试框架 | 覆盖范围 |
 |--------------|------------|---------|---------|
 | `daemons/` | `test_agent_contracts.py` | pytest | Agent 注册/发现/通信/生命周期接口契约 |
 | `openlab/` | `test_agent_contracts.py` | pytest | Agent 在开放生态中的接口契约 |

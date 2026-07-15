@@ -232,7 +232,7 @@ gcc --version
 
 ## 主要目录
 ```
-agentos/
+agentrt/
 ├── atoms/                    # 核心原子模块
 │   ├── coreloopthree/       # 认知三层循环
 │   ├── memoryrovol/         # 记忆系统
@@ -251,8 +251,8 @@ agentos/
 ## 实践任务
 浏览项目目录，熟悉关键文件：
 ```bash
-ls -la agentos/
-find agentos -name "*.md" | head -10
+ls -la agentrt/
+find agentrt -name "*.md" | head -10
 ```
 
 了解项目结构有助于你快速定位代码和文档。
@@ -273,7 +273,7 @@ find agentos -name "*.md" | head -10
 
 ### 1. 进入项目目录
 ```bash
-cd agentos
+cd agentrt
 ```
 
 ### 2. 创建构建目录
@@ -296,7 +296,7 @@ make -j%NUMBER_OF_PROCESSORS%  # Windows
 ## 验证构建
 构建成功后，你会看到类似输出：
 ```
-[100%] Built target agentos
+[100%] Built target agentrt
 ```
 
 ## 实践任务

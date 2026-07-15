@@ -1,6 +1,6 @@
 /**
  * @file test_platform_compat.c
- * @brief AgentOS 跨平台兼容性测试套件 (P2-C04)
+ * @brief AgentRT 跨平台兼容性测试套件 (P2-C04)
  *
  * 验证跨平台一致性：
  * - 平台检测宏正确性（Linux/Windows/macOS）
@@ -162,7 +162,7 @@ static void pt_type_sizes(void)
     TEST_ASSERT(sizeof(float) >= 4, "sizeof(float)>=4");
     TEST_ASSERT(sizeof(double) >= 8, "sizeof(double)>=8");
 
-    /* AgentOS核心类型 */
+    /* AgentRT核心类型 */
     TEST_ASSERT(sizeof(uint8_t) == 1, "uint8_t==1 byte");
     TEST_ASSERT(sizeof(uint16_t) == 2, "uint16_t==2 bytes");
     TEST_ASSERT(sizeof(uint32_t) == 4, "uint32_t==4 bytes");
@@ -416,7 +416,7 @@ static void pt_string_encoding(void)
     printf("\n--- [PT-08] 字符串编码 ---\n");
 
     /* ASCII字符串 */
-    const char* ascii_str = "Hello, AgentOS!";
+    const char* ascii_str = "Hello, AgentRT!";
     TEST_ASSERT(strlen(ascii_str) == 15, "ASCII字符串长度正确");
 
     /* 空字符串 */
@@ -533,7 +533,7 @@ static void pt_config_paths(void)
                 "相对路径存储正确");
 
     /* Windows风格路径（在Unix上应正常存储为字符串）*/
-    cm_set("win.path", "C:\\Program Files\\AgentOS\\config.ini", "pt");
+    cm_set("win.path", "C:\\Program Files\\AgentRT\\config.ini", "pt");
     const char* wpath = cm_get("win.path", NULL);
     TEST_ASSERT(wpath != NULL, "Windows路径作为字符串可存储");
 
@@ -597,7 +597,7 @@ static void pt_full_init_chain(void)
 int main(void)
 {
     printf("========================================\n");
-    printf("  AgentOS 跨平台兼容性测试套件\n");
+    printf("  AgentRT 跨平台兼容性测试套件\n");
     printf("  P2-C04: 平台抽象层验证\n");
     printf("========================================\n");
 

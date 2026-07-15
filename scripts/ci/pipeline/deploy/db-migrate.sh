@@ -22,7 +22,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
 MIGRATIONS_DIR="${PROJECT_ROOT}/agentrt/heapstore/migrations"
 DB_HOST="${AGENTRT_POSTGRES_HOST:-localhost}"
 DB_PORT="${AGENTRT_POSTGRES_PORT:-5432}"

@@ -699,7 +699,7 @@ Examples:
   python unified_quality_analyzer.py --output report.json --format json
   
   # 指定项目路径
-  python unified_quality_analyzer.py --project-path ../agentos --scan-all
+  python unified_quality_analyzer.py --project-path ../agentrt --scan-all
         """
     )
     

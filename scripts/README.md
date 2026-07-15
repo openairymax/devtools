@@ -4,7 +4,7 @@
 
 ## 概述
 
-AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵盖 CI/CD 流水线、开发环境搭建、运维部署、性能基准测试、Python 运维工具包和项目资源等六大领域。所有脚本按职能分类存放于五个子模块中，与 `agentos/` 核心模块紧密对应，形成从代码提交到生产部署的完整自动化链路。
+AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵盖 CI/CD 流水线、开发环境搭建、运维部署、性能基准测试、Python 运维工具包和项目资源等六大领域。所有脚本按职能分类存放于五个子模块中，与 `agentrt/` 核心模块紧密对应，形成从代码提交到生产部署的完整自动化链路。
 
 脚本工具集遵循以下设计原则：
 
@@ -17,9 +17,9 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 >
 > **规范**：所有构建脚本遵循 BAN-33 规则（禁止源内构建），构建产物必须输出到独立构建目录中。
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| scripts/ 模块 | 对应的 agentos/ 模块 | 用途 |
+| scripts/ 模块 | 对应的 agentrt/ 模块 | 用途 |
 |---------------|---------------------|------|
 | `ci/pipeline/` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 全模块 CI/CD 流水线（构建→测试→质量→部署） |
 | `ci/quality/` | `toolkit/` | 多语言 SDK 质量分析（C/C++/Python/Go/Rust/TypeScript） |
@@ -53,7 +53,7 @@ scripts/
 ├── dev/                           # 开发环境工具
 │   ├── build/                     #   跨平台构建（BAN-33 源外构建，Linux/macOS/Windows）
 │   ├── setup/                     #   环境配置（交互式安装，Linux/macOS/Windows）
-│   ├── cli/                       #   CLI 入口（agentos 统一命令行工具）
+│   ├── cli/                       #   CLI 入口（agentrt 统一命令行工具）
 │   ├── cmake/                     #   CMake 辅助（Windows MSVC 兼容性预包含头 + Sanitizers 配置）
 │   ├── docs/                      #   文档生成（Doxygen 配置）
 │   └── utils/                     #   开发辅助（快速启动/环境验证/错误码生成/代码修复工具集）
@@ -89,7 +89,7 @@ scripts/
 
 - **build/**：跨平台构建系统，`build.sh` 实现 BAN-33 源外构建规范，`install.sh`/`install.ps1` 分别支持 Unix 和 Windows 平台的自动化安装。
 - **setup/**：交互式开发环境配置，自动检测系统环境并安装所需依赖和工具链。
-- **cli/agentos**：统一 CLI 命令行入口，提供服务管理、智能体管理、任务管理等子命令。
+- **cli/agentrt**：统一 CLI 命令行入口，提供服务管理、智能体管理、任务管理等子命令。
 - **cmake/windows_preinclude.h**：Windows MSVC 兼容性预包含头，定义 `WIN32_LEAN_AND_MEAN` 等宏以减少 Windows.h 的编译开销。
 - **cmake/Sanitizers.cmake**：CMake Sanitizers 配置模块，支持 AddressSanitizer、MemorySanitizer、UndefinedBehaviorSanitizer 等编译器插桩工具。
 - **docs/Doxyfile**：Doxygen 文档生成配置文件，用于从源码注释自动生成 API 参考文档。
@@ -159,14 +159,14 @@ scripts/dev/build/install.sh
 
 ```bash
 # 查看帮助
-scripts/dev/cli/agentos --help
+scripts/dev/cli/agentrt --help
 
 # 服务管理
-scripts/dev/cli/agentos service start
-scripts/dev/cli/agentos service status
+scripts/dev/cli/agentrt service start
+scripts/dev/cli/agentrt service status
 
 # 智能体管理
-scripts/dev/cli/agentos agent list
+scripts/dev/cli/agentrt agent list
 ```
 
 ### CI/CD 流水线

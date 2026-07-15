@@ -24,7 +24,7 @@ Consolidated Python utilities for AgentRT, including:
 Usage:
     from scripts.toolkit import (
         ConfigInitializer,
-        AgentOSDoctor,
+        AgentRTDoctor,
         MemoryManager,
         TokenCounter,
         TokenBudget,
@@ -36,18 +36,18 @@ Usage:
 """
 
 from .src.initializer import ConfigInitializer
-from .src.doctor import AgentOSDoctor
+from .src.doctor import AgentRTDoctor
 from .src.memory_manager import MemoryManager
 from .src.checkpoint_manager import CheckpointManager
 from .src.token_utils import TokenCounter, TokenBudget, get_token_counter, get_token_budget
-from .src.benchmark import AgentOSBenchmark, BenchmarkReporter
+from .src.benchmark import AgentRTBenchmark, BenchmarkReporter
 from .src.validate_contracts import ContractValidator
 from .src.config_engine import ConfigEngine, Environment, create_default_engine
 from .src.plugin import PluginRegistry, Plugin, PluginMetadata
 from .src.events import EventBus, Event, EventHandler
 from .src.security import SecurityManager, InputValidator
 from .src.telemetry import MetricsCollector, Metric
-from .src.cli import AgentOSCLI
+from .src.cli import AgentRTCLI
 from .src.logger import Color, Style, Logger, OutputFormatter, ProgressBar, Spinner, Table
 
 __version__ = "0.1.0"
@@ -55,14 +55,14 @@ __author__ = "SPHARX Ltd."
 
 __all__ = [
     "ConfigInitializer",
-    "AgentOSDoctor",
+    "AgentRTDoctor",
     "MemoryManager",
     "CheckpointManager",
     "TokenCounter",
     "TokenBudget",
     "get_token_counter",
     "get_token_budget",
-    "AgentOSBenchmark",
+    "AgentRTBenchmark",
     "BenchmarkReporter",
     "ContractValidator",
     "ConfigEngine",
@@ -78,7 +78,7 @@ __all__ = [
     "InputValidator",
     "MetricsCollector",
     "Metric",
-    "AgentOSCLI",
+    "AgentRTCLI",
     "Color",
     "Style",
     "Logger",

@@ -358,7 +358,7 @@ class TestSkillContractStructure:
         """
         return {
             "schema_version": "1.0.0",
-            "skill_id": "com.agentos.github_skill.v1",
+            "skill_id": "com.agentrt.github_skill.v1",
             "skill_name": "GitHub Integration Skill",
             "version": "2.1.0",
             "description": "提供 GitHub 仓库操作、PR 管理、代码审查等功能。",

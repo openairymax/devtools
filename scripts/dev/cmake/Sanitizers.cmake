@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentOS 运行时检测模块 (SEC-05/06/08/09)
+# AgentRT 运行时检测模块 (SEC-05/06/08/09)
 # 版本: 0.2.0
 # 最后更新: 2026-06-03
 #
@@ -26,14 +26,6 @@ option(AGENTRT_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" ON)
 option(AGENTRT_ENABLE_TSAN  "Enable ThreadSanitizer (disables ASan/LSan)" OFF)
 option(AGENTRT_ENABLE_STACK_PROTECTOR "Enable -fstack-protector-strong" ON)
 option(AGENTRT_ENABLE_FORTIFY "Enable _FORTIFY_SOURCE=2" ON)
-
-# 兼容旧版选项名（过渡期，v0.2.0 后移除）
-if(DEFINED ENABLE_SANITIZERS AND NOT DEFINED AGENTRT_ENABLE_ASAN)
-    set(AGENTRT_ENABLE_ASAN ${ENABLE_SANITIZERS})
-endif()
-if(DEFINED ENABLE_TSAN)
-    set(AGENTRT_ENABLE_TSAN ${ENABLE_TSAN})
-endif()
 
 # =============================================================================
 # 平台检查
@@ -227,7 +219,7 @@ endfunction()
 # =============================================================================
 function(airy_print_sanitizer_summary)
     message(STATUS "=========================================")
-    message(STATUS "  AgentOS Runtime Detection Configuration")
+    message(STATUS "  AgentRT Runtime Detection Configuration")
     message(STATUS "=========================================")
     message(STATUS "AddressSanitizer (ASan):       ${AGENTRT_ENABLE_ASAN}")
     message(STATUS "LeakSanitizer (LSan):          ${AGENTRT_ENABLE_ASAN}")
@@ -237,7 +229,7 @@ function(airy_print_sanitizer_summary)
     message(STATUS "FORTIFY_SOURCE=2:              ${AGENTRT_ENABLE_FORTIFY}")
     if(AGENTRT_ENABLE_ASAN)
         message(STATUS "ASan halt_on_error:            YES (CI will fail on detection)")
-        message(STATUS "LSan suppressions:             agentos/manager/sanitizer/lsan-suppressions")
+        message(STATUS "LSan suppressions:             ecosystem/manager/sanitizer/lsan-suppressions")
     endif()
     if(AGENTRT_ENABLE_TSAN)
         message(STATUS "TSan history_size:             7")

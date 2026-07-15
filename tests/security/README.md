@@ -17,9 +17,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| tests/security/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
+| tests/security/ 目录 | 对应的 agentrt/ 模块 | 测试内容 |
 |---------------------|---------------------|----------|
 | `c/test_security_audit.c` | `agentrt/cupolas/audit/` | C 层安全审计套件（审计链完整性、事件签名验证） |
 | `c/test_sec017_compliance.c` | `agentrt/cupolas/` | SEC-017 桩函数合规验证（安全接口桩函数完整性） |
@@ -127,7 +127,7 @@ pytest tests/security/ -v -n auto -m security
 
 ## 安全测试覆盖范围
 
-| 安全领域 | 对应的 agentos/ 模块 | 测试项目 | 测试文件 |
+| 安全领域 | 对应的 agentrt/ 模块 | 测试项目 | 测试文件 |
 |---------|---------------------|----------|---------|
 | **输入验证** | `cupolas/sanitizer/` | XSS、SQL 注入、命令注入、路径遍历 | `python/test_input_sanitizer.py` |
 | **权限控制** | `cupolas/permission/` | RBAC 角色权限、ABAC 属性策略、越权检测 | `python/test_permissions.py` |
@@ -139,7 +139,7 @@ pytest tests/security/ -v -n auto -m security
 
 ## 测试覆盖说明
 
-| agentos/ 模块 | 安全测试文件 | 测试框架 | 覆盖范围 |
+| agentrt/ 模块 | 安全测试文件 | 测试框架 | 覆盖范围 |
 |--------------|------------|---------|---------|
 | `cupolas/audit/` | `c/test_security_audit.c` | CMocka | 审计链完整性、HMAC 签名验证、事件不可篡改性 |
 | `cupolas/permission/` | `python/test_permissions.py`, `cupolas/fuzz_permission.c` | pytest + C | RBAC/ABAC 权限模型、越权检测、模糊测试 |

@@ -19,7 +19,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -166,8 +166,8 @@ gate_tests() {
         failed=$(python3 -c "import json; d=json.load(open('/tmp/protocol_test.json')); print(d.get('failed', 1))" 2>/dev/null || echo "1")
         check_gate "Protocol Tests" "$([ "$failed" = "0" ] && echo 0 || echo 1)"
     else
-        log_warn "Protocol test suite not found, skipping"
-        check_gate "Protocol Tests" 0
+        log_fail "Protocol test suite not found"
+        check_gate "Protocol Tests" 1
     fi
 
     if [ -d "build-release" ] && [ -f "build-release/CTestTestfile.cmake" ]; then
@@ -178,8 +178,8 @@ gate_tests() {
             check_gate "Unit Tests" 0
         fi
     else
-        log_warn "No CTest available, skipping unit test gate"
-        check_gate "Unit Tests" 0
+        log_fail "No CTest available — build required before release"
+        check_gate "Unit Tests" 1
     fi
 }
 
@@ -196,7 +196,7 @@ gate_security() {
     local sec_issues=0
 
     if command -v bandit &>/dev/null; then
-        bandit -r agentos/ -f json -o /tmp/bandit_report.json 2>/dev/null || true
+        bandit -r agentrt/ -f json -o /tmp/bandit_report.json 2>/dev/null || true
         local high_issues
         high_issues=$(python3 -c "import json; d=json.load(open('/tmp/bandit_report.json')); print(len([r for r in d.get('results', []) if r.get('issue_severity') == 'HIGH']))" 2>/dev/null || echo "0")
         if [ "$high_issues" -gt 0 ]; then
@@ -254,8 +254,8 @@ gate_changelog() {
     if grep -q "\[${VERSION}\]" CHANGELOG.md 2>/dev/null; then
         check_gate "Changelog" 0
     else
-        log_warn "Version ${VERSION} not found in CHANGELOG.md"
-        check_gate "Changelog" 0
+        log_fail "Version ${VERSION} not found in CHANGELOG.md"
+        check_gate "Changelog" 1
     fi
 }
 
@@ -283,8 +283,8 @@ gate_cpack() {
         log_ok "CPack generated $pkg_count package(s)"
         check_gate "CPack" 0
     else
-        log_warn "CPack packaging failed (may be missing dependencies)"
-        check_gate "CPack" 0
+        log_fail "CPack packaging failed (may be missing dependencies)"
+        check_gate "CPack" 1
     fi
     cd "$PROJECT_ROOT"
 }
@@ -351,7 +351,7 @@ gate_cosign_sign() {
         fi
     done
 
-    check_gate "Cosign" "$([ "$signed" -gt 0 ] && echo 0 || echo 0)"
+    check_gate "Cosign" "$([ "$signed" -gt 0 ] && echo 0 || echo 1)"
 }
 
 execute_release() {

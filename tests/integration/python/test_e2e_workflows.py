@@ -33,7 +33,7 @@ class TestE2EAgentWorkflow(BaseTestCase):
         assert agent_id.startswith("agent_")
 
         # Step 2: 安装并绑定 Skill
-        skill_url = "https://market.agentos.dev/skills/data-analyzer/v2.0.0"
+        skill_url = "https://market.agentrt.dev/skills/data-analyzer/v2.0.0"
         skill_id = f"skill_{hash(skill_url) % 10000}"
         assert skill_id.startswith("skill_")
 

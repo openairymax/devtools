@@ -1,6 +1,6 @@
 /**
  * @file test_heapstore_registry.c
- * @brief AgentOS 数据分区注册表单元测试
+ * @brief AgentRT 数据分区注册表单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
@@ -178,7 +178,7 @@ static void test_registry_vacuum(void) {
 }
 
 int main(void) {
-    printf("=== AgentOS heapstore Registry Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore Registry Unit Tests ===\n\n");
 
     test_registry_init_shutdown();
     test_registry_agent_crud();

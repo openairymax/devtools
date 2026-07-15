@@ -1,6 +1,6 @@
 /**
  * @file test_heapstore_log.c
- * @brief AgentOS 数据分区日志管理单元测试
+ * @brief AgentRT 数据分区日志管理单元测试
  *
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * "From data intelligence emerges."
@@ -94,7 +94,7 @@ static void test_log_get_service_path(void) {
 
         err = heapstore_log_get_service_path(NULL, path, sizeof(path));
         assert(err == heapstore_SUCCESS);
-        assert(strstr(path, "agentos.log") != NULL);
+        assert(strstr(path, "agentrt.log") != NULL);
 
         err = heapstore_log_get_service_path("test_service", path, sizeof(path));
         assert(err == heapstore_SUCCESS);
@@ -213,7 +213,7 @@ static void test_log_multiple_services(void) {
 }
 
 int main(void) {
-    printf("=== AgentOS heapstore Log Unit Tests ===\n\n");
+    printf("=== AgentRT heapstore Log Unit Tests ===\n\n");
 
     test_log_init_shutdown();
     test_log_write();

@@ -239,7 +239,7 @@ class TestSyscallSkillManagement(IntegrationTestCase):
 
     def test_skill_install_and_list(self):
         """测试 Skill 安装和列表"""
-        skill_url = "https://market.agentos.dev/skills/test-skill/v1.0.0"
+        skill_url = "https://market.agentrt.dev/skills/test-skill/v1.0.0"
         skill_id = self._syscall_skill_install(skill_url)
         assert skill_id is not None
         assert skill_id.startswith("skill_")
@@ -252,7 +252,7 @@ class TestSyscallSkillManagement(IntegrationTestCase):
 
     def test_skill_execute_after_install(self):
         """测试安装后执行 Skill"""
-        skill_url = "https://market.agentos.dev/skills/echo/v1.0.0"
+        skill_url = "https://market.agentrt.dev/skills/echo/v1.0.0"
         skill_id = self._syscall_skill_install(skill_url)
 
         try:
@@ -269,7 +269,7 @@ class TestSyscallSkillManagement(IntegrationTestCase):
 
     def test_skill_uninstall_removes_from_list(self):
         """测试卸载后 Skill 不在列表中"""
-        skill_url = "https://market.agentos.dev/skills/temp/v1.0.0"
+        skill_url = "https://market.agentrt.dev/skills/temp/v1.0.0"
         skill_id = self._syscall_skill_install(skill_url)
         self._syscall_skill_uninstall(skill_id)
 
@@ -304,7 +304,7 @@ class TestSyscallCrossModule(IntegrationTestCase):
         agent_spec = json.dumps({"name": "skilled_agent", "type": "TASK"})
         agent_id = self._syscall_agent_spawn(agent_spec)
 
-        skill_url = "https://market.agentos.dev/skills/analyzer/v1.0.0"
+        skill_url = "https://market.agentrt.dev/skills/analyzer/v1.0.0"
         skill_id = self._syscall_skill_install(skill_url)
 
         try:

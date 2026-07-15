@@ -8,10 +8,10 @@ data:
   agentrt.yaml: |
     # AgentRT Configuration — managed by Helm
     # ConfigMap: {{ include "agentrt.fullname" . }}-config
-    agentos:
+    agentrt:
       version: "0.1.1"
-      log_level: {{ .Values.agentosConfig.logLevel | quote }}
-      deploy_env: {{ .Values.agentosConfig.deployEnv | quote }}
+      log_level: {{ .Values.agentrtConfig.logLevel | quote }}
+      deploy_env: {{ .Values.agentrtConfig.deployEnv | quote }}
 
       corekern:
         host: {{ include "agentrt.fullname" . }}-corekern
@@ -69,9 +69,9 @@ data:
         http_port: 8080
         ws_port: 8081
         metrics_port: 9090
-        mcp_enabled: {{ .Values.agentosConfig.mcpEnabled }}
-        a2a_enabled: {{ .Values.agentosConfig.a2aEnabled }}
-        openai_enabled: {{ .Values.agentosConfig.openaiEnabled }}
+        mcp_enabled: {{ .Values.agentrtConfig.mcpEnabled }}
+        a2a_enabled: {{ .Values.agentrtConfig.a2aEnabled }}
+        openai_enabled: {{ .Values.agentrtConfig.openaiEnabled }}
 
       infra:
         redis:

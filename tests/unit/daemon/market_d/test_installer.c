@@ -26,8 +26,8 @@ static void test_installer_config(void) {
     printf("  test_installer_config...\n");
 
     installer_config_t manager = {
-        .install_dir = AIRY_TMP_DIR "/agentos/test",
-        .temp_dir = AIRY_TMP_DIR "/agentos/temp",
+        .install_dir = AIRY_TMP_DIR "/agentrt/test",
+        .temp_dir = AIRY_TMP_DIR "/agentrt/temp",
         .verify_signature = 1,
         .max_retries = 3
     };

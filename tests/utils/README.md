@@ -16,9 +16,9 @@
 
 > **版本**：v0.1.0
 
-## 与 agentos/ 模块对应关系
+## 与 agentrt/ 模块对应关系
 
-| tests/utils/ 目录 | 对应的 agentos/ 模块 | 用途说明 |
+| tests/utils/ 目录 | 对应的 agentrt/ 模块 | 用途说明 |
 |-------------------|---------------------|----------|
 | `fixtures/data/memories/` | `atoms/memory/`, `atoms/memoryrovol/` | 记忆子系统测试数据（L1-L4 层样本数据） |
 | `fixtures/data/sessions/` | `daemons/`, `gateway/` | 会话管理测试数据（会话创建/恢复/过期样本） |

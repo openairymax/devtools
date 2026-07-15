@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# AgentOS 统一日志和错误处理模块
-# 遵循 AgentOS 架构设计原则：反馈闭环、工程美学
+# AgentRT 统一日志和错误处理模块
+# 遵循 AgentRT 架构设计原则：反馈闭环、工程美学
 
 ###############################################################################
 # 颜色定义
@@ -31,7 +31,7 @@ declare -r LOG_LEVEL_COLORS=("$COLOR_CYAN" "$COLOR_BLUE" "$COLOR_YELLOW" "$COLOR
 # 全局变量
 ###############################################################################
 _AGENTRT_LOG_LEVEL="${AGENTRT_LOG_LEVEL:-$LOG_LEVEL_INFO}"
-_AGENTRT_LOG_PREFIX="${AGENTRT_LOG_PREFIX:-[AgentOS]}"
+_AGENTRT_LOG_PREFIX="${AGENTRT_LOG_PREFIX:-[AgentRT]}"
 _AGENTRT_LOG_TIMESTAMP="${AGENTRT_LOG_TIMESTAMP:-1}"
 _AGENTRT_LOG_FILE="${AGENTRT_LOG_FILE:-}"
 _AGENTRT_SCRIPT_ERRORS=0

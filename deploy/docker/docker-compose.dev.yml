@@ -41,8 +41,8 @@ services:
       - AGENTRT_REDIS_PORT=6379
       - AGENTRT_POSTGRES_HOST=postgres
       - AGENTRT_POSTGRES_PORT=5432
-      - AGENTRT_POSTGRES_DB=agentos
-      - AGENTRT_POSTGRES_USER=agentos
+      - AGENTRT_POSTGRES_DB=agentrt
+      - AGENTRT_POSTGRES_USER=agentrt
       - AGENTRT_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - AGENTRT_JWT_SECRET=${JWT_SECRET}
       - AGENTRT_ENABLE_AUTH=${ENABLE_AUTH:-false}
@@ -53,8 +53,8 @@ services:
       - AGENTRT_TRACING_ENDPOINT=http://jaeger:4318/v1/traces
     volumes:
       - ../manager:/etc/agentrt/gateway:ro
-      - gateway-logs:/var/log/agentos
-      - gateway-run:/var/run/agentos
+      - gateway-logs:/var/log/agentrt
+      - gateway-run:/var/run/agentrt
     depends_on:
       redis:
         condition: service_healthy
@@ -94,8 +94,8 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      - POSTGRES_DB=agentos
-      - POSTGRES_USER=agentos
+      - POSTGRES_DB=agentrt
+      - POSTGRES_USER=agentrt
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8
     volumes:
@@ -103,7 +103,7 @@ services:
     networks:
       - agentrt-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentos"]
+      test: ["CMD-SHELL", "pg_isready -U agentrt"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -144,7 +144,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana_agentrt_dashboard.json:/etc/grafana/provisioning/dashboards/agentos.json:ro
+      - ./monitoring/grafana_agentrt_dashboard.json:/etc/grafana/provisioning/dashboards/agentrt.json:ro
     depends_on:
       - prometheus
     networks:

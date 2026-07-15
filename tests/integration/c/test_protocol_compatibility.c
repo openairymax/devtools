@@ -32,7 +32,7 @@
 
 void test_safe_strcpy_normal(void) {
     char dest[100];
-    const char* src = "Hello, AgentOS!";
+    const char* src = "Hello, AgentRT!";
     int result = safe_strcpy(dest, src, sizeof(dest));
 
     if (result == 0 && strcmp(dest, src) == 0) {
@@ -307,7 +307,7 @@ int main(int argc, char* argv[]) {
 
     printf("\n");
     printf("╔══════════════════════════════════════════╗\n");
-    printf("║   AgentOS Protocol Compatibility Tests   ║\n");
+    printf("║   AgentRT Protocol Compatibility Tests   ║\n");
     printf("╚══════════════════════════════════════════╝\n");
     printf("\n");
 

@@ -14,7 +14,7 @@
 # 选项:
 #   -c <config>    指定 agentrt.yaml 配置文件
 #   -b <bindir>    指定 daemon 二进制目录 (默认: /usr/local/bin)
-#   -r <runtimedir> 指定运行时目录 (默认: /tmp/agentos)
+#   -r <runtimedir> 指定运行时目录 (默认: /tmp/agentrt)
 #   -t <timeout>   全局健康检查超时秒数 (默认: 120)
 #   -s             静默模式（减少输出）
 #   -n             dry-run（只打印启动计划，不实际启动）
@@ -46,7 +46,7 @@ log_debug() { ((SILENT)) || echo -e "${BLUE}[DEBUG]${NC} $*"; }
 # ==================== 默认值 ====================
 
 AGENTRT_BINDIR="${AGENTRT_BINDIR:-/usr/local/bin}"
-AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-/tmp/agentos}"
+AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-/tmp/agentrt}"
 AGENTRT_CONFIG="${AGENTRT_CONFIG:-}"
 GLOBAL_TIMEOUT_SEC=120
 HEALTH_CHECK_INTERVAL_SEC=1
@@ -121,7 +121,7 @@ Usage: bash agentrt-bootstrap.sh [options]
 Options:
   -c <config>      指定 agentrt.yaml 配置文件
   -b <bindir>      指定 daemon 二进制目录 (默认: /usr/local/bin)
-  -r <runtimedir>  指定运行时目录 (默认: /tmp/agentos)
+  -r <runtimedir>  指定运行时目录 (默认: /tmp/agentrt)
   -t <timeout>     全局健康检查超时秒数 (默认: 120)
   -s               静默模式（减少输出）
   -n               dry-run（只打印启动计划，不实际启动）
@@ -136,7 +136,7 @@ Startup DAG:
 
 Examples:
   bash agentrt-bootstrap.sh
-  bash agentrt-bootstrap.sh -b ./build/bin -r /var/run/agentos
+  bash agentrt-bootstrap.sh -b ./build/bin -r /var/run/agentrt
   bash agentrt-bootstrap.sh -n  # dry-run
 EOF
 }
