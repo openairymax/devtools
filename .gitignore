@@ -1,76 +1,28 @@
 # ===========================================================================
-# Airymax DevTools — .gitignore
+# Airymax DevTools 顶层仓 .gitignore
 # 策略：非必要不追踪
-# 说明：DevTools 为工具集叶子仓，含 Docker/K8s/脚本等实际内容
-#       采用白名单+黑名单双重模式保护本地路径
-# ===========================================================================
-
-# ===========================================================================
-# 默认忽略所有，白名单放行项目必需文件
-# ===========================================================================
+# ---------------------------------------------------------------------------
+# 默认忽略所有
+# ---------------------------------------------------------------------------
 *
-!.clang-format
-!.clang-tidy
-!.clangd
-!.git-blame-ignore-revs
+# ---------------------------------------------------------------------------
+# 顶层仓必要文件（白名单）
+# ---------------------------------------------------------------------------
 !.gitignore
-!.pre-commit-config.yaml
 !LICENSE
 !NOTICE
 !README.md
 !README_zh.md
+!.clang-format
+!.clang-tidy
+!.clangd
+!.git-blame-ignore-revs
+!.pre-commit-config.yaml
+!pyproject.toml
+!vcpkg.json
 !deploy/
 !deploy/**
-!pyproject.toml
 !scripts/
 !scripts/**
 !tests/
 !tests/**
-!vcpkg.json
-
-# IDE 配置
-.vscode/
-.idea/
-.vs/
-*.code-workspace
-.lingma/
-.trae/
-
-# 构建目录
-build/
-build-*/
-*-build/
-
-# Python 运行时
-__pycache__/
-*.py[cod]
-*$py.class
-*.pyo
-.pytest_cache/
-.coverage
-htmlcov/
-.ruff_cache/
-
-# 环境与密钥
-.env
-.env.*
-!.env.example
-*.key
-*.pem
-*.cert
-
-# 操作系统
-.DS_Store
-Thumbs.db
-desktop.ini
-*.swp
-*.swo
-*~
-
-# 临时文件
-*.log
-*.tmp
-*.bak
-*.orig
-*.local
-.cache/
