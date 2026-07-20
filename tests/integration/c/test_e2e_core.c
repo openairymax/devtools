@@ -26,6 +26,7 @@
 #include "memory_compat.h"   /* Task #38: AIRY_MEMSET 定义 (BAN-154 安全宏) */
 #include "airy_time.h"
 #include "observability.h"
+#include "corekern_observability.h"  /* airy_observability_config_t */
 
 /* daemons/common */
 #include "svc_common.h"
@@ -928,8 +929,8 @@ static void e2e_scenario_17_error_propagation(void)
         TEST_ASSERT(strlen(i18n_str) > 0, "Step 3: ENOMEM有i18n描述信息");
     }
 
-    airy_err_t neg_code = -2;
-    TEST_ASSERT(neg_code == AIRY_ENOMEM, "Step 4: ENOMEM值为-2");
+    airy_err_t neg_code = -12;
+    TEST_ASSERT(neg_code == AIRY_ENOMEM, "Step 4: ENOMEM值为-12（POSIX ENOMEM=12）");
 
     const char* unknown_name = airy_err_str(AIRY_EUNKNOWN);
     TEST_ASSERT(unknown_name != NULL, "Step 5: EUNKNOWN名称存在");

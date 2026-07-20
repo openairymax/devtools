@@ -24,6 +24,7 @@
 #include "memory_compat.h"
 #include "prometheus_exporter.h"
 #include "airy_types.h"
+#include "error.h"  /* AIRY_ERR_INVALID_PARAM */
 
 /* ============================================================================
  * Test Helpers

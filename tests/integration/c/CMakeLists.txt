@@ -304,6 +304,11 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/deepseek.c
     ${LLM_D_DIR}/src/providers/google.c
     ${LLM_D_DIR}/src/providers/local.c
+    ${LLM_D_DIR}/src/router/llm_router.c
+    ${LLM_D_DIR}/src/router/cost_aware_router.c
+    ${LLM_D_DIR}/src/router/round_robin_router.c
+    ${LLM_D_DIR}/src/router/least_latency_router.c
+    ${LLM_D_DIR}/src/router/quality_first_router.c
 )
 
 add_executable(test_llm_d_routing test_llm_d_routing.c ${LLM_IMPL_SOURCES})
