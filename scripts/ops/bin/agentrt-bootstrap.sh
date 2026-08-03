@@ -469,6 +469,9 @@ show_status() {
                     log_warn "$name: RUNNING but UNHEALTHY (PID=$pid)"
                     all_online=false
                 fi
+            elif [[ -z "$pid" ]] && check_daemon_health "$name"; then
+                # 外部已运行的健康 daemon（socket 存在，非本进程启动）：不误报 OFFLINE
+                log_info "$name: ONLINE (pre-existing)"
             else
                 log_error "$name: OFFLINE"
                 all_online=false
