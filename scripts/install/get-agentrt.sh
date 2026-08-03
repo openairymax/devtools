@@ -1,206 +1,182 @@
 #!/usr/bin/env bash
-# ──────────────────────────────────────────────────────────
-# AgentRT Installer Script (Linux/macOS)
-# Version: 0.1.1
-# Usage: curl -fsSL https://raw.githubusercontent.com/spharx/agentrt/main/scripts/install/get-agentrt.sh | bash
-# ──────────────────────────────────────────────────────────
+# =============================================================================
+# get-agentrt.sh — AgentRT 生产安装脚本（AIRY_HOME 模型）
+# Copyright (C) 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+#
+# 类比 kubeadm 之于 K8s 节点：在一台宿主机上完成 agentrt 节点运行时安装。
+# 安装目标为 $AIRY_HOME（默认 ~/.airymaxrt），完全脱离源码树运行：
+#
+#   bin/     15 个 daemon 二进制（cmake --install）
+#   lib/     Python 依赖（airymax_agents / openlab / markets / agentrt）
+#   config/  secrets.env（LLM key 唯一落点）
+#   run/     运行时 socket 与 agent 子进程日志
+#   logs/    审计日志 daemon_audit.log
+#   data/ tmp/ cache/  持久化与临时数据
+#
+# 用法:
+#   bash get-agentrt.sh [--source <源码目录>] [--airymaxhub <源码目录>]
+#
+#   --source / --airymaxhub <dir>   指定源码树（agentrt 仓库根，含
+#                                    agentrt/ ecosystem/ sdk/ devtools/）
+#   --help                          显示帮助
+#
+# 未指定源码目录时尝试从脚本位置反推仓库根，失败则提示手动 clone。
+# =============================================================================
+
 set -euo pipefail
 
-BOLD='\033[1m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-CYAN='\033[0;36m'
-RED='\033[0;31m'
-NC='\033[0m'
+# ==================== 输出 ====================
 
-info()  { echo -e "${CYAN}[INFO]${NC} $*"; }
-ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-fail()  { echo -e "${RED}[FAIL]${NC} $*"; exit 1; }
+GREEN='\033[0;32m'; YELLOW='\033[0;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
+info() { echo -e "${CYAN}[INFO]${NC} $*"; }
+ok()   { echo -e "${GREEN}[ OK ]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
+fail() { echo -e "${RED}[FAIL]${NC} $*" >&2; exit 1; }
 
-VERSION="${AGENTRT_VERSION:-0.1.1}"
-INSTALL_DIR="${AGENTRT_INSTALL_DIR:-$HOME/.agentrt}"
-BIN_DIR="${AGENTRT_BIN_DIR:-$HOME/.local/bin}"
-REPO_URL="https://atomgit.com/openairymax/airymaxhub"
+# ==================== 参数解析 ====================
 
-echo ""
-echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo -e "${BOLD}   AgentRT v${VERSION} Installer${NC}"
-echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo ""
+SOURCE_DIR=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --source|--airymaxhub)
+            SOURCE_DIR="$2"; shift 2 ;;
+        --help|-h)
+            echo "用法: bash get-agentrt.sh [--source <agentrt 仓库根>]"; exit 0 ;;
+        *)
+            fail "未知参数: $1（--help 查看用法）" ;;
+    esac
+done
 
-# ── Step 1: 检测平台 ─────────────────────────────────────
-info "Step 1/6: 检测平台..."
-
-OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-ARCH="$(uname -m)"
-
-case "${OS}" in
-    linux)  PLATFORM="linux" ;;
-    darwin) PLATFORM="darwin" ;;
-    *)      fail "不支持的操作系统: ${OS}" ;;
-esac
-
-case "${ARCH}" in
-    x86_64|amd64) ARCH="amd64" ;;
-    aarch64|arm64) ARCH="arm64" ;;
-    *)             fail "不支持的架构: ${ARCH}" ;;
-esac
-
-ok "平台: ${PLATFORM}-${ARCH}"
-echo ""
-
-# ── Step 2: 检查依赖 ─────────────────────────────────────
-info "Step 2/6: 检查依赖..."
-
-MISSING_DEPS=()
-
-check_dep() {
-    if command -v "$1" &>/dev/null; then
-        ok "$1 已安装"
-    else
-        warn "$1 未安装"
-        MISSING_DEPS+=("$1")
+# 未指定时从脚本位置反推仓库根：<root>/devtools/scripts/install/get-agentrt.sh
+if [[ -z "${SOURCE_DIR}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    CANDIDATE="$(cd "${SCRIPT_DIR}/../../../.." 2>/dev/null && pwd || true)"
+    if [[ -n "${CANDIDATE}" && -f "${CANDIDATE}/agentrt/CMakeLists.txt" ]]; then
+        SOURCE_DIR="${CANDIDATE}"
     fi
+fi
+
+if [[ -z "${SOURCE_DIR}" ]]; then
+    fail "无法定位源码目录。请显式指定: bash get-agentrt.sh --source /path/to/agentrt"
+fi
+if [[ ! -f "${SOURCE_DIR}/agentrt/CMakeLists.txt" ]]; then
+    fail "源码目录无效（缺 agentrt/CMakeLists.txt）: ${SOURCE_DIR}"
+fi
+
+AGENTRT_SRC="$(cd "${SOURCE_DIR}" && pwd)"
+
+# ==================== 目标目录（AIRY_HOME 体系） ====================
+
+export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+AIRY_BIN_DIR="${AIRY_HOME}/bin"
+AIRY_LIB_DIR="${AIRY_HOME}/lib"
+AIRY_RUN_DIR="${AIRY_HOME}/run"
+AIRY_LOG_DIR="${AIRY_HOME}/logs"
+AIRY_CFG_DIR="${AIRY_HOME}/config"
+AIRY_DATA_DIR="${AIRY_HOME}/data"
+AIRY_TMP_DIR="${AIRY_HOME}/tmp"
+AIRY_CACHE_DIR="${AIRY_HOME}/cache"
+AIRY_SECRETS_FILE="${AIRY_CFG_DIR}/secrets.env"
+
+# ==================== 依赖检测 ====================
+
+info "Step 1/6: 检测依赖..."
+for dep in cmake gcc make python3; do
+    command -v "${dep}" >/dev/null 2>&1 || fail "缺失依赖: ${dep}"
+done
+ok "依赖齐全 (cmake/gcc/make/python3)"
+
+# ==================== 创建目录结构 ====================
+
+info "Step 2/6: 创建 AIRY_HOME 目录结构..."
+mkdir -p "${AIRY_BIN_DIR}" "${AIRY_LIB_DIR}" "${AIRY_RUN_DIR}" "${AIRY_LOG_DIR}" \
+         "${AIRY_CFG_DIR}" "${AIRY_DATA_DIR}" "${AIRY_TMP_DIR}" "${AIRY_CACHE_DIR}"
+# 密钥目录收紧权限
+chmod 700 "${AIRY_CFG_DIR}" 2>/dev/null || true
+ok "目录就绪: ${AIRY_HOME}"
+
+# ==================== 构建（out-of-source，BAN-33） ====================
+
+info "Step 3/6: 构建 C 核心（out-of-source）..."
+# 构建临时目录放系统临时区，与 AIRY_HOME/tmp（运行时临时）解耦，可随时清理
+BUILD_DIR="${TMPDIR:-/tmp}/agentrt-install-build"
+rm -rf "${BUILD_DIR}"
+cmake -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release -S "${AGENTRT_SRC}/agentrt" >/dev/null
+cmake --build "${BUILD_DIR}" -j"$(nproc 2>/dev/null || echo 4)" >/dev/null 2>&1 \
+    || { warn "全量构建失败，重试（首次 LTO 串行较慢）..."; cmake --build "${BUILD_DIR}" -j2 >/dev/null; }
+ok "C 核心构建完成"
+
+# ==================== 安装 daemon 二进制 ====================
+
+info "Step 4/6: 安装 daemon 到 ${AIRY_BIN_DIR}..."
+cmake --install "${BUILD_DIR}" --prefix "${AIRY_HOME}" >/dev/null
+# 校验 15 个 daemon 全部就位
+EXPECTED_DAEMONS=(monit_d observe_d info_d notify_d sched_d channel_d mem_d
+                  llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d)
+MISSING=()
+for d in "${EXPECTED_DAEMONS[@]}"; do
+    [[ -x "${AIRY_BIN_DIR}/${d}" ]] || MISSING+=("${d}")
+done
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+    fail "daemon 安装不完整，缺失: ${MISSING[*]}"
+fi
+ok "15 个 daemon 已安装"
+
+# ==================== Python 依赖 → lib/ ====================
+
+info "Step 5/6: 安装 Python 依赖到 ${AIRY_LIB_DIR}..."
+install_python_deps() {
+    local src_root="$1"; shift
+    local pkg
+    for pkg in "$@"; do
+        [[ -d "${src_root}/${pkg}" ]] || { warn "源码包缺失，跳过: ${src_root}/${pkg}"; continue; }
+        # 不带尾部斜杠：复制目录本身 → ${AIRY_LIB_DIR}/${pkg}/
+        if command -v rsync >/dev/null 2>&1; then
+            rsync -a --exclude 'tests' --exclude '__pycache__' --exclude '.git' \
+                  --exclude 'examples' "${src_root}/${pkg}" "${AIRY_LIB_DIR}/"
+        else
+            cp -r "${src_root}/${pkg}" "${AIRY_LIB_DIR}/"
+        fi
+    done
 }
 
-check_dep curl
-check_dep git
-check_dep gcc
-check_dep cmake
-check_dep cargo
+install_python_deps "${AGENTRT_SRC}/ecosystem/agents" airymax_agents airymax_agents_rs
+install_python_deps "${AGENTRT_SRC}/ecosystem/openlab" openlab markets contrib app
+install_python_deps "${AGENTRT_SRC}/sdk/sdk-python" agentrt
 
-if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
-    warn "缺失依赖: ${MISSING_DEPS[*]}"
-    info "尝试安装缺失依赖..."
-
-    if command -v apt-get &>/dev/null; then
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq "${MISSING_DEPS[@]}" 2>/dev/null || true
-    elif command -v brew &>/dev/null; then
-        brew install "${MISSING_DEPS[@]}" 2>/dev/null || true
-    elif command -v dnf &>/dev/null; then
-        sudo dnf install -y "${MISSING_DEPS[@]}" 2>/dev/null || true
-    fi
-fi
-echo ""
-
-# ── Step 3: 下载源码 ─────────────────────────────────────
-info "Step 3/6: 下载 AgentRT 源码..."
-
-if [ -d "${INSTALL_DIR}/AgentRT" ]; then
-    info "已有源码目录，执行 git pull..."
-    cd "${INSTALL_DIR}/AgentRT"
-    git pull --ff-only 2>/dev/null || warn "git pull 失败，使用现有代码"
+# 校验可导入
+if ! PYTHONPATH="${AIRY_LIB_DIR}" python3 -c "import agentrt, airymax_agents, openlab, markets" 2>/dev/null; then
+    warn "lib/ 导入校验失败（检查源码包结构）"
 else
-    mkdir -p "${INSTALL_DIR}"
-    cd "${INSTALL_DIR}"
-    git clone --depth 1 --branch "v${VERSION}" "${REPO_URL}.git" AgentRT 2>/dev/null || \
-    git clone --depth 1 "${REPO_URL}.git" AgentRT 2>/dev/null || \
-    warn "git clone 失败，请手动下载"
+    ok "Python 依赖可导入 (agentrt/airymax_agents/openlab/markets)"
 fi
 
-ok "源码已就绪: ${INSTALL_DIR}/AgentRT"
-echo ""
+# ==================== secrets.env 模板 ====================
 
-# ── Step 4: 构建 ─────────────────────────────────────────
-info "Step 4/6: 构建 AgentRT..."
-
-cd "${INSTALL_DIR}/AgentRT"
-
-# 构建 C 核心（CMakeLists.txt 在 agentrt/ 子目录下）
-if [ -f "agentrt/CMakeLists.txt" ]; then
-    info "构建 C 核心引擎..."
-    mkdir -p build && cd build
-    cmake ../agentrt -DCMAKE_BUILD_TYPE=Release 2>/dev/null || warn "CMake 配置失败"
-    make -j"$(nproc 2>/dev/null || echo 4)" 2>/dev/null || warn "C 构建失败"
-    cd ..
-fi
-
-# 构建 CLI
-if [ -f "sdk/cli/Cargo.toml" ]; then
-    info "构建 CLI 工具..."
-    cd sdk/cli
-    cargo build --release 2>/dev/null || warn "CLI 构建失败"
-    cd ../..
-fi
-
-# 构建 TUI
-if [ -f "sdk/tui/Cargo.toml" ]; then
-    info "构建 TUI 工具..."
-    cd sdk/tui
-    cargo build --release 2>/dev/null || warn "TUI 构建失败"
-    cd ../..
-fi
-
-ok "构建完成"
-echo ""
-
-# ── Step 5: 安装 ─────────────────────────────────────────
-info "Step 5/6: 安装到系统..."
-
-mkdir -p "${BIN_DIR}"
-
-# 安装 CLI
-if [ -f "sdk/cli/target/release/agentrt" ]; then
-    cp sdk/cli/target/release/agentrt "${BIN_DIR}/agentrt"
-    chmod +x "${BIN_DIR}/agentrt"
-    ok "CLI 已安装: ${BIN_DIR}/agentrt"
-fi
-
-# 安装 TUI
-if [ -f "sdk/tui/target/release/agentrt-tui" ]; then
-    cp sdk/tui/target/release/agentrt-tui "${BIN_DIR}/agentrt-tui"
-    chmod +x "${BIN_DIR}/agentrt-tui"
-    ok "TUI 已安装: ${BIN_DIR}/agentrt-tui"
-fi
-
-# 确保 BIN_DIR 在 PATH 中
-if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
-    info "将 ${BIN_DIR} 添加到 PATH..."
-    SHELL_RC="${HOME}/.bashrc"
-    if [ -f "${HOME}/.zshrc" ]; then
-        SHELL_RC="${HOME}/.zshrc"
+info "Step 6/6: 配置 LLM 凭据模板..."
+if [[ ! -f "${AIRY_SECRETS_FILE}" ]]; then
+    TEMPLATE="${AGENTRT_SRC}/devtools/scripts/ops/templates/secrets.env.example"
+    if [[ -f "${TEMPLATE}" ]]; then
+        cp "${TEMPLATE}" "${AIRY_SECRETS_FILE}"
+        chmod 600 "${AIRY_SECRETS_FILE}"
+        warn "已生成 ${AIRY_SECRETS_FILE}，请填写 LLM API key"
     fi
-    echo "" >> "${SHELL_RC}"
-    echo "# AgentRT" >> "${SHELL_RC}"
-    echo "export PATH=\"${BIN_DIR}:\$PATH\"" >> "${SHELL_RC}"
-    warn "请运行 'source ${SHELL_RC}' 或重新打开终端以更新 PATH"
-fi
-
-echo ""
-
-# ── Step 6: 验证 ─────────────────────────────────────────
-info "Step 6/6: 验证安装..."
-
-if command -v agentrt &>/dev/null; then
-    ok "agentrt 命令可用"
-    agentrt --version 2>/dev/null || true
 else
-    warn "agentrt 命令尚未在 PATH 中，请重新打开终端"
+    ok "secrets.env 已存在，跳过"
 fi
 
+# ==================== 验证 ====================
+
 echo ""
-echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}   安装完成！${NC}"
-echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
+echo "============================================================"
+echo "  AgentRT v0.1.1 生产安装完成（AIRY_HOME=${AIRY_HOME}）"
+echo "============================================================"
+echo "  二进制:   ${AIRY_BIN_DIR}"
+echo "  Python:   ${AIRY_LIB_DIR}"
+echo "  凭据:     ${AIRY_SECRETS_FILE}"
+echo "  运行时:   ${AIRY_RUN_DIR} / ${AIRY_LOG_DIR}"
 echo ""
-echo -e "${BOLD}快速开始:${NC}"
-echo ""
-echo -e "  1. 创建第一个 Agent:"
-echo -e "     ${CYAN}agentrt init my-first-agent${NC}"
-echo ""
-echo -e "  2. 运行 Agent:"
-echo -e "     ${CYAN}cd my-first-agent && agentrt run \"你好，世界！\"${NC}"
-echo ""
-echo -e "  3. 或使用 QuickStart 脚本:"
-echo -e "     ${CYAN}${INSTALL_DIR}/AgentRT/devtools/scripts/ops/bin/quickstart.sh${NC}"
-echo ""
-echo -e "  4. 查看文档:"
-echo -e "     ${CYAN}agentrt --help${NC}"
-echo ""
-echo -e "${BOLD}更多信息:${NC}"
-echo -e "  源码: ${CYAN}${REPO_URL}${NC}"
-echo -e "  版本: ${CYAN}v${VERSION}${NC}"
-echo -e "  安装目录: ${CYAN}${INSTALL_DIR}${NC}"
-echo ""
+echo "启动: bash ${AGENTRT_SRC}/devtools/scripts/ops/bin/agentrt-bootstrap.sh"
+echo "  （或设置 PATH 后直接执行: ${AIRY_BIN_DIR}/agent_d）"
+echo "============================================================"

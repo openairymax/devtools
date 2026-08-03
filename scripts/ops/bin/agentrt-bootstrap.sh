@@ -87,9 +87,11 @@ export AIRY_CONFIG_DIR="${AIRY_CONFIG_DIR:-$AIRY_HOME/config}"
 export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
 export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
 
-# 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）
-AGENTRT_BINDIR="${AGENTRT_BINDIR:-$AIRY_BIN_DIR}"
-AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-$AIRY_RUNTIME_DIR}"
+# 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）。
+# 注意：此处强制覆盖而非 :- 回退——上方 L48/L49 已把默认值设为非空旧路径，
+# 用 :- 不会生效。AIRY_HOME 为权威路径，自定义经 -b/-r 参数或 AIRY_HOME。
+AGENTRT_BINDIR="${AIRY_BIN_DIR}"
+AGENTRT_RUNTIME_DIR="${AIRY_RUNTIME_DIR}"
 
 # ==================== 凭据加载（secrets.env） ====================
 # 开发者设置 LLM key 的唯一位置：$AIRY_HOME/config/secrets.env
