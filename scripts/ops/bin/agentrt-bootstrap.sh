@@ -71,6 +71,42 @@ if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; 
     AGENTRT_AGENTS_PYTHONPATH="${AGENTRT_AGENTS_PYTHONPATH:-${AIRYMAXHUB_ROOT}/ecosystem/agents:${AIRYMAXHUB_ROOT}/ecosystem/openlab:${AIRYMAXHUB_ROOT}/sdk/sdk-python}"
 fi
 
+# ==================== AIRY_HOME 路径体系 ====================
+#
+# 统一安装根目录：$AIRY_HOME 或 ~/.airymaxrt（与 platform.h airy_home_dir()
+# 一致）。全部运行时产物收敛其下，非 root 部署、容器化、卸载均干净。
+export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+mkdir -p "$AIRY_HOME"/bin "$AIRY_HOME"/lib "$AIRY_HOME"/run \
+         "$AIRY_HOME"/logs "$AIRY_HOME"/config "$AIRY_HOME"/data \
+         "$AIRY_HOME"/tmp "$AIRY_HOME"/cache 2>/dev/null
+
+# 子目录导出（与 daemon airy_paths_init() 的 setenv 一致）
+export AIRY_RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+export AIRY_LOG_DIR="${AIRY_LOG_DIR:-$AIRY_HOME/logs}"
+export AIRY_CONFIG_DIR="${AIRY_CONFIG_DIR:-$AIRY_HOME/config}"
+export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
+export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
+
+# 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）
+AGENTRT_BINDIR="${AGENTRT_BINDIR:-$AIRY_BIN_DIR}"
+AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-$AIRY_RUNTIME_DIR}"
+
+# ==================== 凭据加载（secrets.env） ====================
+# 开发者设置 LLM key 的唯一位置：$AIRY_HOME/config/secrets.env
+# 模板：devtools/scripts/ops/templates/secrets.env.example
+AIRY_SECRETS_FILE="${AIRY_SECRETS_FILE:-$AIRY_CONFIG_DIR/secrets.env}"
+if [ -f "$AIRY_SECRETS_FILE" ]; then
+    # shellcheck disable=SC1090
+    set -a
+    # shellcheck disable=SC1090
+    . "$AIRY_SECRETS_FILE"
+    set +a
+    log_info "Loaded LLM secrets from $AIRY_SECRETS_FILE"
+else
+    log_warn "No secrets file at $AIRY_SECRETS_FILE — LLM providers will be unavailable."
+    log_warn "Setup: cp <repo>/devtools/scripts/ops/templates/secrets.env.example $AIRY_SECRETS_FILE"
+fi
+
 # ==================== DAG 定义 ====================
 #
 # 与 daemon_startup.h 保持一致，5 层启动 DAG。
