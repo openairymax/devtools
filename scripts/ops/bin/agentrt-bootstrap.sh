@@ -175,8 +175,11 @@ declare -A DAEMON_HEALTH_TIMEOUT=(
 )
 
 # daemon 默认端口 (0 = Unix Socket)
+# 注意: tool_d 仅监听 Unix Socket，历史遗留的 8082 TCP 端口映射会导致
+# 健康检查 nc -z 8082 挂起（连接被 DROP 而非 REFUSE）后才回退 socket
+# 检查，使 tool_d 每次启动延迟 30s+。已移除，仅保留真实 TCP 端口。
 declare -A DAEMON_PORT=(
-    [gateway_d]=8080 [tool_d]=8082
+    [gateway_d]=8080
 )
 
 # daemon 二进制名称映射 (daemon_name -> binary_name)
