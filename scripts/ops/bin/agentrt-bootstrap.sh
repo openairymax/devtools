@@ -71,11 +71,42 @@ if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; 
     AGENTRT_AGENTS_PYTHONPATH="${AGENTRT_AGENTS_PYTHONPATH:-${AIRYMAXHUB_ROOT}/ecosystem/agents:${AIRYMAXHUB_ROOT}/ecosystem/openlab:${AIRYMAXHUB_ROOT}/sdk/sdk-python}"
 fi
 
+# ==================== 安装目录参数（--home/-H） ====================
+#
+# 用户自选安装目录（与 get-agentrt.sh --prefix 对应）。必须在 AIRY_HOME
+# 默认值解析之前生效，故先做一轮预扫描：提取 --home/--home=/-H 的值并
+# 消费掉（getopts 不支持长选项，若不消费会报 "Unknown option: --"；
+# 短选项 -H 同样在此处理，getopts 阶段已不可见）。
+# 优先级: --home/-H > $AIRY_HOME 环境变量 > ~/.airymaxrt
+
+SCAN_ARGS=("$@")
+FILTERED_ARGS=()
+CUSTOM_AIRY_HOME=""
+i=0
+while [[ $i -lt ${#SCAN_ARGS[@]} ]]; do
+    case "${SCAN_ARGS[$i]}" in
+        --home|-H)
+            CUSTOM_AIRY_HOME="${SCAN_ARGS[$((i + 1))]:-}"
+            i=$((i + 2)) ;;
+        --home=*)
+            CUSTOM_AIRY_HOME="${SCAN_ARGS[$i]#*=}"
+            i=$((i + 1)) ;;
+        *)
+            FILTERED_ARGS+=("${SCAN_ARGS[$i]}")
+            i=$((i + 1)) ;;
+    esac
+done
+set -- "${FILTERED_ARGS[@]}"
+
 # ==================== AIRY_HOME 路径体系 ====================
 #
 # 统一安装根目录：$AIRY_HOME 或 ~/.airymaxrt（与 platform.h airy_home_dir()
 # 一致）。全部运行时产物收敛其下，非 root 部署、容器化、卸载均干净。
-export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+if [[ -n "${CUSTOM_AIRY_HOME}" ]]; then
+    export AIRY_HOME="${CUSTOM_AIRY_HOME}"
+else
+    export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+fi
 mkdir -p "$AIRY_HOME"/bin "$AIRY_HOME"/lib "$AIRY_HOME"/run \
          "$AIRY_HOME"/logs "$AIRY_HOME"/config "$AIRY_HOME"/data \
          "$AIRY_HOME"/tmp "$AIRY_HOME"/cache 2>/dev/null
@@ -182,6 +213,7 @@ AgentRT Bootstrap Script — 一键按序启动所有 daemon
 Usage: bash agentrt-bootstrap.sh [options]
 
 Options:
+  -H <dir>         指定安装目录 AIRY_HOME（用户自选，同 --home）
   -c <config>      指定 agentrt.yaml 配置文件
   -b <bindir>      指定 daemon 二进制目录 (默认: /usr/local/bin)
   -r <runtimedir>  指定运行时目录 (默认: /tmp/agentrt)
@@ -199,14 +231,16 @@ Startup DAG:
 
 Examples:
   bash agentrt-bootstrap.sh
+  bash agentrt-bootstrap.sh --home /srv/airymaxrt
   bash agentrt-bootstrap.sh -b ./build/bin -r /var/run/agentrt
   bash agentrt-bootstrap.sh -n  # dry-run
 EOF
 }
 
 parse_args() {
-    while getopts ":c:b:r:t:snh" opt; do
+    while getopts ":H:c:b:r:t:snh" opt; do
         case "$opt" in
+            H) : ;;  # 已在顶部预扫描处理（AIRY_HOME 需先于默认值解析生效）
             c) AGENTRT_CONFIG="$OPTARG" ;;
             b) AGENTRT_BINDIR="$OPTARG" ;;
             r) AGENTRT_RUNTIME_DIR="$OPTARG" ;;

@@ -15,12 +15,16 @@
 #   data/ tmp/ cache/  持久化与临时数据
 #
 # 用法:
-#   bash get-agentrt.sh [--source <源码目录>] [--airymaxhub <源码目录>]
+#   bash get-agentrt.sh [--prefix <安装目录>] [--source <源码目录>]
 #
+#   --prefix / --home <dir>         安装目录（用户自选，AIRY_HOME）。
+#                                    优先级: --prefix > $AIRY_HOME > ~/.airymaxrt
 #   --source / --airymaxhub <dir>   指定源码树（agentrt 仓库根，含
 #                                    agentrt/ ecosystem/ sdk/ devtools/）
 #   --help                          显示帮助
 #
+# 安装完成后固化安装位置到 $AIRY_HOME/config/install.env，并生成
+# $AIRY_HOME/bin/agentrt-env.sh（source 后获得完整运行环境，免手动 export）。
 # 未指定源码目录时尝试从脚本位置反推仓库根，失败则提示手动 clone。
 # =============================================================================
 
@@ -37,12 +41,15 @@ fail() { echo -e "${RED}[FAIL]${NC} $*" >&2; exit 1; }
 # ==================== 参数解析 ====================
 
 SOURCE_DIR=""
+INSTALL_PREFIX=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --source|--airymaxhub)
             SOURCE_DIR="$2"; shift 2 ;;
+        --prefix|--home)
+            INSTALL_PREFIX="$2"; shift 2 ;;
         --help|-h)
-            echo "用法: bash get-agentrt.sh [--source <agentrt 仓库根>]"; exit 0 ;;
+            echo "用法: bash get-agentrt.sh [--prefix <安装目录>] [--source <agentrt 仓库根>]"; exit 0 ;;
         *)
             fail "未知参数: $1（--help 查看用法）" ;;
     esac
@@ -67,8 +74,16 @@ fi
 AGENTRT_SRC="$(cd "${SOURCE_DIR}" && pwd)"
 
 # ==================== 目标目录（AIRY_HOME 体系） ====================
+#
+# 安装目录由用户自选，优先级: --prefix/--home > $AIRY_HOME 环境变量 > ~/.airymaxrt。
+# --prefix 显式归一为绝对路径，避免后续子目录拼接受相对路径影响。
 
-export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+if [[ -n "${INSTALL_PREFIX}" ]]; then
+    AIRY_HOME="$(cd "${INSTALL_PREFIX}" 2>/dev/null && pwd || echo "${INSTALL_PREFIX}")"
+    export AIRY_HOME
+else
+    export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+fi
 AIRY_BIN_DIR="${AIRY_HOME}/bin"
 AIRY_LIB_DIR="${AIRY_HOME}/lib"
 AIRY_RUN_DIR="${AIRY_HOME}/run"
@@ -166,6 +181,35 @@ else
     ok "secrets.env 已存在，跳过"
 fi
 
+# ==================== 固化安装位置 ====================
+
+# 用户自选目录在后续启动时必须可复现，否则 C 侧 airy_paths_init() 会回落
+# 到默认 $HOME/.airymaxrt。install.env 记录本次安装位置；agentrt-env.sh
+# 提供 source 即用的运行环境（AIRY_HOME + 子目录 + PATH）。
+
+{
+    echo "# AgentRT 安装信息（由 get-agentrt.sh 生成，勿手改）"
+    echo "AIRY_HOME=${AIRY_HOME}"
+    echo "AIRY_VERSION=0.1.1"
+    echo "INSTALLED_AT=$(date -Is 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
+} > "${AIRY_CFG_DIR}/install.env"
+chmod 600 "${AIRY_CFG_DIR}/install.env"
+
+cat > "${AIRY_BIN_DIR}/agentrt-env.sh" <<EOF
+#!/usr/bin/env bash
+# AgentRT 运行环境（由 get-agentrt.sh 生成，source 使用）
+# 用法: source \${AIRY_HOME:-${AIRY_HOME}}/bin/agentrt-env.sh
+export AIRY_HOME="${AIRY_HOME}"
+export AIRY_RUNTIME_DIR="\${AIRY_RUNTIME_DIR:-\$AIRY_HOME/run}"
+export AIRY_LOG_DIR="\${AIRY_LOG_DIR:-\$AIRY_HOME/logs}"
+export AIRY_CONFIG_DIR="\${AIRY_CONFIG_DIR:-\$AIRY_HOME/config}"
+export AIRY_BIN_DIR="\${AIRY_BIN_DIR:-\$AIRY_HOME/bin}"
+export AIRY_LIB_DIR="\${AIRY_LIB_DIR:-\$AIRY_HOME/lib}"
+export PATH="\${AIRY_HOME}/bin:\$PATH"
+EOF
+chmod 600 "${AIRY_BIN_DIR}/agentrt-env.sh"
+ok "安装位置已固化: install.env + agentrt-env.sh"
+
 # ==================== 验证 ====================
 
 echo ""
@@ -176,7 +220,9 @@ echo "  二进制:   ${AIRY_BIN_DIR}"
 echo "  Python:   ${AIRY_LIB_DIR}"
 echo "  凭据:     ${AIRY_SECRETS_FILE}"
 echo "  运行时:   ${AIRY_RUN_DIR} / ${AIRY_LOG_DIR}"
+echo "  安装固化: ${AIRY_CFG_DIR}/install.env"
 echo ""
-echo "启动: bash ${AGENTRT_SRC}/devtools/scripts/ops/bin/agentrt-bootstrap.sh"
+echo "启动: source ${AIRY_BIN_DIR}/agentrt-env.sh"
 echo "  （或设置 PATH 后直接执行: ${AIRY_BIN_DIR}/agent_d）"
+echo "  agentrt-bootstrap.sh 位于源码树 devtools/scripts/ops/bin/"
 echo "============================================================"
