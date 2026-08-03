@@ -51,20 +51,41 @@ AGENTRT_CONFIG="${AGENTRT_CONFIG:-}"
 GLOBAL_TIMEOUT_SEC=120
 HEALTH_CHECK_INTERVAL_SEC=1
 
+# ==================== 仓库根推导 ====================
+
+# 脚本位于 <repo>/devtools/scripts/ops/bin/，仓库根为上 4 级。
+# 不做硬编码本地绝对路径（硬约束），支持环境变量显式覆盖。
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AIRYMAXHUB_ROOT="$(cd "${SCRIPT_DIR}/../../../.." 2>/dev/null && pwd || true)"
+
+# LLM 模型配置（SSoT）：llm_d 的唯一模型来源。
+# 不传 --manager 时 llm_d 模型注册表为空（历史 P1-1：total_endpoints=0 →
+# COMPLETE-FAIL INVALID_MODEL），必须显式指定。
+if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -f "${AIRYMAXHUB_ROOT}/ecosystem/manager/model/model.yaml" ]; then
+    AGENTRT_MODEL_CONFIG="${AGENTRT_MODEL_CONFIG:-${AIRYMAXHUB_ROOT}/ecosystem/manager/model/model.yaml}"
+fi
+
+# Agent Python 运行时路径（agent_d 子进程搜索 airymax_agents/openlab/agentrt SDK）。
+# 历史 P0-3：未设置时子进程 ModuleNotFoundError → 全部回退 stub。
+if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
+    AGENTRT_AGENTS_PYTHONPATH="${AGENTRT_AGENTS_PYTHONPATH:-${AIRYMAXHUB_ROOT}/ecosystem/agents:${AIRYMAXHUB_ROOT}/ecosystem/openlab:${AIRYMAXHUB_ROOT}/sdk/sdk-python}"
+fi
+
 # ==================== DAG 定义 ====================
 #
 # 与 daemon_startup.h 保持一致，5 层启动 DAG。
 # 同层内可并行启动，跨层必须等待前层健康检查通过。
+# 扩展：agent_d（执行体）、mem_d（记忆）、a2a_d（多智能体）并入 Layer 1~2。
 #
 
 # Layer 0: 基础设施（无依赖）
 DAEMON_LAYER_0=("monit_d" "observe_d" "info_d" "notify_d")
 
 # Layer 1: 核心服务
-DAEMON_LAYER_1=("sched_d" "channel_d")
+DAEMON_LAYER_1=("sched_d" "channel_d" "mem_d")
 
 # Layer 2: Agent 服务
-DAEMON_LAYER_2=("llm_d" "tool_d" "hook_d" "plugin_d")
+DAEMON_LAYER_2=("llm_d" "tool_d" "hook_d" "plugin_d" "agent_d" "a2a_d")
 
 # Layer 3: 业务服务
 DAEMON_LAYER_3=("market_d")
@@ -77,8 +98,9 @@ ALL_LAYERS=("DAEMON_LAYER_0" "DAEMON_LAYER_1" "DAEMON_LAYER_2" "DAEMON_LAYER_3" 
 # daemon 健康检查超时 (秒)
 declare -A DAEMON_HEALTH_TIMEOUT=(
     [monit_d]=15    [observe_d]=15   [info_d]=15     [notify_d]=15
-    [sched_d]=20    [channel_d]=20
+    [sched_d]=20    [channel_d]=20   [mem_d]=20
     [llm_d]=30      [tool_d]=30      [hook_d]=20     [plugin_d]=30
+    [agent_d]=30    [a2a_d]=20
     [market_d]=30
     [gateway_d]=30
 )
@@ -97,10 +119,13 @@ declare -A DAEMON_BIN_NAME=(
     [notify_d]="notify_d"
     [sched_d]="sched_d"
     [channel_d]="channel_d"
+    [mem_d]="mem_d"
     [llm_d]="llm_d"
     [tool_d]="tool_d"
     [hook_d]="hook_d"
     [plugin_d]="plugin_d"
+    [agent_d]="agent_d"
+    [a2a_d]="a2a_d"
     [market_d]="market_d"
     [gateway_d]="gateway_d"
 )
@@ -129,8 +154,8 @@ Options:
 
 Startup DAG:
   Layer 0: monit_d, observe_d, info_d, notify_d
-  Layer 1: sched_d, channel_d
-  Layer 2: llm_d, tool_d, hook_d, plugin_d
+  Layer 1: sched_d, channel_d, mem_d
+  Layer 2: llm_d, tool_d, hook_d, plugin_d, agent_d, a2a_d
   Layer 3: market_d
   Layer 4: gateway_d
 
@@ -236,10 +261,32 @@ start_daemon() {
     local bin_name="${DAEMON_BIN_NAME[$name]:-$name}"
     local bin_path="${AGENTRT_BINDIR}/${bin_name}"
 
-    local cmd=("$bin_path")
-    if [[ -n "$AGENTRT_CONFIG" ]]; then
-        cmd+=("-c" "$AGENTRT_CONFIG")
+    # 单实例锁：若对应 socket 已有存活监听，判定该 daemon 已运行，跳过启动
+    # （历史 P2-2：重复启动导致 EVENT-DRIVER STOP / accept 异常）。
+    local sock_path="${AGENTRT_RUNTIME_DIR}/${name%_d}.sock"
+    if [[ -S "$sock_path" ]]; then
+        if ss -xln 2>/dev/null | grep -q "${sock_path} "; then
+            log_warn "$name already running (socket ${sock_path}), skipping"
+            return 0
+        fi
+        # socket 文件残留但无监听 → 删除，避免 bind 失败
+        rm -f "$sock_path"
+        log_warn "$name: stale socket ${sock_path} removed"
     fi
+
+    local cmd=("$bin_path")
+    # daemon 统一使用 --manager（daemon_parse_args 只认 --manager/-h/--tcp）
+    case "$name" in
+        llm_d)
+            # llm_d 的配置即模型清单 SSoT（model.yaml），必须显式传入
+            cmd+=("--manager" "$AGENTRT_MODEL_CONFIG")
+            ;;
+        *)
+            if [[ -n "$AGENTRT_CONFIG" ]]; then
+                cmd+=("--manager" "$AGENTRT_CONFIG")
+            fi
+            ;;
+    esac
 
     log_step "Starting $name..."
     log_debug "  Command: ${cmd[*]}"
@@ -258,6 +305,27 @@ start_daemon() {
 
     # 确保 runtime 目录存在
     mkdir -p "$AGENTRT_RUNTIME_DIR"
+
+    # 导出 Agent Python 运行时路径（agent_d 子进程经 AIRY_AGENTS_PYTHONPATH 读取）
+    if [[ "$name" == "agent_d" ]]; then
+        export AIRY_AGENTS_PYTHONPATH="$AGENTRT_AGENTS_PYTHONPATH"
+    fi
+
+    # 补载 API key：llm_d 依赖 DEEPSEEK_API_KEY/OPENAI_API_KEY 等环境变量
+    # （model.yaml 的 api_key_env 指定）。非交互 nohup 启动不 source ~/.bashrc
+    # （bashrc 对非交互 shell 有提前 return 保护），此处直接从 ~/.bashrc 提取
+    # export 行赋值，避免 401 invalid API key（历史 P1-3 邻近问题）。
+    if [[ "$name" == "llm_d" && -z "${DEEPSEEK_API_KEY:-}" && -f "$HOME/.bashrc" ]]; then
+        local key_line
+        key_line="$(grep -E '^[[:space:]]*export[[:space:]]+DEEPSEEK_API_KEY=' "$HOME/.bashrc" | head -1)"
+        if [[ -n "$key_line" ]]; then
+            # shellcheck disable=SC2086
+            eval "$key_line" 2>/dev/null || true
+            if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
+                log_info "llm_d: DEEPSEEK_API_KEY loaded from ~/.bashrc"
+            fi
+        fi
+    fi
 
     # 启动 daemon（后台运行）
     "${cmd[@]}" &
