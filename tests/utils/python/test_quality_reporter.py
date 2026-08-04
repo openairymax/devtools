@@ -10,7 +10,7 @@ AgentRT 测试质量报告工具
 - 趋势分析
 - 多格式输出 (JSON, HTML, Markdown)
 
-Version: 0.1.0
+# Version: 0.1.1
 Last updated: 2026-04-23
 """
 

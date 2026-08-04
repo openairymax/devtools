@@ -16,7 +16,7 @@ AgentRT 性能基准测试统计计算引擎
 3. 可解释性 - 提供清晰的分析结果
 4. 性能 - 优化大规模数据处理
 
-@version 0.1.0
+@version 0.1.1
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """

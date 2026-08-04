@@ -53,7 +53,7 @@ class PluginMetadata:
     dependencies: List[str] = field(default_factory=list)
     entry_point: str = ""
     tags: List[str] = field(default_factory=list)
-    min_agentrt_version: str = "0.1.0"
+    min_agentrt_version: str = "0.1.1"
     loaded_at: Optional[datetime] = None
 
 

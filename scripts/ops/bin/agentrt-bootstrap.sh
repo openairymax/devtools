@@ -16,11 +16,15 @@
 #   -b <bindir>    指定 daemon 二进制目录 (默认: /usr/local/bin)
 #   -r <runtimedir> 指定运行时目录 (默认: /tmp/agentrt)
 #   -t <timeout>   全局健康检查超时秒数 (默认: 120)
+#   -w / --watchdog  全部拉起后进入 watchdog 自愈巡检循环（默认每 10s，
+#                     死亡 daemon 按启动顺序自动重启，60s 内单 daemon 最多 3 次）
+#   --watchdog-interval <sec>  watchdog 巡检间隔秒数 (默认: 10)
 #   -s             静默模式（减少输出）
 #   -n             dry-run（只打印启动计划，不实际启动）
 #   -h             显示帮助
 #
 # 验收: bash agentrt-bootstrap.sh → 所有 daemon 按序启动 → agentrt status 全部在线
+#       bash agentrt-bootstrap.sh --watchdog → 启动后进程死亡可被自动拉起
 # =============================================================================
 
 set -euo pipefail
@@ -50,6 +54,12 @@ AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-/tmp/agentrt}"
 AGENTRT_CONFIG="${AGENTRT_CONFIG:-}"
 GLOBAL_TIMEOUT_SEC=120
 HEALTH_CHECK_INTERVAL_SEC=1
+
+# Watchdog 自愈模式参数（--watchdog）
+WATCHDOG=0
+WATCHDOG_INTERVAL_SEC=10
+WATCHDOG_RESTART_LIMIT=3            # 60s 窗口内单 daemon 最大重启次数（防崩溃循环）
+WATCHDOG_RESTART_WINDOW_SEC=60
 
 # ==================== 仓库根推导 ====================
 
@@ -90,6 +100,15 @@ while [[ $i -lt ${#SCAN_ARGS[@]} ]]; do
             i=$((i + 2)) ;;
         --home=*)
             CUSTOM_AIRY_HOME="${SCAN_ARGS[$i]#*=}"
+            i=$((i + 1)) ;;
+        --watchdog)
+            WATCHDOG=1
+            i=$((i + 1)) ;;
+        --watchdog-interval)
+            WATCHDOG_INTERVAL_SEC="${SCAN_ARGS[$((i + 1))]:-10}"
+            i=$((i + 2)) ;;
+        --watchdog-interval=*)
+            WATCHDOG_INTERVAL_SEC="${SCAN_ARGS[$i]#*=}"
             i=$((i + 1)) ;;
         *)
             FILTERED_ARGS+=("${SCAN_ARGS[$i]}")
@@ -206,6 +225,7 @@ declare -A DAEMON_BIN_NAME=(
 
 declare -A DAEMON_PIDS=()       # daemon_name -> PID
 FAILED_DAEMONS=()               # 启动失败的 daemon 列表
+declare -A WD_RESTART_TIMES=()  # watchdog: daemon_name -> "ts,ts,..."（60s 滑动窗口）
 
 # ==================== 工具函数 ====================
 
@@ -221,6 +241,11 @@ Options:
   -b <bindir>      指定 daemon 二进制目录 (默认: /usr/local/bin)
   -r <runtimedir>  指定运行时目录 (默认: /tmp/agentrt)
   -t <timeout>     全局健康检查超时秒数 (默认: 120)
+  -w               启用 watchdog 自愈模式（同 --watchdog）
+  --watchdog       全部拉起后进入 watchdog 巡检循环（默认每 10s 检查一次，
+                   死亡 daemon 按启动顺序自动重启，60s 内单 daemon 最多 3 次；
+                   重启记录写入 $AIRY_HOME/logs/watchdog.log）
+  --watchdog-interval <sec>  watchdog 巡检间隔秒数（默认: 10）
   -s               静默模式（减少输出）
   -n               dry-run（只打印启动计划，不实际启动）
   -h               显示帮助
@@ -235,13 +260,15 @@ Startup DAG:
 Examples:
   bash agentrt-bootstrap.sh
   bash agentrt-bootstrap.sh --home /srv/airymaxrt
+  bash agentrt-bootstrap.sh --home /srv/airymaxrt --watchdog
+  bash agentrt-bootstrap.sh --watchdog --watchdog-interval 15
   bash agentrt-bootstrap.sh -b ./build/bin -r /var/run/agentrt
   bash agentrt-bootstrap.sh -n  # dry-run
 EOF
 }
 
 parse_args() {
-    while getopts ":H:c:b:r:t:snh" opt; do
+    while getopts ":H:c:b:r:t:swnh" opt; do
         case "$opt" in
             H) : ;;  # 已在顶部预扫描处理（AIRY_HOME 需先于默认值解析生效）
             c) AGENTRT_CONFIG="$OPTARG" ;;
@@ -249,6 +276,7 @@ parse_args() {
             r) AGENTRT_RUNTIME_DIR="$OPTARG" ;;
             t) GLOBAL_TIMEOUT_SEC="$OPTARG" ;;
             s) SILENT=1 ;;
+            w) WATCHDOG=1 ;;
             n) DRY_RUN=1 ;;
             h) print_usage; exit 0 ;;
             *) log_error "Unknown option: -$OPTARG"; print_usage; exit 1 ;;
@@ -487,6 +515,119 @@ show_status() {
     fi
 }
 
+# ==================== Watchdog 自愈（--watchdog） ====================
+#
+# 进程级存活巡检：按 DAG 启动顺序检查每个 daemon 进程，发现死亡进程
+# 即复用 start_daemon 重新拉起（幂等：存活进程不重复拉起）。带
+# 60s/3 次重启频率限制，防止崩溃循环。重启记录写入 $AIRY_LOG_DIR/watchdog.log。
+# 不依赖本进程 DAEMON_PIDS（支持独立进程调用 --watchdog）。
+
+WATCHDOG_LOG="${AIRY_LOG_DIR:-$AIRY_HOME/logs}/watchdog.log"
+
+wd_log() {
+    echo "$(date '+%F %T') $*" >> "${WATCHDOG_LOG}" 2>/dev/null || true
+}
+
+# 进程存活检测（进程维度）
+daemon_is_alive() {
+    local name="$1"
+    local bin_name="${DAEMON_BIN_NAME[$name]:-$name}"
+
+    if command -v pgrep &>/dev/null; then
+        # 精确进程名匹配（comm ≤ 15 字符，本仓库全部 daemon 名均满足）
+        pgrep -x "${bin_name}" >/dev/null 2>&1 && return 0
+        # 回退：全命令行匹配部署目录二进制路径
+        pgrep -f "${AGENTRT_BINDIR}/${bin_name}" >/dev/null 2>&1 && return 0
+        return 1
+    fi
+    ps -eo comm= 2>/dev/null | grep -qx "${bin_name}" && return 0
+    return 1
+}
+
+# 重启频率限制：返回 0=允许重启，1=60s 窗口内已达 WATCHDOG_RESTART_LIMIT 次
+wd_restart_allowed() {
+    local name="$1"
+    local now
+    now="$(date +%s)"
+    local list="${WD_RESTART_TIMES[$name]:-}"
+    local new_list=""
+    local count=0
+    local t
+    local IFS=','
+
+    # shellcheck disable=SC2206
+    local arr=(${list})
+    for t in "${arr[@]}"; do
+        if (( now - t < WATCHDOG_RESTART_WINDOW_SEC )); then
+            new_list="${new_list}${t},"
+            ((count++)) || true
+        fi
+    done
+    WD_RESTART_TIMES[$name]="${new_list}"
+
+    if (( count >= WATCHDOG_RESTART_LIMIT )); then
+        return 1
+    fi
+    WD_RESTART_TIMES[$name]="${new_list}${now},"
+    return 0
+}
+
+# 单轮巡检：按启动顺序检查全部 daemon，对死亡进程执行幂等重启
+wd_check_all() {
+    ((DRY_RUN)) && return 0
+    local layer_var name
+
+    for layer_var in "${ALL_LAYERS[@]}"; do
+        local -n daemons="$layer_var"
+        for name in "${daemons[@]}"; do
+            if daemon_is_alive "$name"; then
+                continue
+            fi
+
+            if ! wd_restart_allowed "$name"; then
+                wd_log "WARN  ${name} down but restart rate-limited (${WATCHDOG_RESTART_LIMIT}/${WATCHDOG_RESTART_WINDOW_SEC}s), skip this round"
+                continue
+            fi
+
+            wd_log "RESTART ${name} detected down, restarting..."
+            if start_daemon "$name"; then
+                # 短等待健康确认（≤5s），避免阻塞整轮巡检；未通过由下轮巡检兜底
+                local waited=0
+                while (( waited < 5 )); do
+                    if check_daemon_health "$name"; then
+                        break
+                    fi
+                    sleep 1
+                    ((waited++)) || true
+                done
+                if (( waited >= 5 )) && ! check_daemon_health "$name"; then
+                    wd_log "WARN  ${name} restarted but health not confirmed within 5s"
+                else
+                    wd_log "OK    ${name} restarted (pid=${DAEMON_PIDS[$name]:-unknown})"
+                fi
+            else
+                wd_log "FAIL  ${name} restart failed"
+            fi
+        done
+    done
+}
+
+watchdog_loop() {
+    if ! [[ "${WATCHDOG_INTERVAL_SEC}" =~ ^[0-9]+$ ]] || (( WATCHDOG_INTERVAL_SEC < 1 )); then
+        log_error "Invalid --watchdog-interval: ${WATCHDOG_INTERVAL_SEC}"
+        exit 1
+    fi
+
+    log_info "Watchdog started (interval=${WATCHDOG_INTERVAL_SEC}s, limit=${WATCHDOG_RESTART_LIMIT}/${WATCHDOG_RESTART_WINDOW_SEC}s)"
+    log_info "  Watchdog log: ${WATCHDOG_LOG}"
+    wd_log "watchdog started (interval=${WATCHDOG_INTERVAL_SEC}s, limit=${WATCHDOG_RESTART_LIMIT}/${WATCHDOG_RESTART_WINDOW_SEC}s)"
+
+    while true; do
+        sleep "${WATCHDOG_INTERVAL_SEC}"
+        wd_check_all
+    done
+}
+
 # ==================== 信号处理 ====================
 
 cleanup() {
@@ -561,6 +702,12 @@ main() {
     fi
 
     log_info "Bootstrap complete — all ${total_started} daemons started successfully"
+
+    # Watchdog 自愈模式：全部拉起后进入巡检循环（前台常驻）
+    if ((WATCHDOG)); then
+        watchdog_loop
+    fi
+
     return 0
 }
 

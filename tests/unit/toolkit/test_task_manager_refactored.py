@@ -1,5 +1,5 @@
 # AgentRT Python SDK - Task Manager Tests (Using BaseTestCase)
-# Version: 0.1.0
+# Version: 0.1.1
 # Last updated: 2026-04-05
 #
 # 使用 BaseTestCase 的任务管理器测试

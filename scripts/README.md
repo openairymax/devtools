@@ -13,7 +13,7 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 - **模块化编排**：每个子模块职责单一、接口清晰，可独立运行也可组合编排
 - **安全优先**：集成安全扫描、编码修复、桩函数检测等多层安全保障
 
-> **版本**：v0.1.0
+> **版本**: v0.1.1
 >
 > **规范**：所有构建脚本遵循 BAN-33 规则（禁止源内构建），构建产物必须输出到独立构建目录中。
 
@@ -182,7 +182,7 @@ scripts/ci/quality/check-quality.sh
 scripts/ci/verify/sec017_scan.sh all
 
 # 版本发布
-scripts/ci/release/release.sh 0.1.0 stable
+scripts/ci/release/release.sh 0.1.1 stable
 ```
 
 ### Docker 部署

@@ -16,7 +16,7 @@ AgentRT 性能基准测试历史比较器
 4. 自动化 - 支持CI/CD集成
 5. 可追溯性 - 完整的比较历史记录
 
-@version 0.1.0
+@version 0.1.1
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """

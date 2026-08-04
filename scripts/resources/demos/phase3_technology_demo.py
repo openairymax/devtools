@@ -10,7 +10,7 @@ AgentRT 第三阶段技术演示
 
 通过本演示，您可以了解 AgentRT 在系统完善方面的进展和实际应用。
 
-@version 0.1.0
+@version 0.1.1
 @date 2026-04-11
 @copyright (c) 2026 SPHARX. All Rights Reserved.
 """

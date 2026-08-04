@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "agentrt"
-version = "0.1.0"
+version = "0.1.1"
 description = "AgentRT - Agent Runtime Platform"
 authors = ["SPHARX Ltd. - Airymax Team"]
 license = "AGPL-3.0-or-later OR Apache-2.0"

@@ -13,7 +13,7 @@ CI/CD 流水线脚本覆盖 `agentrt/` 下全部模块的构建、测试、质�
 - **多语言覆盖**：质量分析器支持 C/C++/Python/Go/Rust/TypeScript 六种语言的 SDK 质量检测
 - **跨平台支持**：依赖安装和 SDK 验证同时覆盖 Linux、macOS 和 Windows 三大平台
 
-> **版本**：v0.1.0
+> **版本**: v0.1.1
 
 ## 与 agentrt/ 模块对应关系
 
@@ -225,7 +225,7 @@ scripts/ci/verify/sec017_scan.sh atoms commons
 
 ```bash
 # 稳定版发布
-scripts/ci/release/release.sh 0.1.0 stable
+scripts/ci/release/release.sh 0.1.1 stable
 
 # Beta 版发布
 scripts/ci/release/release.sh 0.2.0-beta.1 beta

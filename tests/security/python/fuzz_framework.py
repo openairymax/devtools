@@ -1,7 +1,7 @@
 """
 AgentRT 模糊测试框架
 Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-Version: 0.1.0
+# Version: 0.1.1
 
 基于 Hypothesis 和 Atheris 的模糊测试框架
 用于测试解析器和输入处理模块的健壮性

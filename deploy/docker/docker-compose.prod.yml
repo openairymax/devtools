@@ -9,7 +9,7 @@ version: '3.8'
 services:
   gateway:
     # 生产环境使用预构建镜像
-    image: ghcr.io/spharx/agentrt/gateway:${BUILD_VERSION:-0.1.0}
+    image: ghcr.io/spharx/agentrt/gateway:${BUILD_VERSION:-0.1.1}
     
     # 生产环境不暴露端口，通过反向代理访问
     ports: []
