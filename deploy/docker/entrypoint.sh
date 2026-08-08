@@ -53,6 +53,8 @@ case "${SERVICE_NAME}" in
         ;;
     llm_d)
         BINARY="agentrt-llm_d"
+        # llm_d 以 model.yaml 为模型清单 SSoT，必须显式传入（否则 registry 为空）
+        DAEMON_ARGS+=("--manager" "${AGENTRT_MODEL_CONFIG:-/etc/agentrt/model.yaml}")
         ;;
     tool_d)
         BINARY="agentrt-tool_d"

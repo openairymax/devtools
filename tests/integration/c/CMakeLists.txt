@@ -181,13 +181,10 @@ configure_real_lib_test(test_c_link_05_safety_tool
     LIBS airy_tool_service svc_common cupolas
 )
 
-# C-L11: gateway_d → Gateway（已迁移到真实库 airy_gateway_service）
-# v0.1.1 修复：detect_proto 真实实现用 strncmp 前缀匹配 + body 检测，
-# 默认返回 JSONRPC（非桩的 COUNT）。测试 CHECK 用 `|| proto < COUNT` 宽泛条件，
-# 真实实现下仍通过。forward 调用不检查 ret（无后端 daemon 时超时返回错误）。
-configure_real_lib_test(test_c_link_11_gateway_forward
-    LIBS airy_gateway_service
-)
+# C-L11: gateway_d → Gateway（已废弃，v0.1.1 D2 决策）
+# gateway_forward（gateway.forward 透传壳）为架构反模式，已被网关集中翻译
+# （MCP→tool_d / OpenAI→llm_d / A2A→sched_d 协议适配器）替代，测试随机制废弃移除。
+# 新机制的验证由 HTTP 端到端承担（见 06-agent-gateway-wiring.md Phase 2 出口标准）。
 
 # C-L12: CoreLoopThree → MemoryRovol（已迁移到真实库）
 # v0.1.1 修复：真实 memoryrovol_bridge_create 依赖 builtin_init 成功，

@@ -10,7 +10,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=@CMAKE_INSTALL_PREFIX@/bin/llm_d
+# llm_d 以 model.yaml 为模型清单 SSoT，必须 --manager 显式传入
+# （否则 provider registry 为空，所有模型请求失败）。路径可用
+# systemctl edit 覆盖：ExecStart 追加其他参数。
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/llm_d --manager /etc/agentrt/model.yaml
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536

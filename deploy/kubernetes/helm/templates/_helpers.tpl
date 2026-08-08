@@ -62,6 +62,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   image: {{ include "agentrt.image" . }}
   imagePullPolicy: {{ .image.pullPolicy | default .Values.global.image.pullPolicy }}
   command: ["/usr/local/bin/{{ .name }}"]
+  {{- if .args }}
+  args:
+    {{- toYaml .args | nindent 4 }}
+  {{- end }}
   ports:
     - name: http
       containerPort: {{ .service.port }}

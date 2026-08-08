@@ -410,20 +410,20 @@ static void test_health_check_and_dump(void) {
 static void test_l3_public_api_bind_and_query(void) {
     TEST("C-L12 C2: L3 bind_entity + query_relations (no ENOTSUP stub)");
 
-    airy_memoryrov_handle_t *handle = airy_memoryrov_create();
-    CHECK(handle != NULL, "airy_memoryrov_create returned NULL");
+    airy_mr_handle_t *handle = airy_mr_create();
+    CHECK(handle != NULL, "airy_mr_create returned NULL");
 
     /* 1. 绑定实体 rec_001，附带两条关系 */
     const char *relations =
         "[{\"to\":\"rec_002\",\"type\":\"BEFORE\",\"weight\":0.8},"
         " {\"to\":\"rec_003\",\"type\":\"SIMILAR_TO\",\"weight\":0.9}]";
-    airy_err_t err = airy_memoryrov_l3_bind_entity(
+    airy_err_t err = airy_mr_l3_bind_entity(
         handle, "rec_001", "memory_record", relations);
 
     /* OSS 模式（L3 未编译）返回 ENOTSUP — 非桩，是合法降级 */
     if (err == (airy_err_t)AIRY_ENOTSUP) {
         printf("(OSS mode, L3 not compiled) ");
-        airy_memoryrov_destroy(handle);
+        airy_mr_cleanup(handle);
         PASS();
         return;
     }
@@ -431,7 +431,7 @@ static void test_l3_public_api_bind_and_query(void) {
 
     /* 2. 查询 rec_001 的关联实体 */
     char *json = NULL;
-    err = airy_memoryrov_l3_query_relations(handle, "rec_001", &json);
+    err = airy_mr_l3_query_relations(handle, "rec_001", &json);
     CHECK_EQ(err, 0, "l3_query_relations should succeed");
     CHECK(json != NULL, "query_relations should return JSON");
 
@@ -446,17 +446,17 @@ static void test_l3_public_api_bind_and_query(void) {
 
     /* 4. 查询不存在的实体 — 应返回 ENOENT 或空数组 */
     char *json2 = NULL;
-    err = airy_memoryrov_l3_query_relations(handle, "nonexistent_xyz", &json2);
+    err = airy_mr_l3_query_relations(handle, "nonexistent_xyz", &json2);
     if (json2) free(json2);
     /* ENOENT 或 SUCCESS(空数组) 均可接受 */
 
     /* 5. NULL 参数错误处理 */
-    err = airy_memoryrov_l3_bind_entity(NULL, "rec", "type", NULL);
+    err = airy_mr_l3_bind_entity(NULL, "rec", "type", NULL);
     CHECK(err != 0, "NULL handle should fail");
-    err = airy_memoryrov_l3_query_relations(NULL, "rec", &json);
+    err = airy_mr_l3_query_relations(NULL, "rec", &json);
     CHECK(err != 0, "NULL handle query should fail");
 
-    airy_memoryrov_destroy(handle);
+    airy_mr_cleanup(handle);
     PASS();
 }
 
