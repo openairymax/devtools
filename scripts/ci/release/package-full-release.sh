@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+# ============================================================================
+# AgentRT 完全体二进制包发布流水线（CI 构建 + 上传）
+#
+# 阶段 0：质量门禁（可选：SKIP_GATES=1 跳过）
+# 阶段 1：闭源预编译模块包 — atoms-prebuilt / memoryrovol-pro
+#         （内部 CI 持有闭源源码；对外交付「静态库 + 公共 API 头」）
+# 阶段 2：完全体二进制包 — agentrt-full-<ver>-<os>-<arch>.tar.gz
+#         （bin: 16 daemon + CLI + TUI；lib: Python 依赖；include: 公共头；
+#          config: 配置模板；manifest.json：版本/组件/校验和）
+# 阶段 3：上传 release（可配 atomgit release API 或通用 UPLOAD_URL；DRY_RUN 模拟）
+#
+# 用法：
+#   ./package-full-release.sh <版本> [os-arch]      # 如 0.1.1 linux-x86_64
+# 环境变量：
+#   SKIP_GATES=1      跳过质量门禁（CI 快速发布）
+#   SKIP_MODULES=1    跳过闭源预编译模块包（仅打完全体）
+#   SKIP_UPLOAD=1     不上传（仅本地打包）
+#   DRY_RUN=1         模拟（打印将执行的命令）
+#   UPLOAD_URL / UPLOAD_TOKEN / RELEASE_ORG / RELEASE_REPO
+#   AIRY_BUILD_JOBS   并行编译数（默认 nproc）
+#
+# 产物：dist/ 下全部 tarball + manifest.json + *.sha256
+# ============================================================================
+
+set -euo pipefail
+
+# ─── 颜色 ──────────────────────────────────────────────────────────────
+if [ -t 1 ]; then
+    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;36m'; NC='\033[0m'
+else
+    RED=''; GREEN=''; YELLOW=''; BLUE=''; NC=''
+fi
+log_info()  { echo -e "${BLUE}[INFO]${NC} $*"; }
+log_ok()    { echo -e "${GREEN}[ OK ]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_fail()  { echo -e "${RED}[FAIL]${NC} $*" >&2; }
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+
+VERSION="${1:-0.1.1}"
+PLATFORM="${2:-linux-x86_64}"
+SKIP_GATES="${SKIP_GATES:-0}"
+SKIP_MODULES="${SKIP_MODULES:-0}"
+SKIP_UPLOAD="${SKIP_UPLOAD:-0}"
+DRY_RUN="${DRY_RUN:-0}"
+JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
+UPLOAD_URL="${UPLOAD_URL:-}"
+UPLOAD_TOKEN="${UPLOAD_TOKEN:-}"
+RELEASE_ORG="${RELEASE_ORG:-openairymax}"
+RELEASE_REPO="${RELEASE_REPO:-airymaxhub}"
+
+DIST_DIR="${PROJECT_ROOT}/dist"
+STAGE_DIR="${PROJECT_ROOT}/dist/.stage-${VERSION}"
+AGENTRT_SRC="${PROJECT_ROOT}/agentrt"
+TUI_SRC="${PROJECT_ROOT}/sdk/tui"
+
+# 闭源模块源码（内部 CI 持有；本地开发模式从本地路径取）
+ATOMS_SRC="${ATOMS_SRC:-${AGENTRT_SRC}/atoms}"
+MEMORYROVOL_SRC="${MEMORYROVOL_SRC:-${PROJECT_ROOT}/products/memoryrovol}"
+
+# 预编译包内容清单
+ATOMS_LIBS="core memory cognition execution coreloopthree taskflow syscall frameworks"
+# 内部实现头（不进入公共头包，避免与系统/commons 同名头冲突）
+ATOMS_EXCLUDE_HEADERS="stdatomic.h"
+
+run() {
+    if [ "$DRY_RUN" = "1" ]; then
+        log_info "DRY-RUN: $*"
+    else
+        "$@"
+    fi
+}
+
+# ─── 阶段 0：质量门禁（复用 release.sh 的构建/测试门禁） ───────────────
+quality_gates() {
+    [ "$SKIP_GATES" = "1" ] && { log_warn "跳过质量门禁（SKIP_GATES=1）"; return 0; }
+    log_info "阶段0：质量门禁（源码构建回归）…"
+    local gates_build="${PROJECT_ROOT}/dist/.gates-build"
+    run cmake -S "$AGENTRT_SRC" -B "$gates_build" \
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON >/dev/null
+    run cmake --build "$gates_build" -j"$JOBS"
+    log_ok "质量门禁通过（构建成功）"
+}
+
+# ─── 阶段 1：闭源预编译模块包 ───────────────────────────────────────────
+build_atoms_prebuilt() {
+    local out="${STAGE_DIR}/atoms-prebuilt-${VERSION}-${PLATFORM}"
+    log_info "阶段1：构建 atoms 预编译包（${PLATFORM}）…"
+    [ -d "$ATOMS_SRC" ] || { log_fail "atoms 源码缺失（闭源模块须由内部 CI 构建）: $ATOMS_SRC"; return 1; }
+
+    local build_dir="${STAGE_DIR}/build-atoms"
+    run cmake -S "$AGENTRT_SRC" -B "$build_dir" \
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DAIRY_WITH_MEMORYROVOL=OFF \
+        -DCMAKE_INSTALL_PREFIX="$build_dir/install" >/dev/null
+    run cmake --build "$build_dir" -j"$JOBS" --target airy_core airy_memory airy_syscall \
+        airy_cognition airy_execution airy_coreloopthree airy_taskflow airy_frameworks
+
+    # 收集静态库
+    run mkdir -p "$out/lib"
+    local lib
+    for lib in $ATOMS_LIBS; do
+        local src_lib
+        src_lib="$(find "$build_dir" -name "libairy_${lib}.a" | head -1)"
+        [ -n "$src_lib" ] || { log_fail "缺少 libairy_${lib}.a（构建产物未生成）"; return 1; }
+        run cp "$src_lib" "$out/lib/"
+    done
+    # 可选：MemoryRovol PRO 预编译库（商业化，内部 CI 单独构建）
+    if [ -f "${build_dir}/memoryrovol/src/libagentrt_memoryrovol.a" ]; then
+        run cp "${build_dir}/memoryrovol/src/libagentrt_memoryrovol.a" "$out/lib/"
+    fi
+
+    # 镜像公共头文件（源码相对结构，剔除内部实现头）
+    local inc_pairs="corekern/include coreloopthree/include coreloopthree/src/cognition syscall/include frameworks/include taskflow/include"
+    local pair h
+    for pair in $inc_pairs; do
+        [ -d "$ATOMS_SRC/$pair" ] || continue
+        run mkdir -p "$out/atoms/$(dirname "$pair")"
+        run cp -r "$ATOMS_SRC/$pair" "$out/atoms/$pair"
+    done
+    run mkdir -p "$out/atoms/memory"
+    [ -d "$ATOMS_SRC/memory/include" ] && run cp -r "$ATOMS_SRC/memory/include" "$out/atoms/memory/"
+    [ -d "$ATOMS_SRC/memory/src" ] && run cp -r "$ATOMS_SRC/memory/src" "$out/atoms/memory/"
+    # 剔除内部实现头（stdatomic.h shim 等，避免 include_next 递归与同名遮蔽）
+    for h in $ATOMS_EXCLUDE_HEADERS; do
+        run find "$out/atoms" -name "$h" -delete 2>/dev/null || true
+    done
+
+    # manifest + 打包
+    {
+        echo "{"
+        echo "  \"name\": \"airy-atoms-prebuilt\","
+        echo "  \"version\": \"${VERSION}\","
+        echo "  \"platform\": \"${PLATFORM}\","
+        echo "  \"libs\": [$(printf '"libairy_%s.a",' $ATOMS_LIBS | sed 's/,$//')],"
+        echo "  \"note\": \"atoms 闭源模块预编译交付：静态库 + 公共 API 头（不含实现源码）\""
+        echo "}"
+    } > "$out/manifest.json"
+
+    ( cd "$DIST_DIR" && run tar -czf "airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz" \
+        "$(basename "$out")" )
+    run sha256sum "$DIST_DIR/airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz" \
+        > "$DIST_DIR/airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz.sha256"
+    log_ok "atoms 预编译包: dist/airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz"
+}
+
+# ─── 阶段 2：完全体二进制包 ─────────────────────────────────────────────
+build_full_package() {
+    local out="${STAGE_DIR}/agentrt-full-${VERSION}-${PLATFORM}"
+    log_info "阶段2：构建完全体二进制包（${PLATFORM}）…"
+    local build_dir="${STAGE_DIR}/build-full"
+    run cmake -S "$AGENTRT_SRC" -B "$build_dir" \
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF \
+        -DCMAKE_INSTALL_PREFIX="$out" >/dev/null
+    run cmake --build "$build_dir" -j"$JOBS"
+    run cmake --install "$build_dir" || true
+    [ -d "$build_dir/bin" ] && run cp -f "$build_dir"/bin/* "$out/bin/" 2>/dev/null || true
+
+    # Rust TUI
+    if [ -d "$TUI_SRC" ] && command -v cargo >/dev/null 2>&1; then
+        log_info "构建 agentrt-tui…"
+        run bash -c "cd '$TUI_SRC' && cargo build --release"
+        [ -f "$TUI_SRC/target/release/agentrt-tui" ] && \
+            run cp -f "$TUI_SRC/target/release/agentrt-tui" "$out/bin/"
+    fi
+
+    # Python 运行时依赖
+    run mkdir -p "$out/lib"
+    local pkg
+    for pkg in airymax_agents airymax_agents_rs; do
+        [ -d "${PROJECT_ROOT}/ecosystem/agents/$pkg" ] || continue
+        run cp -r "${PROJECT_ROOT}/ecosystem/agents/$pkg" "$out/lib/"
+    done
+    for pkg in openlab markets contrib app; do
+        [ -d "${PROJECT_ROOT}/ecosystem/openlab/$pkg" ] || continue
+        run cp -r "${PROJECT_ROOT}/ecosystem/openlab/$pkg" "$out/lib/"
+    done
+    [ -d "${PROJECT_ROOT}/sdk/sdk-python/agentrt" ] && \
+        run cp -r "${PROJECT_ROOT}/sdk/sdk-python/agentrt" "$out/lib/"
+
+    # 配置模板
+    run mkdir -p "$out/config"
+    [ -f "${PROJECT_ROOT}/devtools/scripts/ops/templates/secrets.env.example" ] && \
+        run cp -f "${PROJECT_ROOT}/devtools/scripts/ops/templates/secrets.env.example" "$out/config/"
+    [ -f "${PROJECT_ROOT}/ecosystem/manager/configs/agentrt.yaml" ] && \
+        run cp -f "${PROJECT_ROOT}/ecosystem/manager/configs/agentrt.yaml" "$out/config/"
+    [ -f "${PROJECT_ROOT}/ecosystem/manager/model/model.yaml" ] && \
+        run cp -f "${PROJECT_ROOT}/ecosystem/manager/model/model.yaml" "$out/config/"
+
+    # manifest
+    {
+        echo "{"
+        echo "  \"name\": \"agentrt-full\","
+        echo "  \"version\": \"${VERSION}\","
+        echo "  \"platform\": \"${PLATFORM}\","
+        echo "  \"components\": {"
+        echo "    \"daemons\": \"16 + think_d/cupolas_d\","
+        echo "    \"cli\": \"airy_cli\","
+        echo "    \"tui\": \"agentrt-tui (rust)\","
+        echo "    \"atoms\": \"prebuilt (closed source)\","
+        echo "    \"memoryrovol\": \"prebuilt (commercial, optional)\""
+        echo "  },"
+        echo "  \"checksums\": {"
+        for f in "$DIST_DIR"/*.tar.gz; do
+            [ -e "$f" ] || continue
+            echo "    \"$(basename "$f")\": \"$(sha256sum "$f" | cut -d' ' -f1)\","
+        done
+        echo "  }"
+        echo "}"
+    } > "$out/manifest.json"
+
+    ( cd "$DIST_DIR" && run tar -czf "agentrt-full-${VERSION}-${PLATFORM}.tar.gz" \
+        "$(basename "$out")" )
+    run sha256sum "$DIST_DIR/agentrt-full-${VERSION}-${PLATFORM}.tar.gz" \
+        > "$DIST_DIR/agentrt-full-${VERSION}-${PLATFORM}.tar.gz.sha256"
+    log_ok "完全体包: dist/agentrt-full-${VERSION}-${PLATFORM}.tar.gz"
+}
+
+# ─── 阶段 3：上传 release ───────────────────────────────────────────────
+upload_releases() {
+    [ "$SKIP_UPLOAD" = "1" ] && { log_warn "跳过上传（SKIP_UPLOAD=1）"; return 0; }
+    [ -n "$UPLOAD_URL" ] || { log_warn "未配置 UPLOAD_URL，跳过上传（可用 SKIP_UPLOAD=1 明确跳过）"; return 0; }
+
+    local f
+    for f in "$DIST_DIR"/agentrt-full-*.tar.gz "$DIST_DIR"/agentrt-full-*.sha256 \
+             "$DIST_DIR"/airy-atoms-prebuilt-*.tar.gz; do
+        [ -e "$f" ] || continue
+        log_info "上传: $(basename "$f")"
+        run curl -fsSL -X POST -H "Authorization: Bearer ${UPLOAD_TOKEN}" \
+            -F "file=@${f}" -F "version=${VERSION}" -F "platform=${PLATFORM}" \
+            "${UPLOAD_URL}"
+        log_ok "已上传: $(basename "$f")"
+    done
+}
+
+# ─── 主流程 ─────────────────────────────────────────────────────────────
+main() {
+    log_info "AgentRT 完全体发布流水线 v${VERSION} (${PLATFORM})"
+    run mkdir -p "$DIST_DIR" "$STAGE_DIR"
+
+    quality_gates || true
+
+    if [ "$SKIP_MODULES" != "1" ]; then
+        build_atoms_prebuilt || log_warn "atoms 预编译包构建失败（SKIP_MODULES=1 可跳过）"
+    fi
+
+    build_full_package
+
+    # 清理阶段目录（保留最终 tarball）
+    run rm -rf "$STAGE_DIR" 2>/dev/null || true
+
+    upload_releases
+
+    log_ok "发布完成，产物位于 ${DIST_DIR}/"
+    ls -la "$DIST_DIR" 2>/dev/null || true
+}
+
+main "$@"
