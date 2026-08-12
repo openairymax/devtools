@@ -61,24 +61,50 @@ WATCHDOG_INTERVAL_SEC=10
 WATCHDOG_RESTART_LIMIT=3            # 60s 窗口内单 daemon 最大重启次数（防崩溃循环）
 WATCHDOG_RESTART_WINDOW_SEC=60
 
+# 优雅停止窗口（秒）：daemon 收到 SIGTERM 后允许的清理时间，
+# 与 daemon 生命周期约定（50-engineering-standards）的 10s 一致。
+GRACEFUL_STOP_SEC="${GRACEFUL_STOP_SEC:-10}"
+
 # ==================== 仓库根推导 ====================
 
 # 脚本位于 <repo>/devtools/scripts/ops/bin/，仓库根为上 4 级。
 # 不做硬编码本地绝对路径（硬约束），支持环境变量显式覆盖。
+# 生产部署时脚本被复制到 $AIRY_HOME/bin/，上溯 4 级无法回到仓库根，
+# 此时回退到 $AIRY_HOME 标准布局（config/model.yaml 与 lib/ 由 build.sh 固化）。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AIRYMAXHUB_ROOT="$(cd "${SCRIPT_DIR}/../../../.." 2>/dev/null && pwd || true)"
+# 提前解析 AIRY_HOME（--home/-H 预扫描之后会再次赋值，此处仅用于依赖推导）
+if [ -z "${AIRY_HOME:-}" ]; then
+    for _CAND in "${SCRIPT_DIR}/../config/install.env" "$HOME/.airymaxrt/config/install.env"; do
+        if [ -f "$_CAND" ] && _HOME="$(sed -n 's/^AIRY_HOME=//p' "$_CAND" 2>/dev/null | head -1)"; then
+            [ -n "$_HOME" ] && AIRY_HOME="$_HOME"
+            break
+        fi
+    done
+    AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+fi
+AIRY_HOME="$(echo "$AIRY_HOME" | sed 's#/$##')"
 
 # LLM 模型配置（SSoT）：llm_d 的唯一模型来源。
 # 不传 --manager 时 llm_d 模型注册表为空（历史 P1-1：total_endpoints=0 →
 # COMPLETE-FAIL INVALID_MODEL），必须显式指定。
-if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -f "${AIRYMAXHUB_ROOT}/ecosystem/manager/model/model.yaml" ]; then
-    AGENTRT_MODEL_CONFIG="${AGENTRT_MODEL_CONFIG:-${AIRYMAXHUB_ROOT}/ecosystem/manager/model/model.yaml}"
+# 优先级：显式 env > 仓库生态模型配置 > 已安装 $AIRY_HOME/config/model.yaml。
+if [ -z "${AGENTRT_MODEL_CONFIG:-}" ]; then
+    if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -f "${AIRYMAXHUB_ROOT}/ecosystem/manager/model/model.yaml" ]; then
+        AGENTRT_MODEL_CONFIG="${AIRYMAXHUB_ROOT}/ecosystem/manager/model/model.yaml"
+    elif [ -f "${AIRY_HOME}/config/model.yaml" ]; then
+        AGENTRT_MODEL_CONFIG="${AIRY_HOME}/config/model.yaml"
+    fi
 fi
 
 # Agent Python 运行时路径（agent_d 子进程搜索 airymax_agents/openlab/agentrt SDK）。
 # 历史 P0-3：未设置时子进程 ModuleNotFoundError → 全部回退 stub。
-if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
-    AGENTRT_AGENTS_PYTHONPATH="${AGENTRT_AGENTS_PYTHONPATH:-${AIRYMAXHUB_ROOT}/ecosystem/agents:${AIRYMAXHUB_ROOT}/ecosystem/openlab:${AIRYMAXHUB_ROOT}/sdk/sdk-python}"
+if [ -z "${AGENTRT_AGENTS_PYTHONPATH:-}" ]; then
+    if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
+        AGENTRT_AGENTS_PYTHONPATH="${AIRYMAXHUB_ROOT}/ecosystem/agents:${AIRYMAXHUB_ROOT}/ecosystem/openlab:${AIRYMAXHUB_ROOT}/sdk/sdk-python"
+    elif [ -d "${AIRY_HOME}/lib/airymax_agents" ]; then
+        AGENTRT_AGENTS_PYTHONPATH="${AIRY_HOME}/lib"
+    fi
 fi
 
 # ==================== 安装目录参数（--home/-H） ====================
@@ -167,13 +193,13 @@ fi
 #
 
 # Layer 0: 基础设施（无依赖）
-DAEMON_LAYER_0=("monit_d" "observe_d" "info_d" "notify_d")
+DAEMON_LAYER_0=("monit_d" "observe_d" "info_d" "notify_d" "cupolas_d")
 
 # Layer 1: 核心服务
 DAEMON_LAYER_1=("sched_d" "channel_d" "mem_d")
 
-# Layer 2: Agent 服务
-DAEMON_LAYER_2=("llm_d" "tool_d" "hook_d" "plugin_d" "agent_d" "a2a_d")
+# Layer 2: Agent 服务（think_d：双思考 GCCP+GRAD，gateway 经 think.sock 调用）
+DAEMON_LAYER_2=("llm_d" "think_d" "tool_d" "hook_d" "plugin_d" "agent_d" "a2a_d")
 
 # Layer 3: 业务服务
 DAEMON_LAYER_3=("market_d")
@@ -185,9 +211,9 @@ ALL_LAYERS=("DAEMON_LAYER_0" "DAEMON_LAYER_1" "DAEMON_LAYER_2" "DAEMON_LAYER_3" 
 
 # daemon 健康检查超时 (秒)
 declare -A DAEMON_HEALTH_TIMEOUT=(
-    [monit_d]=15    [observe_d]=15   [info_d]=15     [notify_d]=15
+    [monit_d]=15    [observe_d]=15   [info_d]=15     [notify_d]=15    [cupolas_d]=20
     [sched_d]=20    [channel_d]=20   [mem_d]=20
-    [llm_d]=30      [tool_d]=30      [hook_d]=20     [plugin_d]=30
+    [llm_d]=30      [think_d]=30     [tool_d]=30     [hook_d]=20     [plugin_d]=30
     [agent_d]=30    [a2a_d]=20
     [market_d]=30
     [gateway_d]=30
@@ -208,10 +234,12 @@ declare -A DAEMON_BIN_NAME=(
     [observe_d]="observe_d"
     [info_d]="info_d"
     [notify_d]="notify_d"
+    [cupolas_d]="cupolas_d"
     [sched_d]="sched_d"
     [channel_d]="channel_d"
     [mem_d]="mem_d"
     [llm_d]="llm_d"
+    [think_d]="think_d"
     [tool_d]="tool_d"
     [hook_d]="hook_d"
     [plugin_d]="plugin_d"
@@ -412,6 +440,14 @@ start_daemon() {
     # 导出 Agent Python 运行时路径（agent_d 子进程经 AIRY_AGENTS_PYTHONPATH 读取）
     if [[ "$name" == "agent_d" ]]; then
         export AIRY_AGENTS_PYTHONPATH="$AGENTRT_AGENTS_PYTHONPATH"
+        # 模型名贯通：openlab 子进程 SDK 默认模型硬编码 gpt-4o-mini（DeepSeek
+        # provider 不认 → HTTP 400），注入 model.yaml 默认模型。AIRY_AGENT_MODEL
+        # 在 openlab LLMAgent 中优先级最高（强制单模型），环境变量优先不覆盖。
+        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "$AGENTRT_MODEL_CONFIG" && -f "$AGENTRT_MODEL_CONFIG" ]]; then
+            local _def_model
+            _def_model="$(sed -n 's/^[[:space:]]*model:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$AGENTRT_MODEL_CONFIG" | head -1 | tr -d '[:space:]')"
+            [[ -n "$_def_model" ]] && export AIRY_AGENT_MODEL="$_def_model"
+        fi
     fi
 
     # 补载 API key：llm_d 依赖 DEEPSEEK_API_KEY/OPENAI_API_KEY 等环境变量
@@ -450,14 +486,18 @@ stop_daemon() {
     log_step "Stopping $name (PID=$pid)..."
     kill -TERM "$pid" 2>/dev/null || true
 
+    # 优雅停止窗口：daemon 统一按 GRACEFUL_STOP_SEC（默认 10s，与
+    # 50-engineering-standards daemon 生命周期约定一致）清理后退出，
+    # 超时再 KILL 兜底。逐 daemon 顺序等待会放大总停止时间，批量场景
+    # 由 stop_all_daemons 的并行信号 + 统一等待处理。
     local elapsed=0
-    while kill -0 "$pid" 2>/dev/null && [[ $elapsed -lt 5 ]]; do
+    while kill -0 "$pid" 2>/dev/null && [[ $elapsed -lt $GRACEFUL_STOP_SEC ]]; do
         sleep 1
-        ((elapsed++))
+        elapsed=$((elapsed + 1))  # 同 stop_all_daemons：set -e 下 ((elapsed++)) 会以退出码 1 中断脚本
     done
 
     if kill -0 "$pid" 2>/dev/null; then
-        log_warn "$name did not stop gracefully, force killing..."
+        log_warn "$name did not stop within ${GRACEFUL_STOP_SEC}s, force killing..."
         kill -9 "$pid" 2>/dev/null || true
     fi
 
@@ -465,14 +505,57 @@ stop_daemon() {
 }
 
 stop_all_daemons() {
-    log_step "Stopping all daemons (reverse order)..."
+    log_step "Stopping all daemons (parallel SIGTERM + graceful window)..."
+    if ((DRY_RUN)); then
+        return 0
+    fi
 
-    # 逆序停止
+    # 阶段一：逆序向全部 daemon 并行发送 SIGTERM（不逐个等待）
     for ((layer=${#ALL_LAYERS[@]}-1; layer>=0; layer--)); do
         local layer_var="${ALL_LAYERS[$layer]}"
         local -n daemons="$layer_var"
         for ((i=${#daemons[@]}-1; i>=0; i--)); do
-            stop_daemon "${daemons[$i]}"
+            local name="${daemons[$i]}"
+            local pid="${DAEMON_PIDS[$name]:-}"
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                kill -TERM "$pid" 2>/dev/null || true
+                log_debug "  TERM → $name (PID=$pid)"
+            fi
+        done
+    done
+
+    # 阶段二：统一等待优雅停止窗口（全部并行清理，总耗时 ≈ 单个窗口）
+    local elapsed=0
+    local any_alive=1
+    while [[ $elapsed -lt $GRACEFUL_STOP_SEC ]]; do
+        any_alive=0
+        for ((layer=${#ALL_LAYERS[@]}-1; layer>=0; layer--)); do
+            local layer_var2="${ALL_LAYERS[$layer]}"
+            local -n daemons2="$layer_var2"
+            for name2 in "${daemons2[@]}"; do
+                local pid2="${DAEMON_PIDS[$name2]:-}"
+                if [[ -n "$pid2" ]] && kill -0 "$pid2" 2>/dev/null; then
+                    any_alive=1
+                fi
+            done
+        done
+        [[ $any_alive -eq 0 ]] && break
+        sleep 1
+        # 注意：不能用 ((elapsed++))——set -e 下 elapsed=0 时其求值退出码为 1，
+        # 会中断脚本（实测 systemd 记录 status=1，exit 0/130 分支均未到达）。
+        elapsed=$((elapsed + 1))
+    done
+
+    # 阶段三：窗口超时仍未退出的进程强制清理（KILL 兜底）
+    for ((layer=${#ALL_LAYERS[@]}-1; layer>=0; layer--)); do
+        local layer_var3="${ALL_LAYERS[$layer]}"
+        local -n daemons3="$layer_var3"
+        for name3 in "${daemons3[@]}"; do
+            local pid3="${DAEMON_PIDS[$name3]:-}"
+            if [[ -n "$pid3" ]] && kill -0 "$pid3" 2>/dev/null; then
+                log_warn "  $name3 exceeded graceful window, KILL (PID=$pid3)"
+                kill -9 "$pid3" 2>/dev/null || true
+            fi
         done
     done
 }
@@ -633,6 +716,13 @@ watchdog_loop() {
 cleanup() {
     log_warn "Received shutdown signal, stopping all daemons..."
     stop_all_daemons
+    # 由 systemd 托管时（INVOCATION_ID 由 systemd 注入），正常停止须以 0 退出，
+    # 否则 Restart=on-failure 会把每次 stop 判为 failed 并自动拉起（实测 3 次
+    # 'Failed with result exit-code' 均因此触发）。交互式 Ctrl-C 保留 130（128+SIGINT）
+    # 惯例，供 shell 判断中断语义。
+    if [[ -n "${INVOCATION_ID:-}" ]]; then
+        exit 0
+    fi
     exit 130
 }
 
