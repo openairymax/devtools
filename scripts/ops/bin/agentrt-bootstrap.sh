@@ -185,6 +185,28 @@ else
     log_warn "Setup: cp <repo>/devtools/scripts/ops/templates/secrets.env.example $AIRY_SECRETS_FILE"
 fi
 
+# ==================== Agent 工具 ACL（执行任务所需） ====================
+#
+# 工具执行采用 fail-closed ACL：无 ACL 条目的 agent/tool 一律拒绝。coding_v1
+# 是默认编码执行体（ecosystem/agents/airymax_agents/coding 契约 agent_id），
+# 必须预授权内置工具，否则 CLI 任务执行时 agent 无法读写文件/执行 shell
+# （服务端无交互审批者，静态 ACL 是唯一授权路径）。shell_run 经 os_sandbox
+# （Landlock + seccomp + rlimit）隔离，默认放行与 gateway「external」一致。
+# 可用环境变量收紧覆盖：AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob" ...
+AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-coding_v1=fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply}"
+export AIRY_AGENT_ACL
+
+# ==================== Sanitizer 部署兼容（ASAN_OPTIONS） ====================
+#
+# 生产构建启用 AddressSanitizer（0.1.1 质量基线）。部分部署环境存在系统级
+# preload 库（如容器/沙箱注入的 LD_PRELOAD 拦截器），会先于 libasan 被加载，
+# 触发 "ASan runtime does not come first in initial library list" 启动失败。
+# verify_asan_link_order=0 仅跳过链接顺序校验（ASan 仍完整生效），纯兼容性
+# 开关：无 preload 环境不受影响。可用环境变量显式覆盖。
+if [ -z "${ASAN_OPTIONS:-}" ]; then
+    export ASAN_OPTIONS="verify_asan_link_order=0"
+fi
+
 # ==================== DAG 定义 ====================
 #
 # 与 daemon_startup.h 保持一致，5 层启动 DAG。
