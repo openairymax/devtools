@@ -290,6 +290,10 @@ set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
 set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/service.c
+    ${LLM_D_DIR}/src/service_config.c
+    ${LLM_D_DIR}/src/service_providers.c
+    ${LLM_D_DIR}/src/service_request.c
+    ${LLM_D_DIR}/src/service_metrics.c
     ${LLM_D_DIR}/src/cache.c
     ${LLM_D_DIR}/src/token_counter.c
     ${LLM_D_DIR}/src/response.c

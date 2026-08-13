@@ -1,0 +1,61 @@
+# =============================================================================
+# AgentRT 工具级权限规则（Tool-level permission rules）
+# 版本: v1.0.0
+#
+# 由 daemon_security 在 daemon 启动时加载（daemon_security_load_rules_file），
+# 写入 tool_d / agent_d 等 daemon 的 ACL 表。判定为 fail-closed：
+# 未在此文件中显式 allow 的 (agent, tool) 一律拒绝（0x5002 Permission denied）。
+#
+# 部署位置: $AIRY_CONFIG_DIR/cupolas/permission_rules.yaml
+# Schema:   rules: [{agent, tool, effect}]
+#   - agent  : 智能体标识（见 ecosystem/agents/*/contract.json 的 agent_id）
+#   - tool   : 工具名（与 tool_d 注册的工具名一致，如 fs_read / shell_run）
+#   - effect : "allow" 或 "deny"（deny 规则优先于同一 (agent, tool) 的 allow）
+#
+# 模板授予 coding_v1（默认编码智能体）标准工作工具集；生产部署应
+# 按最小权限原则裁剪，并显式 deny 高风险工具。
+# =============================================================================
+
+rules:
+  # ─── coding_v1: 标准编码工作工具集 ─────────────────────────────
+  - agent: "coding_v1"
+    tool: "fs_read"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "fs_write"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "fs_edit"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "fs_list"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "fs_glob"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "fs_grep"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "shell_run"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "git_diff"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "git_exec"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "git_apply"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "web_search"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "web_fetch"
+    effect: "allow"
+
+  # ─── 明确拒绝示例（默认已 fail-closed，无需枚举）────────────────
+  # - agent: "coding_v1"
+  #   tool: "shell_run"
+  #   effect: "deny"
