@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────
 # AgentRT 5-Minute QuickStart Script
-# Version: 0.1.1
+# Version: 0.1.2
 # ──────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -23,7 +23,7 @@ TARGET_DIR="${2:-./my-agent-project}"
 
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo -e "${BOLD}   AgentRT v0.1.1 — 5-Minute QuickStart${NC}"
+echo -e "${BOLD}   AgentRT v0.1.2 — 5-Minute QuickStart${NC}"
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
 echo ""
 

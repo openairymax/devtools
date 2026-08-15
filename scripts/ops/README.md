@@ -86,7 +86,7 @@ Docker 容器化部署方案已迁移至 `deploy/docker/`，采用单 Dockerfile
 
 运维操作的入口脚本集合：
 
-- **agentrt-bootstrap.sh**：AgentRT 一键启动脚本，按 DAG 层级顺序启动所有 daemon（5 层启动 DAG：基础设施→核心服务→Agent 服务→业务服务→网关），等待每层健康检查通过后再启动下一层。支持 `-c`（配置文件）、`-b`（二进制目录）、`-r`（运行时目录）、`-t`（超时）、`-s`（静默）、`-n`（dry-run）等选项。`scripts/install/agentrt-bootstrap.sh` 为其安装侧包装器。
+- **agentrt-bootstrap.sh**：AgentRT 一键启动脚本，按 DAG 层级顺序启动所有 daemon（5 层启动 DAG：基础设施→核心服务→Agent 服务→业务服务→网关），等待每层健康检查通过后再启动下一层。支持 `-c`（配置文件）、`-b`（二进制目录）、`-r`（运行时目录）、`-t`（超时）、`-s`（静默）、`-n`（dry-run）等选项。安装时由 `scripts/install.sh` 部署到 `$AIRY_HOME/bin/`。
 - **quickstart.sh**：5 分钟快速创建示例 Agent 项目脚本，从 `examples/` 复制指定示例项目到目标目录，生成默认 `config.yaml` 和 `agents/main.agent.yaml`，引导新用户快速上手。
 
 ### benchmark/ — 性能基准测试框架

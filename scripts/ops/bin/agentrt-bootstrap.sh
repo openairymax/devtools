@@ -100,15 +100,33 @@ if [ -z "${AGENTRT_MODEL_CONFIG:-}" ]; then
     fi
 fi
 
-# Agent Python 运行时路径（agent_d 子进程搜索 airymax_agents/openlab/agentrt SDK）。
-# 历史 P0-3：未设置时子进程 ModuleNotFoundError → 全部回退 stub。
-if [ -z "${AGENTRT_AGENTS_PYTHONPATH:-}" ]; then
+# ==================== Agent Python SDK 依赖（airymax_agents / openlab / agentrt） ====================
+#
+# agent_d 的 Python runner 子进程以 `python3 -m airymax_agents.runner` 启动，
+# 依赖三个 SDK 包可导入（service_child.c 采用标准包安装解析——pip install -e
+# 或 wheel，不再注入 PYTHONPATH）。bootstrap 在启动 agent_d 前做一次性导入
+# 检查并显式告知，避免 spawn 阶段 ModuleNotFoundError 静默回退。
+# 本地源码构建（AIRYMAXHUB_ROOT 存在）时自动 editable 安装三包（幂等，
+# --user 避免污染系统 Python）；生产 lib 布局依赖 $AIRY_HOME/lib 下已安装
+# 的 SDK（由发行包安装器负责），检查失败仅告警不阻断 bootstrap。
+AGENT_SDK_OK=1
+if ! python3 -c "import airymax_agents, openlab, agentrt" >/dev/null 2>&1; then
+    AGENT_SDK_OK=0
     if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
-        AGENTRT_AGENTS_PYTHONPATH="${AIRYMAXHUB_ROOT}/ecosystem/agents:${AIRYMAXHUB_ROOT}/ecosystem/openlab:${AIRYMAXHUB_ROOT}/sdk/sdk-python"
-    elif [ -d "${AIRY_HOME}/lib/airymax_agents" ]; then
-        AGENTRT_AGENTS_PYTHONPATH="${AIRY_HOME}/lib"
+        log_info "Agent SDK packages not importable — editable-installing from source tree"
+        if python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/sdk/sdk-python" >/dev/null 2>&1 \
+           && python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/ecosystem/openlab" >/dev/null 2>&1 \
+           && python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/ecosystem/agents" >/dev/null 2>&1; then
+            AGENT_SDK_OK=1
+            log_info "Agent SDK editable install OK"
+        else
+            log_warn "Agent SDK auto-install failed — agents will not execute"
+        fi
+    else
+        log_warn "Agent SDK packages not importable and no source tree — agents will not execute"
     fi
 fi
+export AGENT_SDK_OK
 
 # ==================== 安装目录参数（--home/-H） ====================
 #
@@ -469,7 +487,11 @@ start_daemon() {
             # 干净环境（二进制安装后尚未配置 model.yaml）时 AGENTRT_MODEL_CONFIG
             # 为空串——set -u 下必须用 :- 保护，否则 bootstrap 直接以
             # "unbound variable" 崩溃中断全部 daemon 启动（发行版阻塞）。
-            cmd+=("--manager" "${AGENTRT_MODEL_CONFIG:-}")
+            # 空串时**省略** --manager 参数：llm_d 在 config_path==NULL 时回退到
+            # $AIRY_CONFIG_DIR/model.yaml 自动发现（传空串会阻断该 fallback）。
+            if [ -n "${AGENTRT_MODEL_CONFIG:-}" ]; then
+                cmd+=("--manager" "$AGENTRT_MODEL_CONFIG")
+            fi
             ;;
         *)
             if [[ -n "$AGENTRT_CONFIG" ]]; then
@@ -496,13 +518,13 @@ start_daemon() {
     # 确保 runtime 目录存在
     mkdir -p "$AGENTRT_RUNTIME_DIR"
 
-    # 导出 Agent Python 运行时路径（agent_d 子进程经 AIRY_AGENTS_PYTHONPATH 读取）
+    # agent_d：模型名贯通——openlab 子进程 SDK 默认模型硬编码 gpt-4o-mini
+    # （DeepSeek provider 不认 → HTTP 400），注入 model.yaml 默认模型。
+    # AIRY_AGENT_MODEL 在 openlab LLMAgent 中优先级最高（强制单模型），
+    # 环境变量优先不覆盖。Agent SDK 包导入由脚本开头 AGENT_SDK_OK 检查保证，
+    # agent_d 子进程经标准包解析（pip install -e / wheel）定位，无需 PYTHONPATH。
     if [[ "$name" == "agent_d" ]]; then
-        export AIRY_AGENTS_PYTHONPATH="${AGENTRT_AGENTS_PYTHONPATH:-}"
-        # 模型名贯通：openlab 子进程 SDK 默认模型硬编码 gpt-4o-mini（DeepSeek
-        # provider 不认 → HTTP 400），注入 model.yaml 默认模型。AIRY_AGENT_MODEL
-        # 在 openlab LLMAgent 中优先级最高（强制单模型），环境变量优先不覆盖。
-        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "${AGENTRT_MODEL_CONFIG:-}" && -f "${AGENTRT_MODEL_CONFIG}" ]]; then
+        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "$AGENTRT_MODEL_CONFIG" && -f "$AGENTRT_MODEL_CONFIG" ]]; then
             local _def_model
             _def_model="$(sed -n 's/^[[:space:]]*model:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$AGENTRT_MODEL_CONFIG" | head -1 | tr -d '[:space:]')"
             [[ -n "$_def_model" ]] && export AIRY_AGENT_MODEL="$_def_model"
@@ -806,7 +828,7 @@ trap cleanup SIGINT SIGTERM
 main() {
     parse_args "$@"
 
-    log_info "AgentRT Bootstrap v0.1.1"
+    log_info "AgentRT Bootstrap v0.1.2"
     log_info "  Bindir:    $AGENTRT_BINDIR"
     log_info "  Runtime:   $AGENTRT_RUNTIME_DIR"
     log_info "  Config:    ${AGENTRT_CONFIG:-<none>}"
