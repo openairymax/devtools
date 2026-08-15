@@ -57,6 +57,8 @@ function(configure_real_lib_test test_name)
         -Wno-unused-parameter
     )
 
+    # --start-group/--end-group 为 GNU ld 专有（macOS ld64 / MSVC 不识别）；
+    # m/uuid/dl/ws2_32 平台映射统一由 airy_platform_libs 提供（含 m，非 MSVC 时）。
     if(NOT MSVC AND NOT APPLE)
         target_link_libraries(${test_name} PRIVATE
             "-Wl,--start-group"
@@ -64,13 +66,12 @@ function(configure_real_lib_test test_name)
             "-Wl,--end-group"
             Threads::Threads
             airy_platform_libs
-            m
         )
     else()
         target_link_libraries(${test_name} PRIVATE
             ${TEST_LIBS}
             Threads::Threads
-            m
+            airy_platform_libs
         )
     endif()
 
@@ -244,25 +245,40 @@ if(TARGET svc_common)
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/cache/include
     )
 
-    target_link_libraries(test_e2e_core PRIVATE
-        airy_core
-        airy_syscall
-        -Wl,--whole-archive
-        airy_coreloopthree
-        -Wl,--no-whole-archive
-        svc_common
-        -Wl,--start-group
-        airy_cognition
-        airy_execution
-        airy_memory
-        airy_atoms
-        airy_llm_service
-        airy_tool_service
-        -Wl,--end-group
-        Threads::Threads
-        airy_platform_libs
-        m
-    )
+    # --whole-archive/--start-group 为 GNU ld 专有：macOS ld64 / MSVC 不识别，
+    # 这两平台直接链接（对齐 configure_real_lib_test 的分支写法）。
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(test_e2e_core PRIVATE
+            airy_core
+            airy_syscall
+            -Wl,--whole-archive
+            airy_coreloopthree
+            -Wl,--no-whole-archive
+            svc_common
+            -Wl,--start-group
+            airy_cognition
+            airy_execution
+            airy_memory
+            airy_atoms
+            airy_llm_service
+            airy_tool_service
+            -Wl,--end-group
+        )
+    else()
+        target_link_libraries(test_e2e_core PRIVATE
+            airy_core
+            airy_syscall
+            airy_coreloopthree
+            svc_common
+            airy_cognition
+            airy_execution
+            airy_memory
+            airy_atoms
+            airy_llm_service
+            airy_tool_service
+        )
+    endif()
+    target_link_libraries(test_e2e_core PRIVATE Threads::Threads airy_platform_libs)
 
     if(AGENTRT_HAS_CJSON OR CJSON_FOUND)
         target_link_libraries(test_e2e_core PRIVATE cjson)

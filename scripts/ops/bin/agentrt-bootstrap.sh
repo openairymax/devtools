@@ -65,6 +65,9 @@ WATCHDOG_RESTART_WINDOW_SEC=60
 # 与 daemon 生命周期约定（50-engineering-standards）的 10s 一致。
 GRACEFUL_STOP_SEC="${GRACEFUL_STOP_SEC:-10}"
 
+# 工具 OS 沙箱模式（--sandbox off|workspace|strict，默认 workspace）
+SANDBOX_MODE="workspace"
+
 # ==================== 仓库根推导 ====================
 
 # 脚本位于 <repo>/devtools/scripts/ops/bin/，仓库根为上 4 级。
@@ -130,6 +133,12 @@ while [[ $i -lt ${#SCAN_ARGS[@]} ]]; do
         --watchdog)
             WATCHDOG=1
             i=$((i + 1)) ;;
+        --sandbox)
+            SANDBOX_MODE="${SCAN_ARGS[$((i + 1))]:-workspace}"
+            i=$((i + 2)) ;;
+        --sandbox=*)
+            SANDBOX_MODE="${SCAN_ARGS[$i]#*=}"
+            i=$((i + 1)) ;;
         --watchdog-interval)
             WATCHDOG_INTERVAL_SEC="${SCAN_ARGS[$((i + 1))]:-10}"
             i=$((i + 2)) ;;
@@ -187,14 +196,37 @@ fi
 
 # ==================== Agent 工具 ACL（执行任务所需） ====================
 #
-# 工具执行采用 fail-closed ACL：无 ACL 条目的 agent/tool 一律拒绝。coding_v1
-# 是默认编码执行体（ecosystem/agents/airymax_agents/coding 契约 agent_id），
-# 必须预授权内置工具，否则 CLI 任务执行时 agent 无法读写文件/执行 shell
-# （服务端无交互审批者，静态 ACL 是唯一授权路径）。shell_run 经 os_sandbox
+# 工具执行采用 fail-closed ACL：无 ACL 条目的 agent/tool 一律拒绝。内置
+# Agent（ecosystem/agents/airymax_agents/* 契约 agent_id）全部预授权内置
+# 工具，否则 CLI 任务执行时 agent 无法读写文件/执行 shell（服务端无交互
+# 审批者，静态 ACL 是唯一授权路径）。shell_run 经 os_sandbox
 # （Landlock + seccomp + rlimit）隔离，默认放行与 gateway「external」一致。
 # 可用环境变量收紧覆盖：AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob" ...
-AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-coding_v1=fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply}"
+AIRY_AGENT_ACL_TOOLS="fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
+AIRY_AGENT_ACL_DEFAULT=""
+for _AGENT in coding_v1 devops_v1 backend_v1 frontend_v1 tester_v1 architect_v1 \
+              product_manager_v1 data_engineer_v1 security_v1 reviewer_v1 analyst_v1; do
+    AIRY_AGENT_ACL_DEFAULT="${AIRY_AGENT_ACL_DEFAULT:+${AIRY_AGENT_ACL_DEFAULT};}${_AGENT}=${AIRY_AGENT_ACL_TOOLS}"
+done
+AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-${AIRY_AGENT_ACL_DEFAULT}}"
 export AIRY_AGENT_ACL
+unset AIRY_AGENT_ACL_TOOLS AIRY_AGENT_ACL_DEFAULT _AGENT
+
+# ==================== 工具 OS 沙箱模式（shell_run） ====================
+#
+# shell_run 经 os_sandbox（Landlock + seccomp + rlimit）隔离。模式：
+#   workspace: 全局只读 + workspace 可写（安全默认）
+#   strict:    仅系统基础路径 + workspace 可读执行，默认禁网（Landlock 不可用时 fail-closed）
+#   off:       无 OS 级隔离（仅超时/输出截断），用于无沙箱能力内核或本地全放行调试
+# 默认 workspace（安全）。--sandbox <off|workspace|strict> 参数可显式覆盖；
+# 环境变量 AIRY_TOOL_SANDBOX_MODE 仍为最高优先（与 daemon os_sandbox_cfg_from_env 一致）。
+# 注意：web_search/web_fetch 走 curl 子进程（sandbox=NULL），不受本模式影响。
+case "$SANDBOX_MODE" in
+    off|workspace|strict) ;;
+    *) SANDBOX_MODE="workspace" ;;
+esac
+AIRY_TOOL_SANDBOX_MODE="${AIRY_TOOL_SANDBOX_MODE:-$SANDBOX_MODE}"
+export AIRY_TOOL_SANDBOX_MODE
 
 # ==================== Sanitizer 部署兼容（ASAN_OPTIONS） ====================
 #
@@ -292,6 +324,7 @@ Options:
   -r <runtimedir>  指定运行时目录 (默认: /tmp/agentrt)
   -t <timeout>     全局健康检查超时秒数 (默认: 120)
   -w               启用 watchdog 自愈模式（同 --watchdog）
+  --sandbox <mode> 工具 shell_run OS 沙箱模式: off|workspace|strict（默认 workspace）
   --watchdog       全部拉起后进入 watchdog 巡检循环（默认每 10s 检查一次，
                    死亡 daemon 按启动顺序自动重启，60s 内单 daemon 最多 3 次；
                    重启记录写入 $AIRY_HOME/logs/watchdog.log）
@@ -416,8 +449,9 @@ start_daemon() {
 
     # 单实例锁：若对应 socket 已有存活监听，判定该 daemon 已运行，跳过启动
     # （历史 P2-2：重复启动导致 EVENT-DRIVER STOP / accept 异常）。
+    # dry-run 提前跳过，不产生副作用（不删除 stale socket）。
     local sock_path="${AGENTRT_RUNTIME_DIR}/${name%_d}.sock"
-    if [[ -S "$sock_path" ]]; then
+    if ! ((DRY_RUN)) && [[ -S "$sock_path" ]]; then
         if ss -xln 2>/dev/null | grep -q "${sock_path} "; then
             log_warn "$name already running (socket ${sock_path}), skipping"
             return 0
@@ -431,8 +465,11 @@ start_daemon() {
     # daemon 统一使用 --manager（daemon_parse_args 只认 --manager/-h/--tcp）
     case "$name" in
         llm_d)
-            # llm_d 的配置即模型清单 SSoT（model.yaml），必须显式传入
-            cmd+=("--manager" "$AGENTRT_MODEL_CONFIG")
+            # llm_d 的配置即模型清单 SSoT（model.yaml），必须显式传入。
+            # 干净环境（二进制安装后尚未配置 model.yaml）时 AGENTRT_MODEL_CONFIG
+            # 为空串——set -u 下必须用 :- 保护，否则 bootstrap 直接以
+            # "unbound variable" 崩溃中断全部 daemon 启动（发行版阻塞）。
+            cmd+=("--manager" "${AGENTRT_MODEL_CONFIG:-}")
             ;;
         *)
             if [[ -n "$AGENTRT_CONFIG" ]]; then
@@ -461,11 +498,11 @@ start_daemon() {
 
     # 导出 Agent Python 运行时路径（agent_d 子进程经 AIRY_AGENTS_PYTHONPATH 读取）
     if [[ "$name" == "agent_d" ]]; then
-        export AIRY_AGENTS_PYTHONPATH="$AGENTRT_AGENTS_PYTHONPATH"
+        export AIRY_AGENTS_PYTHONPATH="${AGENTRT_AGENTS_PYTHONPATH:-}"
         # 模型名贯通：openlab 子进程 SDK 默认模型硬编码 gpt-4o-mini（DeepSeek
         # provider 不认 → HTTP 400），注入 model.yaml 默认模型。AIRY_AGENT_MODEL
         # 在 openlab LLMAgent 中优先级最高（强制单模型），环境变量优先不覆盖。
-        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "$AGENTRT_MODEL_CONFIG" && -f "$AGENTRT_MODEL_CONFIG" ]]; then
+        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "${AGENTRT_MODEL_CONFIG:-}" && -f "${AGENTRT_MODEL_CONFIG}" ]]; then
             local _def_model
             _def_model="$(sed -n 's/^[[:space:]]*model:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$AGENTRT_MODEL_CONFIG" | head -1 | tr -d '[:space:]')"
             [[ -n "$_def_model" ]] && export AIRY_AGENT_MODEL="$_def_model"
@@ -489,11 +526,25 @@ start_daemon() {
     fi
 
     # 启动 daemon（后台运行）
-    "${cmd[@]}" &
+    #
+    # stdout/stderr 一律重定向到 $AIRY_LOG_DIR/<name>.log，daemon 不再继承
+    # 调用方的 stdout 管道。否则在 `bootstrap | tail` 这类管道调用场景下，
+    # daemon 进程持有管道写端使其永不 EOF，调用方会无限挂起（历史问题：
+    # 管道悬挂 5 分钟+）。日志文件亦为 daemon 单进程排他写入，不会交叉。
+    #
+    # setsid 脱离当前进程组（独立会话）：交互式 Ctrl-C / 沙箱回收只影响
+    # bootstrap 自身，不会连带终止 daemon（历史问题：StopCommand 停掉
+    # bootstrap 进程组时误杀了全部 daemon）。setsid 不可用时降级为普通后台。
+    local daemon_log="${AIRY_LOG_DIR}/${name}.log"
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "${cmd[@]}" >>"${daemon_log}" 2>&1 &
+    else
+        "${cmd[@]}" >>"${daemon_log}" 2>&1 &
+    fi
     local pid=$!
     DAEMON_PIDS[$name]=$pid
 
-    log_debug "  PID=$pid"
+    log_debug "  PID=$pid (log=$daemon_log)"
     return 0
 }
 

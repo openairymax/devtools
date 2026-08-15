@@ -929,8 +929,9 @@ static void e2e_scenario_17_error_propagation(void)
         TEST_ASSERT(strlen(i18n_str) > 0, "Step 3: ENOMEM有i18n描述信息");
     }
 
-    airy_err_t neg_code = -12;
-    TEST_ASSERT(neg_code == AIRY_ENOMEM, "Step 4: ENOMEM值为-12（POSIX ENOMEM=12）");
+    /* S-1 收敛（2026-08-14）：用户态错误码权威源为 POSIX errno 负值
+     * （AIRY_ENOMEM=-12 等，直接返回），错误返回值恒为「0 或负」。 */
+    TEST_ASSERT(AIRY_ENOMEM < 0, "Step 4: ENOMEM 返回值为负（用户态 errno）");
 
     const char* unknown_name = airy_err_str(AIRY_EUNKNOWN);
     TEST_ASSERT(unknown_name != NULL, "Step 5: EUNKNOWN名称存在");
