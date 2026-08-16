@@ -220,7 +220,7 @@ fi
 # 审批者，静态 ACL 是唯一授权路径）。shell_run 经 os_sandbox
 # （Landlock + seccomp + rlimit）隔离，默认放行与 gateway「external」一致。
 # 可用环境变量收紧覆盖：AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob" ...
-AIRY_AGENT_ACL_TOOLS="fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
+AIRY_AGENT_ACL_TOOLS="fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,fs_delete,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
 AIRY_AGENT_ACL_DEFAULT=""
 for _AGENT in coding_v1 devops_v1 backend_v1 frontend_v1 tester_v1 architect_v1 \
               product_manager_v1 data_engineer_v1 security_v1 reviewer_v1 analyst_v1; do

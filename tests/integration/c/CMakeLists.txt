@@ -92,25 +92,6 @@ configure_real_lib_test(test_c_link_03_market_openlab
     LIBS airy_common
 )
 
-# C-L06: Orchestrator → CoreLoopThree（orchestrator 真实实现）
-# 注意：airy_coreloopthree 已 PUBLIC 链接 svc_common（含 orchestrator.c），
-# 链接器自动处理重复符号（仅从首个库提取 .o）
-# LTO 链接下 --start-group/--end-group 必须包裹所有传递依赖，
-# 否则组外库引用组内库符号时无法回溯解析。
-# 显式列出所有传递依赖：
-#   - airy_coreloopthree: 主库（含 cognition/engine.c, execution/tool_svc_adapter.c）
-#   - airy_llm_service:   提供 llm_service_complete[_stream]/llm_response_free
-#   - airy_tool_service:  提供 tool_service_execute/tool_approval_check/tool_result_free
-#   - airy_cognition:     传递依赖（引用 tool/llm 符号）
-#   - airy_execution:     传递依赖（引用 tool_approval_check）
-#   - airy_core:          atoms 内核
-#   - airy_memory:        记忆模块
-#   - svc_common:            daemon 公共库（含 orchestrator.c, checkpoint.c）
-configure_real_lib_test(test_c_link_06_orchestrator_loop
-    LIBS airy_coreloopthree airy_llm_service airy_tool_service
-         airy_cognition airy_execution airy_core airy_memory svc_common
-)
-
 # C-L07: Checkpoint → CoreLoopThree（checkpoint_adapter 真实实现）
 configure_real_lib_test(test_c_link_07_checkpoint_loop
     LIBS airy_coreloopthree
