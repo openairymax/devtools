@@ -38,14 +38,18 @@ static void test_loop_submit() {
         return;
     }
 
-    // 提交一个任务
-    char* task_id = NULL;
-    const char* input = "帮我分析最近的销售数据";
-    err = airy_loop_submit(loop, input, strlen(input), &task_id);
+    /* airy_loop_submit 随旧 execution 引擎删除（双管线收敛）。核心循环
+     * 的任务提交由 airy_loop_submit_dag（taskflow DAG）承载，此处仅验证
+     * DAG 提交 API 可触达。 */
+    taskflow_workflow_t wf;
+    __builtin_memset(&wf, 0, sizeof(wf));
+    snprintf(wf.id, sizeof(wf.id), "wf-test-loop");
+    wf.node_count = 1;
+    char *exec_id = NULL;
+    err = airy_loop_submit_dag(loop, &wf, NULL, &exec_id);
     printf("test_loop_submit: %d\n", err);
-    if (err == AIRY_SUCCESS && task_id) {
-        printf("Task ID: %s\n", task_id);
-        AIRY_FREE(task_id);
+    if (exec_id) {
+        AIRY_FREE(exec_id);
     }
 
     airy_loop_destroy(loop);
@@ -64,11 +68,10 @@ static void test_loop_get_engines() {
 
     // 获取引擎
     airy_cognition_engine_t* cognition = NULL;
-    airy_execution_engine_t* execution = NULL;
     airy_memory_engine_t* memory = NULL;
-    airy_loop_get_engines(loop, &cognition, &execution, &memory);
-    printf("test_loop_get_engines: cognition=%p, execution=%p, memory=%p\n",
-           (void *)cognition, (void *)execution, (void *)memory);
+    airy_loop_get_engines(loop, &cognition, &memory);
+    printf("test_loop_get_engines: cognition=%p, memory=%p\n",
+           (void *)cognition, (void *)memory);
 
     airy_loop_destroy(loop);
 }

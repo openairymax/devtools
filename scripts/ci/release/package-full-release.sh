@@ -61,7 +61,7 @@ ATOMS_SRC="${ATOMS_SRC:-${AGENTRT_SRC}/atoms}"
 MEMORYROVOL_SRC="${MEMORYROVOL_SRC:-${PROJECT_ROOT}/products/memoryrovol}"
 
 # 预编译包内容清单
-ATOMS_LIBS="core memory cognition execution coreloopthree taskflow syscall frameworks"
+ATOMS_LIBS="core memory cognition coreloopthree taskflow syscall frameworks"
 # 内部实现头（不进入公共头包，避免与系统/commons 同名头冲突）
 ATOMS_EXCLUDE_HEADERS="stdatomic.h"
 
@@ -95,7 +95,7 @@ build_atoms_prebuilt() {
         -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DAIRY_WITH_MEMORYROVOL=OFF \
         -DCMAKE_INSTALL_PREFIX="$build_dir/install" >/dev/null
     run cmake --build "$build_dir" -j"$JOBS" --target airy_core airy_memory airy_syscall \
-        airy_cognition airy_execution airy_coreloopthree airy_taskflow airy_frameworks
+        airy_cognition airy_coreloopthree airy_taskflow airy_frameworks
 
     # 收集静态库
     run mkdir -p "$out/lib"

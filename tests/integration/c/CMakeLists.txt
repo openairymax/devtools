@@ -151,7 +151,7 @@ configure_real_lib_test(test_c_link_02_llm_loop
 # 真实 create 会启动 SD+IPC 引导，但 ipc_bus_helper_register_channel 按 ibh 实例
 # 独立注册（非全局 channel 名唯一性检查），多实例同 channel 名不冲突。
 configure_real_lib_test(test_c_link_04_tool_loop
-    LIBS airy_execution airy_core svc_common airy_tool_service
+    LIBS airy_coreloopthree airy_core svc_common airy_tool_service
 )
 
 # C-L05: Cupolas SafetyGuard → tool_d（已迁移到真实库）
@@ -238,7 +238,6 @@ if(TARGET svc_common)
             svc_common
             -Wl,--start-group
             airy_cognition
-            airy_execution
             airy_memory
             airy_atoms
             airy_llm_service
@@ -252,7 +251,6 @@ if(TARGET svc_common)
             airy_coreloopthree
             svc_common
             airy_cognition
-            airy_execution
             airy_memory
             airy_atoms
             airy_llm_service

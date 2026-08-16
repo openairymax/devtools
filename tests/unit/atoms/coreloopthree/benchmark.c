@@ -16,122 +16,6 @@
 #include <time.h>
 
 /**
- * @brief 基准测试：任务提交性能
- */
-static void benchmark_task_submit() {
-    airy_core_loop_t* loop = NULL;
-    airy_error_t err = airy_loop_create(NULL, &loop);
-    if (err != AIRY_SUCCESS) {
-        printf("benchmark_task_submit: Failed to create loop\n");
-        return;
-    }
-
-    const char* input = "帮我分析最近的销售数据";
-    size_t input_len = strlen(input);
-    int num_tasks = 1000;
-    char** task_ids;
-    SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
-    if (!task_ids) {
-        airy_loop_destroy(loop);
-        return;
-    }
-
-    clock_t start = clock();
-    for (int i = 0; i < num_tasks; i++) {
-        err = airy_loop_submit(loop, input, input_len, &task_ids[i]);
-        if (err != AIRY_SUCCESS) {
-            printf("benchmark_task_submit: Failed to submit task %d\n", i);
-            break;
-        }
-    }
-    clock_t end = clock();
-    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-
-    printf("benchmark_task_submit: %d tasks in %.3f seconds (%.3f tasks/sec)\n",
-           num_tasks, elapsed, num_tasks / elapsed);
-
-    for (int i = 0; i < num_tasks; i++) {
-        if (task_ids[i]) {
-            AIRY_FREE(task_ids[i]);
-        }
-    }
-    AIRY_FREE(task_ids);
-
-    airy_loop_destroy(loop);
-}
-
-/**
- * @brief 基准测试：任务查询性能
- */
-static void benchmark_task_query() {
-    airy_execution_engine_t* engine = NULL;
-    airy_error_t err = airy_execution_create(4, &engine);
-    if (err != AIRY_SUCCESS) {
-        printf("benchmark_task_query: Failed to create engine\n");
-        return;
-    }
-
-    int num_tasks = 1000;
-    char** task_ids;
-    SAFE_MALLOC_ARRAY(task_ids, num_tasks, sizeof(char*));
-    if (!task_ids) {
-        airy_execution_destroy(engine);
-        return;
-    }
-
-    for (int i = 0; i < num_tasks; i++) {
-        airy_task_t task = {
-            .task_id = NULL,
-            .task_id_len = 0,
-            .task_agent_id = "test_agent",
-            .task_agent_id_len = strlen("test_agent"),
-            .task_status = TASK_STATUS_PENDING,
-            .task_input = NULL,
-            .task_output = NULL,
-            .task_created_ns = 0,
-            .task_started_ns = 0,
-            .task_completed_ns = 0,
-            .task_timeout_ms = 1000,
-            .task_retry_count = 0,
-            .task_max_retries = 3,
-            .task_error_msg = NULL
-        };
-
-        err = airy_execution_submit(engine, &task, &task_ids[i]);
-        if (err != AIRY_SUCCESS) {
-            printf("benchmark_task_query: Failed to submit task %d\n", i);
-            break;
-        }
-    }
-
-    clock_t start = clock();
-    for (int i = 0; i < num_tasks; i++) {
-        if (task_ids[i]) {
-            airy_task_status_t status;
-            err = airy_execution_query(engine, task_ids[i], &status);
-            if (err != AIRY_SUCCESS) {
-                printf("benchmark_task_query: Failed to query task %d\n", i);
-                break;
-            }
-        }
-    }
-    clock_t end = clock();
-    double elapsed = (double)(end - start) / CLOCKS_PER_SEC;
-
-    printf("benchmark_task_query: %d queries in %.3f seconds (%.3f queries/sec)\n",
-           num_tasks, elapsed, num_tasks / elapsed);
-
-    for (int i = 0; i < num_tasks; i++) {
-        if (task_ids[i]) {
-            AIRY_FREE(task_ids[i]);
-        }
-    }
-    AIRY_FREE(task_ids);
-
-    airy_execution_destroy(engine);
-}
-
-/**
  * @brief 基准测试：记忆写入性能
  */
 static void benchmark_memory_write() {
@@ -256,8 +140,6 @@ static void benchmark_memory_query() {
 
 int main() {
     printf("=== Running Benchmark Tests ===\n");
-    benchmark_task_submit();
-    benchmark_task_query();
     benchmark_memory_write();
     benchmark_memory_query();
     printf("=== Benchmark Tests Complete ===\n");
