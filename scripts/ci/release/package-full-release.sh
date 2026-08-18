@@ -5,13 +5,15 @@
 # 阶段 0：质量门禁（可选：SKIP_GATES=1 跳过）
 # 阶段 1：闭源预编译模块包 — atoms-prebuilt / memoryrovol-pro
 #         （内部 CI 持有闭源源码；对外交付「静态库 + 公共 API 头」）
-# 阶段 2：完全体二进制包 — agentrt-full-<ver>-<os>-<arch>.tar.gz
+# 阶段 2：完全体二进制包 — agentrt-<v版本>-<os>-<arch>.tar.gz
 #         （bin: 16 daemon + CLI + TUI；lib: Python 依赖；include: 公共头；
 #          config: 配置模板；manifest.json：版本/组件/校验和）
+# 制品命名规范与 .github/workflows/release.yml 对齐（默认承载 atomgit，
+# GitHub Release 为镜像）。
 # 阶段 3：上传 release（可配 atomgit release API 或通用 UPLOAD_URL；DRY_RUN 模拟）
 #
 # 用法：
-#   ./package-full-release.sh <版本> [os-arch]      # 如 0.1.2 linux-x86_64
+#   ./package-full-release.sh <版本> [os-arch]      # 如 v0.1.2 linux-x86_64
 # 环境变量：
 #   SKIP_GATES=1      跳过质量门禁（CI 快速发布）
 #   SKIP_MODULES=1    跳过闭源预编译模块包（仅打完全体）
@@ -39,8 +41,10 @@ log_fail()  { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-VERSION="${1:-0.1.2}"
+VERSION="${1:-v0.1.2}"
 PLATFORM="${2:-linux-x86_64}"
+# 目录内使用去 v 的版本号（包内顶层目录 agentrt-<num>，与 install.sh 匹配）
+VERSION_NUM="${VERSION#v}"
 SKIP_GATES="${SKIP_GATES:-0}"
 SKIP_MODULES="${SKIP_MODULES:-0}"
 SKIP_UPLOAD="${SKIP_UPLOAD:-0}"
@@ -147,7 +151,9 @@ build_atoms_prebuilt() {
 
 # ─── 阶段 2：完全体二进制包 ─────────────────────────────────────────────
 build_full_package() {
-    local out="${STAGE_DIR}/agentrt-full-${VERSION}-${PLATFORM}"
+    # 包内顶层目录 agentrt-<num>（去 v），与 install.sh/install.ps1 二进制
+    # 模式按 agentrt-* 目录匹配解压位置对齐。
+    local out="${STAGE_DIR}/agentrt-${VERSION_NUM}"
     log_info "阶段2：构建完全体二进制包（${PLATFORM}）…"
     local build_dir="${STAGE_DIR}/build-full"
     run cmake -S "$AGENTRT_SRC" -B "$build_dir" \
@@ -191,7 +197,7 @@ build_full_package() {
     # manifest
     {
         echo "{"
-        echo "  \"name\": \"agentrt-full\","
+        echo "  \"name\": \"agentrt\","
         echo "  \"version\": \"${VERSION}\","
         echo "  \"platform\": \"${PLATFORM}\","
         echo "  \"components\": {"
@@ -210,11 +216,11 @@ build_full_package() {
         echo "}"
     } > "$out/manifest.json"
 
-    ( cd "$DIST_DIR" && run tar -czf "agentrt-full-${VERSION}-${PLATFORM}.tar.gz" \
+    ( cd "$DIST_DIR" && run tar -czf "agentrt-${VERSION}-${PLATFORM}.tar.gz" \
         "$(basename "$out")" )
-    run sha256sum "$DIST_DIR/agentrt-full-${VERSION}-${PLATFORM}.tar.gz" \
-        > "$DIST_DIR/agentrt-full-${VERSION}-${PLATFORM}.tar.gz.sha256"
-    log_ok "完全体包: dist/agentrt-full-${VERSION}-${PLATFORM}.tar.gz"
+    run sha256sum "$DIST_DIR/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
+        > "$DIST_DIR/agentrt-${VERSION}-${PLATFORM}.tar.gz.sha256"
+    log_ok "完全体包: dist/agentrt-${VERSION}-${PLATFORM}.tar.gz"
 }
 
 # ─── 阶段 3：上传 release ───────────────────────────────────────────────
@@ -223,7 +229,7 @@ upload_releases() {
     [ -n "$UPLOAD_URL" ] || { log_warn "未配置 UPLOAD_URL，跳过上传（可用 SKIP_UPLOAD=1 明确跳过）"; return 0; }
 
     local f
-    for f in "$DIST_DIR"/agentrt-full-*.tar.gz "$DIST_DIR"/agentrt-full-*.sha256 \
+    for f in "$DIST_DIR"/agentrt-*.tar.gz "$DIST_DIR"/agentrt-*.sha256 \
              "$DIST_DIR"/airy-atoms-prebuilt-*.tar.gz; do
         [ -e "$f" ] || continue
         log_info "上传: $(basename "$f")"
