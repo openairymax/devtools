@@ -55,8 +55,10 @@ UPLOAD_TOKEN="${UPLOAD_TOKEN:-}"
 RELEASE_ORG="${RELEASE_ORG:-openairymax}"
 RELEASE_REPO="${RELEASE_REPO:-airymaxhub}"
 
-DIST_DIR="${PROJECT_ROOT}/dist"
-STAGE_DIR="${PROJECT_ROOT}/dist/.stage-${VERSION}"
+# 产物目录：默认源码区外（铁律 4.7：构建产物禁止污染 airymaxhub 源码区），
+# 可用 AIRY_DIST_OUT 覆盖（CI 上传场景可指向共享制品目录）。
+DIST_DIR="${AIRY_DIST_OUT:-${HOME}/.airymaxrt/dist}"
+STAGE_DIR="${DIST_DIR}/.stage-${VERSION}"
 AGENTRT_SRC="${PROJECT_ROOT}/agentrt"
 TUI_SRC="${PROJECT_ROOT}/sdk/tui"
 
@@ -166,9 +168,11 @@ build_full_package() {
     # Rust TUI
     if [ -d "$TUI_SRC" ] && command -v cargo >/dev/null 2>&1; then
         log_info "构建 agentrt-tui…"
-        run bash -c "cd '$TUI_SRC' && cargo build --release"
-        [ -f "$TUI_SRC/target/release/agentrt-tui" ] && \
-            run cp -f "$TUI_SRC/target/release/agentrt-tui" "$out/bin/"
+        # 构建产物收敛（铁律 4.7）：CARGO_TARGET_DIR 指向 DIST_DIR/target，
+        # 禁止 cargo 在源码树 sdk/tui/target 落盘。
+        run bash -c "cd '$TUI_SRC' && CARGO_TARGET_DIR='${DIST_DIR}/target' cargo build --release"
+        [ -f "${DIST_DIR}/target/release/agentrt-tui" ] && \
+            run cp -f "${DIST_DIR}/target/release/agentrt-tui" "$out/bin/"
     fi
 
     # Python 运行时依赖
