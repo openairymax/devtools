@@ -214,21 +214,12 @@ fi
 
 # ==================== Agent 工具 ACL（执行任务所需） ====================
 #
-# 工具执行采用 fail-closed ACL：无 ACL 条目的 agent/tool 一律拒绝。内置
-# Agent（ecosystem/agents/airymax_agents/* 契约 agent_id）全部预授权内置
-# 工具，否则 CLI 任务执行时 agent 无法读写文件/执行 shell（服务端无交互
-# 审批者，静态 ACL 是唯一授权路径）。shell_run 经 os_sandbox
-# （Landlock + seccomp + rlimit）隔离，默认放行与 gateway「external」一致。
-# 可用环境变量收紧覆盖：AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob" ...
-AIRY_AGENT_ACL_TOOLS="fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,fs_delete,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
-AIRY_AGENT_ACL_DEFAULT=""
-for _AGENT in coding_v1 devops_v1 backend_v1 frontend_v1 tester_v1 architect_v1 \
-              product_manager_v1 data_engineer_v1 security_v1 reviewer_v1 analyst_v1; do
-    AIRY_AGENT_ACL_DEFAULT="${AIRY_AGENT_ACL_DEFAULT:+${AIRY_AGENT_ACL_DEFAULT};}${_AGENT}=${AIRY_AGENT_ACL_TOOLS}"
-done
-AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-${AIRY_AGENT_ACL_DEFAULT}}"
-export AIRY_AGENT_ACL
-unset AIRY_AGENT_ACL_TOOLS AIRY_AGENT_ACL_DEFAULT _AGENT
+# 工具执行采用 fail-closed ACL：无 ACL 条目的 agent/tool 一律拒绝。
+# 权威源为 $AIRY_CONFIG_DIR/permission_rules.yaml（daemon_security 启动时
+# 加载，按标准角色最小权限授予；install.sh/build.sh 部署模板）。
+# AIRY_AGENT_ACL 默认不设，保持 rules 文件唯一权威；高级部署可显式
+# 覆盖收紧：AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob" ...
+export AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-}"
 
 # ==================== 工具 OS 沙箱模式（shell_run） ====================
 #
