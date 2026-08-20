@@ -378,17 +378,60 @@ parse_args() {
 
 # ==================== 健康检查 ====================
 
+# 读取 daemon 真实 PID：PID 文件优先（start_daemon 经 sh -c 包装落盘，
+# $$ 即 exec 后 daemon 的真实 PID），无文件或文件 stale 时回退记录值。
+# setsid 在调用方为进程组组长时会 fork 使 $! 记录的 PID 漂移（历史根因：
+# 健康检查 kill -0 误判 FAILED + SIGTERM 发给死 PID 导致 daemon 群残留），
+# 因此所有进程维度的操作（停止/状态）一律经本函数取真实 PID。
+get_daemon_pid() {
+    local name="$1"
+    local pid_file="${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"
+    if [[ -f "$pid_file" ]]; then
+        local _p
+        _p="$(cat "$pid_file" 2>/dev/null | tr -d '[:space:]')"
+        if [[ -n "$_p" ]] && kill -0 "$_p" 2>/dev/null; then
+            echo "$_p"
+            return 0
+        fi
+        # stale PID 文件（进程已退出），删除避免污染后续判断
+        rm -f "$pid_file"
+    fi
+    echo "${DAEMON_PIDS[$name]:-}"
+    return 0
+}
+
+# 检查 Unix socket 是否有活跃监听：ss 输出整体读入后字符串匹配。
+# 不用 `ss | grep -q`——grep -q 匹配后提前退出使 ss 收到 SIGPIPE，
+# set -euo pipefail 下管道退出码 141 会误判失败（历史根因：socket
+# 在 ss 输出中排序靠前时，启动健康检查偶发误判 UNHEALTHY、单实例锁
+# 误删活跃 socket）。ss 不可用时返回 1，由调用方回退 -S 判断。
+sock_is_listening() {
+    local sock_path="$1"
+    command -v ss >/dev/null 2>&1 || return 1
+    local ss_out
+    ss_out="$(ss -xln 2>/dev/null || true)"
+    case "$ss_out" in
+        *"${sock_path} "*) return 0 ;;
+    esac
+    return 1
+}
+
 check_daemon_health_unix() {
     local name="$1"
     # daemon socket 名称不带 _d 后缀 (monit_d → monit.sock)
     local short_name="${name%_d}"
     local sock_path="${AGENTRT_RUNTIME_DIR}/${short_name}.sock"
 
-    # 检查 Unix Socket 是否存在且可连接
-    if [[ -S "$sock_path" ]]; then
-        return 0
+    # socket 文件不存在 → 未 bind，不健康
+    [[ -S "$sock_path" ]] || return 1
+
+    # ss 可用时确认实际监听（防 stale socket 文件残留误判为健康）；
+    # ss 不可用（受限环境）时信任 socket 文件存在（bind 成功的直接证据）。
+    if command -v ss >/dev/null 2>&1; then
+        sock_is_listening "$sock_path"
+        return $?
     fi
-    return 1
+    return 0
 }
 
 check_daemon_health_tcp() {
@@ -417,14 +460,10 @@ check_daemon_health_tcp() {
 
 check_daemon_health() {
     local name="$1"
-    local pid="${DAEMON_PIDS[$name]:-}"
 
-    # 先检查进程是否存活
-    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
-        return 1
-    fi
-
-    # 检查健康状态
+    # socket 可达为权威判据（daemon bind 成功的直接证据）。
+    # 不再以 kill -0 记录 PID 为前置失败条件——setsid fork 时 $!
+    # 记录的中间 PID 会立即失效，曾导致健康检查误判 FAILED（根因）。
     check_daemon_health_tcp "$name"
     return $?
 }
@@ -438,6 +477,11 @@ wait_for_daemon() {
 
     while [[ $elapsed -lt $timeout ]]; do
         if check_daemon_health "$name"; then
+            # 健康确认后从 PID 文件回填真实 PID（setsid fork 时 $! 漂移，
+            # 后续 stop/status 一律以真实 PID 为准）
+            local real_pid
+            real_pid="$(get_daemon_pid "$name")"
+            [[ -n "$real_pid" ]] && DAEMON_PIDS[$name]="$real_pid"
             log_info "$name is healthy (${elapsed}s)"
             return 0
         fi
@@ -461,7 +505,7 @@ start_daemon() {
     # dry-run 提前跳过，不产生副作用（不删除 stale socket）。
     local sock_path="${AGENTRT_RUNTIME_DIR}/${name%_d}.sock"
     if ! ((DRY_RUN)) && [[ -S "$sock_path" ]]; then
-        if ss -xln 2>/dev/null | grep -q "${sock_path} "; then
+        if sock_is_listening "$sock_path"; then
             log_warn "$name already running (socket ${sock_path}), skipping"
             return 0
         fi
@@ -548,22 +592,35 @@ start_daemon() {
     # setsid 脱离当前进程组（独立会话）：交互式 Ctrl-C / 沙箱回收只影响
     # bootstrap 自身，不会连带终止 daemon（历史问题：StopCommand 停掉
     # bootstrap 进程组时误杀了全部 daemon）。setsid 不可用时降级为普通后台。
+    #
+    # PID 捕获（根因修复）：setsid 在调用方为进程组组长时会先 fork 再 exec，
+    # $! 记录的是 fork 前的中间 PID（立即退出）——此前导致健康检查 kill -0
+    # 误判 FAILED、SIGTERM 发给死 PID 使 daemon 群残留。经 sh -c 包装将
+    # $$（exec 后 daemon 的真实 PID）落盘到 $AIRY_RUNTIME_DIR/<name>.pid，
+    # 健康检查回填与 stop/status 均以 PID 文件为准。
     local daemon_log="${AIRY_LOG_DIR}/${name}.log"
+    local pid_file="${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"
+    rm -f "$pid_file"
     if command -v setsid >/dev/null 2>&1; then
-        setsid "${cmd[@]}" >>"${daemon_log}" 2>&1 &
+        # sh 包装参数：$0=_, $1=pid_file，shift 后 $@ 即 daemon 完整命令行
+        # （bin + 可选 --manager）。shift 2 会把无参数 daemon 的 bin 也移掉，
+        # 导致 exec "$@" 为空、daemon 静默未启动（历史教训）。
+        setsid /bin/sh -c 'echo $$ > "$1"; shift; exec "$@"' _ "$pid_file" "${cmd[@]}" >>"${daemon_log}" 2>&1 &
     else
-        "${cmd[@]}" >>"${daemon_log}" 2>&1 &
+        /bin/sh -c 'echo $$ > "$1"; shift; exec "$@"' _ "$pid_file" "${cmd[@]}" >>"${daemon_log}" 2>&1 &
     fi
     local pid=$!
     DAEMON_PIDS[$name]=$pid
 
-    log_debug "  PID=$pid (log=$daemon_log)"
+    log_debug "  PID=$pid (log=$daemon_log, pidfile=$pid_file)"
     return 0
 }
 
 stop_daemon() {
     local name="$1"
-    local pid="${DAEMON_PIDS[$name]:-}"
+    # 以 PID 文件中的真实 PID 为准（setsid fork 时记录 PID 会漂移）
+    local pid
+    pid="$(get_daemon_pid "$name")"
 
     if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
         return 0
@@ -587,6 +644,7 @@ stop_daemon() {
         kill -9 "$pid" 2>/dev/null || true
     fi
 
+    rm -f "${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"
     unset DAEMON_PIDS[$name]
 }
 
@@ -602,7 +660,8 @@ stop_all_daemons() {
         local -n daemons="$layer_var"
         for ((i=${#daemons[@]}-1; i>=0; i--)); do
             local name="${daemons[$i]}"
-            local pid="${DAEMON_PIDS[$name]:-}"
+            local pid
+            pid="$(get_daemon_pid "$name")"
             if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
                 kill -TERM "$pid" 2>/dev/null || true
                 log_debug "  TERM → $name (PID=$pid)"
@@ -619,7 +678,8 @@ stop_all_daemons() {
             local layer_var2="${ALL_LAYERS[$layer]}"
             local -n daemons2="$layer_var2"
             for name2 in "${daemons2[@]}"; do
-                local pid2="${DAEMON_PIDS[$name2]:-}"
+                local pid2
+                pid2="$(get_daemon_pid "$name2")"
                 if [[ -n "$pid2" ]] && kill -0 "$pid2" 2>/dev/null; then
                     any_alive=1
                 fi
@@ -637,7 +697,8 @@ stop_all_daemons() {
         local layer_var3="${ALL_LAYERS[$layer]}"
         local -n daemons3="$layer_var3"
         for name3 in "${daemons3[@]}"; do
-            local pid3="${DAEMON_PIDS[$name3]:-}"
+            local pid3
+            pid3="$(get_daemon_pid "$name3")"
             if [[ -n "$pid3" ]] && kill -0 "$pid3" 2>/dev/null; then
                 log_warn "  $name3 exceeded graceful window, KILL (PID=$pid3)"
                 kill -9 "$pid3" 2>/dev/null || true
@@ -658,7 +719,8 @@ show_status() {
     for layer_var in "${ALL_LAYERS[@]}"; do
         local -n daemons="$layer_var"
         for name in "${daemons[@]}"; do
-            local pid="${DAEMON_PIDS[$name]:-}"
+            local pid
+            pid="$(get_daemon_pid "$name")"
             if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
                 if check_daemon_health "$name"; then
                     log_info "$name: ONLINE (PID=$pid)"
@@ -666,7 +728,7 @@ show_status() {
                     log_warn "$name: RUNNING but UNHEALTHY (PID=$pid)"
                     all_online=false
                 fi
-            elif [[ -z "$pid" ]] && check_daemon_health "$name"; then
+            elif check_daemon_health "$name"; then
                 # 外部已运行的健康 daemon（socket 存在，非本进程启动）：不误报 OFFLINE
                 log_info "$name: ONLINE (pre-existing)"
             else
@@ -772,7 +834,7 @@ wd_check_all() {
                 if (( waited >= 5 )) && ! check_daemon_health "$name"; then
                     wd_log "WARN  ${name} restarted but health not confirmed within 5s"
                 else
-                    wd_log "OK    ${name} restarted (pid=${DAEMON_PIDS[$name]:-unknown})"
+                    wd_log "OK    ${name} restarted (pid=$(get_daemon_pid "$name"))"
                 fi
             else
                 wd_log "FAIL  ${name} restart failed"
