@@ -500,18 +500,30 @@ start_daemon() {
     local bin_name="${DAEMON_BIN_NAME[$name]:-$name}"
     local bin_path="${AGENTRT_BINDIR}/${bin_name}"
 
-    # 单实例锁：若对应 socket 已有存活监听，判定该 daemon 已运行，跳过启动
-    # （历史 P2-2：重复启动导致 EVENT-DRIVER STOP / accept 异常）。
+    # 单实例锁：daemon 已运行则跳过启动（历史 P2-2：重复启动导致
+    # EVENT-DRIVER STOP / accept 异常）。判定方式按监听类型分：
+    #   - TCP daemon（gateway_d 监听 HTTP 8080）：检查端口已被监听。
+    #     gateway 不建 Unix socket，仅按 socket 文件判断会让每次 bootstrap
+    #     都重复启动一个 bind 失败的失效实例，残留多个半死 gateway_d。
+    #   - 其余 daemon：检查 <runtime>/<name>.sock 存活监听。
     # dry-run 提前跳过，不产生副作用（不删除 stale socket）。
     local sock_path="${AGENTRT_RUNTIME_DIR}/${name%_d}.sock"
-    if ! ((DRY_RUN)) && [[ -S "$sock_path" ]]; then
-        if sock_is_listening "$sock_path"; then
-            log_warn "$name already running (socket ${sock_path}), skipping"
-            return 0
+    if ! ((DRY_RUN)); then
+        local tcp_port="${DAEMON_PORT[$name]:-0}"
+        if [[ "$tcp_port" -gt 0 ]]; then
+            if check_daemon_health_tcp "$name"; then
+                log_warn "$name already running (port $tcp_port), skipping"
+                return 0
+            fi
+        elif [[ -S "$sock_path" ]]; then
+            if sock_is_listening "$sock_path"; then
+                log_warn "$name already running (socket ${sock_path}), skipping"
+                return 0
+            fi
+            # socket 文件残留但无监听 → 删除，避免 bind 失败
+            rm -f "$sock_path"
+            log_warn "$name: stale socket ${sock_path} removed"
         fi
-        # socket 文件残留但无监听 → 删除，避免 bind 失败
-        rm -f "$sock_path"
-        log_warn "$name: stale socket ${sock_path} removed"
     fi
 
     local cmd=("$bin_path")
