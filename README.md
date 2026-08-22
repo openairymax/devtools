@@ -19,16 +19,18 @@ This repository contains no executable code — only configuration files and too
 
 ```
 airymaxhub/                     ← Umbrella repo
-├── agentrt/                    ← Management repo (7 leaf repos; since v0.1.2 also owns cmake/ build modules and scripts/ installer)
-├── sdk/                        ← Management repo (6 leaf repos)
-├── ecosystem/                  ← Management repo (5 leaf repos)
-├── products/                   ← Management repo (3 leaf repos)
-├── agentrt-linux/              ← Management repo (8 leaf repos, AirymaxOS)
+├── agent-runtim/               ← user-space engineering super-repo (v0.1.3)
+│   ├── agentrt/                ← Management repo (7 leaf repos; owns cmake/ build modules and scripts/ installer)
+│   ├── sdk/                    ← Management repo (6 leaf repos)
+│   ├── ecosystem/              ← Management repo (6 leaf repos)
+│   └── products/               ← Management repo (3 leaf repos)
+├── agent-linux/                ← kernel-space engineering super-repo (8 leaf repos, AirymaxOS; formerly agentrt-linux, renamed v0.1.3)
 ├── devtools/                   ← THIS REPO (top-level)
 ├── docs/                       ← Top-level (open documentation)
-└── docs-closed/                ← Top-level (internal documentation)
+├── closed-docs/                ← Top-level (internal documentation)
+└── closed-dev-build/           ← Top-level (internal build/deploy)
 ```
-> Umbrella-direct `cmake/` and `scripts/` moved into the agentrt management repo since v0.1.2 (IRON-9 [IND] fully independent layer).
+> Umbrella-direct `cmake/` and `scripts/` moved into the agentrt management repo since v0.1.2 (IRON-9 [IND] fully independent layer); the umbrella root holds no direct source directories.
 
 ## Directory Structure
 

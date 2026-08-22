@@ -19,16 +19,18 @@ DevTools 是 Airymax 38 仓拆分方案中的 3 个顶层仓之一（另两个�
 
 ```
 airymaxhub/                     ← 伞仓
-├── agentrt/                    ← 管理仓（7 叶子仓；v0.1.2 起含 cmake/ 构建模块与 scripts/ 安装器）
-├── sdk/                        ← 管理仓（6 叶子仓）
-├── ecosystem/                  ← 管理仓（5 叶子仓）
-├── products/                   ← 管理仓（3 叶子仓）
-├── agentrt-linux/              ← 管理仓（8 叶子仓，AirymaxOS）
+├── agent-runtim/               ← 用户态工程大管理仓（v0.1.3）
+│   ├── agentrt/                ← 管理仓（7 叶子仓；含 cmake/ 构建模块与 scripts/ 安装器）
+│   ├── sdk/                    ← 管理仓（6 叶子仓）
+│   ├── ecosystem/              ← 管理仓（6 叶子仓）
+│   └── products/               ← 管理仓（3 叶子仓）
+├── agent-linux/                ← 内核态工程大管理仓（8 叶子仓，AirymaxOS；原 agentrt-linux，v0.1.3 改名）
 ├── devtools/                   ← 本仓库（顶层仓）
 ├── docs/                       ← 顶层仓（开放文档）
-└── docs-closed/                ← 顶层仓（内部文档）
+├── closed-docs/                ← 顶层仓（内部文档）
+└── closed-dev-build/           ← 顶层仓（内部构建/部署）
 ```
-> 伞仓直属 `cmake/`、`scripts/` 自 v0.1.2 起迁入 agentrt 管理仓（IRON-9 [IND] 完全独立层）。
+> 伞仓直属 `cmake/`、`scripts/` 自 v0.1.2 起迁入 agentrt 管理仓（IRON-9 [IND] 完全独立层）；伞仓根不含直属源码目录。
 
 ## 目录结构
 
