@@ -893,7 +893,7 @@ trap cleanup SIGINT SIGTERM
 main() {
     parse_args "$@"
 
-    log_info "AgentRT Bootstrap v0.1.2"
+    log_info "AgentRT Bootstrap v0.1.3"
     log_info "  Bindir:    $AGENTRT_BINDIR"
     log_info "  Runtime:   $AGENTRT_RUNTIME_DIR"
     log_info "  Config:    ${AGENTRT_CONFIG:-<none>}"

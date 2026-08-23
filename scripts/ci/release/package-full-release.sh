@@ -13,7 +13,7 @@
 # 阶段 3：上传 release（可配 atomgit release API 或通用 UPLOAD_URL；DRY_RUN 模拟）
 #
 # 用法：
-#   ./package-full-release.sh <版本> [os-arch]      # 如 v0.1.2 linux-x86_64
+#   ./package-full-release.sh <版本> [os-arch]      # 如 v0.1.3 linux-x86_64
 # 环境变量：
 #   SKIP_GATES=1      跳过质量门禁（CI 快速发布）
 #   SKIP_MODULES=1    跳过闭源预编译模块包（仅打完全体）
@@ -41,7 +41,7 @@ log_fail()  { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-VERSION="${1:-v0.1.2}"
+VERSION="${1:-v0.1.3}"
 PLATFORM="${2:-linux-x86_64}"
 # 目录内使用去 v 的版本号（包内顶层目录 agentrt-<num>，与 install.sh 匹配）
 VERSION_NUM="${VERSION#v}"

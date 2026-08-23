@@ -52,10 +52,10 @@ DEFAULT_CONFIGS = {
         name="agentrt.conf",
         description="AgentRT main configuration",
         content="""# AgentRT Main Configuration
-# Version: 0.1.2
+# Version: 0.1.3
 
 # System
-version = "0.1.2"
+version = "0.1.3"
 log_level = "info"
 data_dir = "${HOME}/.agentrt/data"
 run_dir = "/var/run/agentrt"
