@@ -181,7 +181,7 @@ else
 fi
 mkdir -p "$AIRY_HOME"/bin "$AIRY_HOME"/lib "$AIRY_HOME"/run \
          "$AIRY_HOME"/logs "$AIRY_HOME"/config "$AIRY_HOME"/data \
-         "$AIRY_HOME"/tmp "$AIRY_HOME"/cache 2>/dev/null
+         "$AIRY_HOME"/tmp "$AIRY_HOME"/cache "$AIRY_HOME"/workspace 2>/dev/null
 
 # 子目录导出（与 daemon airy_paths_init() 的 setenv 一致）
 export AIRY_RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
