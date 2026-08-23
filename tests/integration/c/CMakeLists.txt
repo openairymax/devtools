@@ -13,32 +13,32 @@ add_compile_definitions(AIRY_COMPLIANCE_IMPL)
 # 公共 include 路径
 # ============================================================================
 set(INTEGRATION_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/coreloopthree/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/syscall/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/memory/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/llm_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/tool_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/monit_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/gateway_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/market_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/config_unified/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/cache/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/compat/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/network/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/ipc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/cupolas/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/cupolas/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/syscall/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/memory/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/monit_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/gateway_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/market_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/config_unified/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/compat/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/network/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/ipc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/cupolas/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/cupolas/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -213,17 +213,17 @@ if(TARGET svc_common)
     add_executable(test_e2e_core test_e2e_core.c)
 
     target_include_directories(test_e2e_core PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/coreloopthree/tests/unit
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/coreloopthree/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms/syscall/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons/utils/cache/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/corekern/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/tests/unit
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/syscall/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache/include
     )
 
     # --whole-archive/--start-group 为 GNU ld 专有：macOS ld64 / MSVC 不识别，
@@ -277,9 +277,9 @@ else()
 endif()
 
 # LLM Routing Integration Test (INT-15)
-set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/llm_d)
-set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/commons)
-set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/atoms)
+set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/llm_d)
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons)
+set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms)
 set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
@@ -325,7 +325,7 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${COMMONS_DIR}/utils/compat/include
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agentrt/daemons/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
 )
 
 target_link_libraries(test_llm_d_routing PRIVATE
