@@ -1,6 +1,6 @@
 # C Integration Test Fixture Data
 
-> **路径**: `devtools/tests/integration/c/data/` | **版本**: 0.1.1
+> **路径**: `tools/tests/integration/c/data/` | **版本**: 0.1.1
 
 ## 概述
 
@@ -16,7 +16,7 @@
 
 ## 使用方式
 
-这些数据文件由 `devtools/tests/integration/c/` 下的 C 集成测试代码自动加载，无需手动操作。
+这些数据文件由 `tools/tests/integration/c/` 下的 C 集成测试代码自动加载，无需手动操作。
 
 ## 许可证
 

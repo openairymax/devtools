@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# 脚本位于 devtools/scripts/ci/pipeline/validate/ — 需向上 5 级到达项目根目录
+# 脚本位于 tools/scripts/ci/pipeline/validate/ — 需向上 5 级到达项目根目录
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 
 # ============================================================================

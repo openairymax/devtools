@@ -70,7 +70,7 @@ SANDBOX_MODE="workspace"
 
 # ==================== 仓库根推导 ====================
 
-# 脚本位于 <repo>/devtools/scripts/ops/bin/，仓库根为上 4 级。
+# 脚本位于 <repo>/tools/scripts/ops/bin/，仓库根为上 4 级。
 # 不做硬编码本地绝对路径（硬约束），支持环境变量显式覆盖。
 # 生产部署时脚本被复制到 $AIRY_HOME/bin/，上溯 4 级无法回到仓库根，
 # 此时回退到 $AIRY_HOME 标准布局（config/model.yaml 与 lib/ 由 build.sh 固化）。
@@ -198,7 +198,7 @@ AGENTRT_RUNTIME_DIR="${AIRY_RUNTIME_DIR}"
 
 # ==================== 凭据加载（secrets.env） ====================
 # 开发者设置 LLM key 的唯一位置：$AIRY_HOME/config/secrets.env
-# 模板：devtools/scripts/ops/templates/secrets.env.example
+# 模板：tools/scripts/ops/templates/secrets.env.example
 AIRY_SECRETS_FILE="${AIRY_SECRETS_FILE:-$AIRY_CONFIG_DIR/secrets.env}"
 if [ -f "$AIRY_SECRETS_FILE" ]; then
     # shellcheck disable=SC1090
@@ -209,7 +209,7 @@ if [ -f "$AIRY_SECRETS_FILE" ]; then
     log_info "Loaded LLM secrets from $AIRY_SECRETS_FILE"
 else
     log_warn "No secrets file at $AIRY_SECRETS_FILE — LLM providers will be unavailable."
-    log_warn "Setup: cp <repo>/devtools/scripts/ops/templates/secrets.env.example $AIRY_SECRETS_FILE"
+    log_warn "Setup: cp <repo>/tools/scripts/ops/templates/secrets.env.example $AIRY_SECRETS_FILE"
 fi
 
 # ==================== Agent 工具 ACL（执行任务所需） ====================

@@ -26,16 +26,16 @@ import pytest
 
 # 添加项目根目录到路径
 # 注意：agentrt 的多个子包分布在 agentrt/ 和 sdk/sdk-python/ 下
-# conftest.py 位于 airymaxhub/devtools/tests/，需上溯 3 级到达 airymaxhub/
+# conftest.py 位于 airymaxhub/tools/tests/，需上溯 3 级到达 airymaxhub/
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-DEVTOOLS_ROOT = Path(__file__).parent.parent
+TOOLS_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "sdk" / "sdk-python"))
 sys.path.insert(0, str(PROJECT_ROOT / "agentrt"))
 # 添加 manager 和 openlab 子包路径（已移至 ecosystem/）
 sys.path.insert(0, str(PROJECT_ROOT / "ecosystem" / "manager"))
 sys.path.insert(0, str(PROJECT_ROOT / "ecosystem" / "openlab"))
-# devtools/ 需在 sys.path 中以支持 from tests.utils.python.* 导入
-sys.path.insert(0, str(DEVTOOLS_ROOT))
+# tools/ 需在 sys.path 中以支持 from tests.utils.python.* 导入
+sys.path.insert(0, str(TOOLS_ROOT))
 
 
 # ============================================================
@@ -51,8 +51,8 @@ class TestConfig:
     # 测试超时时间（秒）
     DEFAULT_TIMEOUT = 30
 
-    # 测试数据目录（位于 devtools/tests/utils/fixtures/data）
-    TEST_DATA_DIR = DEVTOOLS_ROOT / "tests" / "utils" / "fixtures" / "data"
+    # 测试数据目录（位于 tools/tests/utils/fixtures/data）
+    TEST_DATA_DIR = TOOLS_ROOT / "tests" / "utils" / "fixtures" / "data"
 
     # 临时文件目录
     TEMP_DIR = Path(tempfile.gettempdir()) / "airy_tests"

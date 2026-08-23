@@ -1,17 +1,17 @@
-# Airymax DevTools — Development Tools & Configuration Center
+# Airymax Tools — Development Tools & Configuration Center
 
 > Unified development tools and configuration center for the Airymax project.
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/devtools)
+[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/tools)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 
 ---
 
 ## Overview
 
-DevTools is one of the 3 top-level repositories in the Airymax 38-repository split (alongside docs and docs-closed). It centralizes shared development tool configurations, coding standards, and build toolchains used across the entire project. All 38 repositories reference the configuration files here, ensuring consistent code style and quality standards across repos.
+Tools is one of the 4 top-level repositories in the Airymax 38-repository split (alongside docs, closed-docs and closed-dev-build; renamed from devtools in v0.1.4). It centralizes shared development tool configurations, coding standards, and build toolchains used across the entire project. All 38 repositories reference the configuration files here, ensuring consistent code style and quality standards across repos.
 
 This repository contains no executable code — only configuration files and toolchain definitions, consumed by other repositories via git submodule.
 
@@ -19,13 +19,13 @@ This repository contains no executable code — only configuration files and too
 
 ```
 airymaxhub/                     ← Umbrella repo
-├── agent-runtim/               ← user-space engineering super-repo (v0.1.3)
+├── agent-workload/             ← user-space engineering super-repo (v0.1.3, renamed from agent-runtim in v0.1.4)
 │   ├── agentrt/                ← Management repo (7 leaf repos; owns cmake/ build modules and scripts/ installer)
 │   ├── sdk/                    ← Management repo (6 leaf repos)
 │   ├── ecosystem/              ← Management repo (6 leaf repos)
 │   └── products/               ← Management repo (3 leaf repos)
 ├── agent-linux/                ← kernel-space engineering super-repo (8 leaf repos, AirymaxOS; formerly agentrt-linux, renamed v0.1.3)
-├── devtools/                   ← THIS REPO (top-level)
+├── tools/                      ← THIS REPO (top-level, renamed from devtools in v0.1.4)
 ├── docs/                       ← Top-level (open documentation)
 ├── closed-docs/                ← Top-level (internal documentation)
 └── closed-dev-build/           ← Top-level (internal build/deploy)
@@ -35,7 +35,7 @@ airymaxhub/                     ← Umbrella repo
 ## Directory Structure
 
 ```
-devtools/
+tools/
 ├── .clang-format              # C/C++ formatting rules (LLVM style, 100 col, 4-space indent)
 ├── .clang-tidy                # C/C++ static analysis rules (bugprone/performance/readability)
 ├── .clangd                    # clangd language server configuration
@@ -91,14 +91,14 @@ devtools/
 
 ### Referencing from Other Repositories
 
-Each repository references devtools configs via the `devtools/` submodule path:
+Each repository references tools configs via the `tools/` submodule path:
 
 ```bash
 # CMake referencing clang-format
-set(CLANG_FORMAT_CONFIG ${CMAKE_SOURCE_DIR}/../devtools/.clang-format)
+set(CLANG_FORMAT_CONFIG ${CMAKE_SOURCE_DIR}/../tools/.clang-format)
 
 # pre-commit installation
-cp devtools/.pre-commit-config.yaml .pre-commit-config.yaml
+cp tools/.pre-commit-config.yaml .pre-commit-config.yaml
 pre-commit install
 ```
 
@@ -122,11 +122,11 @@ git clone https://github.com/microsoft/vcpkg.git
 | Direction | Relationship |
 |-----------|-------------|
 | **Upstream** | None (top-level repo, no Airymax dependencies) |
-| **Downstream** | All 38 repos reference devtools configs via submodule |
+| **Downstream** | All 38 repos reference tools configs via submodule |
 
 ## Repository Information
 
-- **Repository URL**: `git@atomgit.com:openairymax/devtools.git`
+- **Repository URL**: `git@atomgit.com:openairymax/tools.git`
 - **Organization**: openairymax
 - **Branch Strategy**: `main` only
 - **License**: AGPL v3 + Apache 2.0 dual license

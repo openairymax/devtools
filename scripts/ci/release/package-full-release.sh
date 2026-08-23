@@ -191,8 +191,8 @@ build_full_package() {
 
     # 配置模板
     run mkdir -p "$out/config"
-    [ -f "${PROJECT_ROOT}/devtools/scripts/ops/templates/secrets.env.example" ] && \
-        run cp -f "${PROJECT_ROOT}/devtools/scripts/ops/templates/secrets.env.example" "$out/config/"
+    [ -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" ] && \
+        run cp -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" "$out/config/"
     [ -f "${PROJECT_ROOT}/ecosystem/manager/configs/agentrt.yaml" ] && \
         run cp -f "${PROJECT_ROOT}/ecosystem/manager/configs/agentrt.yaml" "$out/config/"
     [ -f "${PROJECT_ROOT}/ecosystem/manager/model/model.yaml" ] && \

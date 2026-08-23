@@ -21,7 +21,7 @@ source "${LIB_DIR}/platform.sh" 2>/dev/null || {
     exit 1
 }
 
-# setup.sh 位于 devtools/scripts/dev/setup/，需上溯 4 级到达 airymaxhub/
+# setup.sh 位于 tools/scripts/dev/setup/，需上溯 4 级到达 airymaxhub/
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
 print_header() {
