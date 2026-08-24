@@ -48,9 +48,14 @@ log_step()  { ((SILENT)) || echo -e "${CYAN}[STEP]${NC} $*"; }
 log_debug() { ((SILENT)) || echo -e "${BLUE}[DEBUG]${NC} $*"; }
 
 # ==================== 默认值 ====================
+# 路径默认值全部对齐 AIRY_HOME 路径体系（2.3.2.5）：AGENTRT_BINDIR/
+# AGENTRT_RUNTIME_DIR 以 $AIRY_HOME 子目录为准（下方 AIRY_HOME 解析后
+# 强制覆盖），此处不再保留 /tmp/agentrt、/usr/local/bin 旧路径——旧默认值
+# 虽会被覆盖，但残留会误导诊断（用户看到"默认 /tmp/agentrt"以为数据在
+# /tmp）。AGENTRT_CONFIG 兼容旧显式传参；无值时用 $AIRY_HOME/config。
 
-AGENTRT_BINDIR="${AGENTRT_BINDIR:-/usr/local/bin}"
-AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-/tmp/agentrt}"
+AGENTRT_BINDIR="${AGENTRT_BINDIR:-}"
+AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-}"
 AGENTRT_CONFIG="${AGENTRT_CONFIG:-}"
 GLOBAL_TIMEOUT_SEC=120
 HEALTH_CHECK_INTERVAL_SEC=1
@@ -191,8 +196,8 @@ export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
 export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
 
 # 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）。
-# 注意：此处强制覆盖而非 :- 回退——上方 L48/L49 已把默认值设为非空旧路径，
-# 用 :- 不会生效。AIRY_HOME 为权威路径，自定义经 -b/-r 参数或 AIRY_HOME。
+# 直接以 AIRY_* 权威子目录为准（空默认值 + 覆盖，等价于旧"强制覆盖"）。
+# AIRY_HOME 为权威路径，自定义经 -b/-r 参数或 AIRY_HOME。
 AGENTRT_BINDIR="${AIRY_BIN_DIR}"
 AGENTRT_RUNTIME_DIR="${AIRY_RUNTIME_DIR}"
 
@@ -329,8 +334,8 @@ Usage: bash agentrt-bootstrap.sh [options]
 Options:
   -H <dir>         指定安装目录 AIRY_HOME（用户自选，同 --home）
   -c <config>      指定 agentrt.yaml 配置文件
-  -b <bindir>      指定 daemon 二进制目录 (默认: /usr/local/bin)
-  -r <runtimedir>  指定运行时目录 (默认: /tmp/agentrt)
+  -b <bindir>      指定 daemon 二进制目录 (默认: $AIRY_HOME/bin)
+  -r <runtimedir>  指定运行时目录 (默认: $AIRY_HOME/run)
   -t <timeout>     全局健康检查超时秒数 (默认: 120)
   -w               启用 watchdog 自愈模式（同 --watchdog）
   --sandbox <mode> 工具 shell_run OS 沙箱模式: off|workspace|strict（默认 workspace）
