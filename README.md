@@ -13,7 +13,9 @@
 
 Tools is one of the 4 top-level repositories in the Airymax 38-repository split (alongside docs, closed-docs and closed-dev-build; renamed from devtools in v0.1.4). It centralizes shared development tool configurations, coding standards, and build toolchains used across the entire project. All 38 repositories reference the configuration files here, ensuring consistent code style and quality standards across repos.
 
-This repository contains no executable code — only configuration files and toolchain definitions, consumed by other repositories via git submodule.
+This repository contains shared tooling — CI/CD pipelines, development/ops scripts,
+Python toolkit, deployment configs and cross-repo test suites — consumed by other
+repositories via git submodule.
 
 ## Repository Position
 
@@ -43,17 +45,20 @@ tools/
 ├── .pre-commit-config.yaml    # Pre-commit hooks (formatting, lint, large files, branch naming)
 ├── pyproject.toml             # Python project config (ruff/mypy/black)
 ├── vcpkg.json                 # vcpkg C++ dependency manifest (libuv/json-c/libyaml, etc.)
-├── deploy/                    # Deployment configs (Docker/Kubernetes)
+├── deploy/                    # Deployment configs（docker / kubernetes / systemd）
 ├── scripts/                   # Development & ops scripts
-│   ├── ci/                    # CI pipeline scripts
-│   ├── dev/                   # Development tool scripts
-│   └── ops/                   # Operations scripts
+│   ├── ci/                    # CI/CD（pipeline 编排 / quality 质量 / verify 安全 / release 发布）
+│   ├── dev/                   # Development tool scripts（setup/cmake/cli/utils/docs）
+│   ├── ops/                   # Operations scripts（bin 编排 / lib 公共库 / tests / deploy / benchmark）
+│   ├── resources/             # 演示脚本与教程资源（demos / tutorial / images）
+│   └── toolkit/               # Python 运维工具包（src/ 15 模块）
 ├── tests/                     # Cross-repo test suites
-│   ├── unit/                  # Unit tests
-│   ├── integration/           # Integration tests
+│   ├── unit/                  # Unit tests（manager / cupolas / scripts）
+│   ├── integration/           # Integration tests（python / c / coreloopthree / syscall / memoryrovol / platform / commons / cupolas）
 │   ├── contract/              # Contract tests
-│   ├── security/              # Security tests
-│   └── benchmarks/            # Performance benchmarks
+│   ├── security/              # Security tests（python / c / cupolas）
+│   ├── benchmarks/            # Performance benchmarks（python / c / atoms / cupolas）
+│   └── utils/                 # Test utilities（fixtures / templates）
 ├── LICENSE                    # AGPL v3 + Apache 2.0 dual license
 └── NOTICE                     # Copyright and trademark notice
 ```

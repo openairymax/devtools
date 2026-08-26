@@ -4,7 +4,9 @@
 
 ## 概述
 
-`deploy/` 目录包含 AgentRT 的部署配置，提供容器化部署方案、多环境编排和监控集成。当前以 Docker 容器化部署为核心，支持开发、调试和生产三种环境的一键部署。
+`deploy/` 目录包含 AgentRT 的部署配置，提供容器化部署方案、systemd 服务编排、Kubernetes Helm Chart 和多环境编排与监控集成。支持开发、调试和生产多种环境的部署。
+
+> **版本**：v0.1.5
 
 ## 目录结构
 
@@ -25,6 +27,13 @@ deploy/
 │   │   └── grafana_agentrt_dashboard.json  # Grafana 仪表盘
 │   ├── secrets/                   #   Docker Swarm 密钥目录（.gitkeep）
 │   └── README.md                  #   Docker 部署详细文档
+├── kubernetes/                    # Kubernetes 部署
+│   └── helm/                      #   Helm Chart（values/values-prod + 模板）
+│       └── README.md              #   Kubernetes 部署详细文档
+├── systemd/                       # systemd 服务编排
+│   ├── agentrt.target             #   聚合目标（一键启停 12 个 daemon 服务）
+│   ├── agentrt-*.service          #   12 个 daemon 的 systemd 单元文件
+│   └── README.md                  #   systemd 部署详细文档
 └── README.md                      # 本文件
 ```
 

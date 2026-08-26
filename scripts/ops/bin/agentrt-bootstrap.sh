@@ -358,7 +358,7 @@ Options:
   -h               显示帮助
 
 Startup DAG:
-  Layer 0: monit_d, observe_d, info_d, notify_d
+  Layer 0: monit_d, observe_d, info_d, notify_d, cupolas_d
   Layer 1: sched_d, channel_d, mem_d
   Layer 2: llm_d, think_d, tool_d, hook_d, plugin_d, agent_d, a2a_d, maths_d
   Layer 3: market_d

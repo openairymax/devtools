@@ -12,17 +12,17 @@
 - **可复用演示**：技术演示脚本设计为可独立运行和可定制的展示模块，方便在不同场合复用
 - **社区友好**：包含飞书社区二维码等社区推广资源，降低社区参与门槛
 
-> **版本**: v0.1.1
+> **版本**: v0.1.5
 
 ## 与 agentrt/ 模块对应关系
 
 | resources/ 组件 | 支持的 agentrt/ 模块 | 用途 |
 |-----------------|---------------------|------|
 | `demos/phase3_technology_demo.py` | 全部模块 | 第三阶段技术演示（服务框架/基准测试/工具链/开源治理） |
-| `images/AgentRT-desktop-preview.gif` | 全部模块 | 桌面端预览动图，用于 README 和宣传材料 |
+| `images/AgentOS-desktop-preview.gif` | 全部模块 | 桌面端预览动图，用于 README 和宣传材料 |
 | `images/feishu-community-qr.png` | 全部模块 | 飞书社区二维码，用于社区推广 |
-| `tutorial/tutorial_engine.py` | `openlab/` | 交互式教程引擎，帮助新贡献者了解 OpenLab 生态系统 |
-| `tutorial/new-contributor.json` | `openlab/contrib/` | 新贡献者入门教程配置（Skills/Strategies/Agents） |
+| `tutorial/tutorial_engine.py` | 全部模块 | 交互式教程引擎（命令行/Web 双模式，渐进式学习路径） |
+| `tutorial/new-contributor.json` | 全部模块 | 新贡献者入门教程配置（欢迎→环境配置→项目结构→首个 PR，约 4 小时） |
 
 ## 目录结构
 
@@ -32,7 +32,7 @@ resources/
 ├── demos/                                 # 技术演示脚本（1 个文件）
 │   └── phase3_technology_demo.py          #   第三阶段技术演示（服务框架/基准测试/工具链/开源治理）
 ├── images/                                # 静态图片资源（2 个文件）
-│   ├── AgentRT-desktop-preview.gif        #   桌面端预览动图
+│   ├── AgentOS-desktop-preview.gif        #   桌面端预览动图
 │   └── feishu-community-qr.png            #   飞书社区二维码
 └── tutorial/                              # 交互式教程引擎（2 个文件）
     ├── tutorial_engine.py                 #   交互式教程引擎（命令行/Web 双模式，渐进式学习路径）
@@ -55,7 +55,7 @@ resources/
 
 项目宣传和社区推广使用的静态图片资源：
 
-- **AgentRT-desktop-preview.gif**：桌面端预览动图，用于项目 README、官网和宣传材料，展示 AgentRT 的桌面端交互界面
+- **AgentOS-desktop-preview.gif**：桌面端预览动图，用于项目 README、官网和宣传材料，展示 AgentRT 的桌面端交互界面
 - **feishu-community-qr.png**：飞书社区二维码，用于社区推广和用户引导，扫码即可加入 AgentRT 飞书社区
 
 ### tutorial/ — 交互式教程引擎
@@ -80,33 +80,30 @@ resources/
 ### 技术演示
 
 ```bash
-# 运行第三阶段技术演示
+# 运行第三阶段技术演示（服务框架/基准测试/工具链/开源治理四部分依次展示）
 python scripts/resources/demos/phase3_technology_demo.py
-
-# 指定演示模块
-python scripts/resources/demos/phase3_technology_demo.py --module service-framework
-python scripts/resources/demos/phase3_technology_demo.py --module benchmark
-python scripts/resources/demos/phase3_technology_demo.py --module toolkit
-python scripts/resources/demos/phase3_technology_demo.py --module governance
 ```
 
 ### 交互式教程
 
 ```bash
-# 启动交互式教程（默认命令行模式）
-python scripts/resources/tutorial/tutorial_engine.py
+# 列出所有教程
+python scripts/resources/tutorial/tutorial_engine.py list
 
-# 使用新贡献者教程
-python scripts/resources/tutorial/tutorial_engine.py --tutorial new-contributor
+# 开始新贡献者教程（指定用户 ID 可选）
+python scripts/resources/tutorial/tutorial_engine.py start --tutorial new-contributor
+python scripts/resources/tutorial/tutorial_engine.py start --tutorial new-contributor --user alice
 
-# 启动 Web 模式
-python scripts/resources/tutorial/tutorial_engine.py --mode web
+# 前进 / 后退 / 查看当前状态
+python scripts/resources/tutorial/tutorial_engine.py next
+python scripts/resources/tutorial/tutorial_engine.py prev
+python scripts/resources/tutorial/tutorial_engine.py status
 
-# 恢复上次进度
-python scripts/resources/tutorial/tutorial_engine.py --resume
+# 验证当前步骤（练习类步骤提交输入）
+python scripts/resources/tutorial/tutorial_engine.py validate --input "done"
 
-# 查看可用教程列表
-python scripts/resources/tutorial/tutorial_engine.py --list
+# 启动 Web 交互模式（默认端口 8080）
+python scripts/resources/tutorial/tutorial_engine.py serve --port 8080
 ```
 
 ### 图片资源引用
@@ -114,7 +111,7 @@ python scripts/resources/tutorial/tutorial_engine.py --list
 在 Markdown 文档中引用图片资源：
 
 ```markdown
-![AgentRT Desktop Preview](scripts/resources/images/AgentRT-desktop-preview.gif)
+![AgentOS Desktop Preview](scripts/resources/images/AgentOS-desktop-preview.gif)
 ![Feishu Community](scripts/resources/images/feishu-community-qr.png)
 ```
 
@@ -122,8 +119,8 @@ python scripts/resources/tutorial/tutorial_engine.py --list
 
 | 组件 | 核心依赖 | 说明 |
 |------|---------|------|
-| `demos/phase3_technology_demo.py` | Python 3.8+ | 技术演示脚本为纯 Python 实现 |
-| `tutorial/tutorial_engine.py` | Python 3.8+ | 教程引擎为纯 Python 实现，Web 模式需要 Flask |
+| `demos/phase3_technology_demo.py` | Python 3.8+ | 演示依赖同仓库 `benchmark/`、`tutorial/`、`code_quality/` 模块 |
+| `tutorial/tutorial_engine.py` | Python 3.8+ | 教程引擎为纯 Python 标准库实现（argparse/http.server），Web 模式无需 Flask |
 | `tutorial/new-contributor.json` | 无 | JSON 配置文件，无运行时依赖 |
 | `images/` | 无 | 静态图片资源，无运行时依赖 |
 

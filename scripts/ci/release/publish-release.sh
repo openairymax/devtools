@@ -50,9 +50,12 @@ run() {
 [ -n "$VERSION" ] || { echo "用法: $0 <版本号> [DIST_DIR]"; exit 1; }
 
 # ─── 通道判定 ──────────────────────────────────────────────────────────────
+# 语义：stable（生产）/ beta（预发布）/ rc（候选发布）。rc 独立通道
+# （manifest.rc.json），避免与 beta 混淆（问题 10：rc 通道曾塌缩为 beta）。
 case "$VERSION" in
-    *-beta.*|*-rc.*) CHANNEL="beta"; PRERELEASE="true" ;;
-    *) CHANNEL="stable"; PRERELEASE="false" ;;
+    *-rc.*)     CHANNEL="rc";     PRERELEASE="true" ;;
+    *-beta.*)   CHANNEL="beta";   PRERELEASE="true" ;;
+    *)          CHANNEL="stable"; PRERELEASE="false" ;;
 esac
 log_info "AgentRT 发布 ${VERSION}（通道: ${CHANNEL}）"
 log_info "制品目录: ${DIST_DIR}  目标: ${ATOMGIT_REPO}"
@@ -86,8 +89,11 @@ else
             continue
         fi
         log_info "cosign 签名: $(basename "$f")…"
+        # --tlog-upload=false：静态密钥签名无需透明日志（避免交互确认与
+        # 公网 tlog 依赖，企业/离线场景更友好）；--yes 跳过 cosign 确认提示。
         run env COSIGN_PASSWORD="${COSIGN_PASSWORD:-}" cosign sign-blob \
-            --key "$COSIGN_KEY_FILE" --output-signature "${f}.sig" "$f" >/dev/null
+            --key "$COSIGN_KEY_FILE" --tlog-upload=false --yes \
+            --output-signature "${f}.sig" "$f" >/dev/null
         [ "$DRY_RUN" = "1" ] || [ -s "${f}.sig" ] || { log_fail "签名失败: $f"; exit 1; }
         log_ok "cosign 签名: $(basename "$f").sig"
     done
@@ -158,9 +164,19 @@ else
         printf '%s' "${GPG_PRIVATE_KEY}" | base64 -d 2>/dev/null | gpg --batch --import 2>/dev/null || \
             printf '%s\n' "${GPG_PRIVATE_KEY}" | gpg --batch --import 2>/dev/null
     fi
-    # 校验公钥指纹与仓库内置一致（防私钥张冠李戴）
-    BUILTIN_FPR="$(cat "$KEYS_DIR/agentrt.fingerprint" 2>/dev/null || true)"
-    [ -z "$BUILTIN_FPR" ] || { log_info "公钥指纹基线: ${BUILTIN_FPR}"; }
+    # 校验公钥指纹与仓库内置一致（防私钥张冠李戴）：取导入私钥的真实指纹
+    # 与 keys/agentrt.fingerprint 硬比对，不符立即失败，杜绝签出客户端
+    # 无法验证的 manifest。
+    BUILTIN_FPR="$(cat "$KEYS_DIR/agentrt.fingerprint" 2>/dev/null | tr -d '[:space:]' || true)"
+    if [ -n "$BUILTIN_FPR" ]; then
+        IMPORTED_FPR="$(gpg --batch --list-keys --with-colons 2>/dev/null | \
+            awk -F: '$1=="fpr" {print $10}' | head -1)"
+        if [ -n "$IMPORTED_FPR" ] && [ "$(echo "$IMPORTED_FPR" | tr -d '[:space:]')" != "$BUILTIN_FPR" ]; then
+            log_fail "GPG 指纹不匹配：导入私钥 ${IMPORTED_FPR} != 内置基线 ${BUILTIN_FPR}"
+            exit 1
+        fi
+        log_info "公钥指纹基线: ${BUILTIN_FPR}（与导入私钥一致）"
+    fi
     if [ -f "$MANIFEST.asc" ]; then
         log_warn "已存在签名，跳过: $(basename "$MANIFEST").asc"
     else
@@ -179,27 +195,32 @@ if [ "$SKIP_UPLOAD" = "1" ] || [ -z "${ATOMGIT_TOKEN:-}" ]; then
     exit 0
 fi
 
-API="https://atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
+API="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
 RELEASE_BODY="${NOTES:-AgentRT ${VERSION}}"
 log_info "创建/更新 Release ${VERSION}…"
-# Gitee/atomgit 兼容 API：tag 已存在则复用 release_id
-RELEASE_ID="$(curl -fsSL --connect-timeout 20 -H "Content-Type: application/json" \
-    -d "{\"access_token\":\"${ATOMGIT_TOKEN}\",\"tag_name\":\"${VERSION}\",\"name\":\"AgentRT ${VERSION}\",\"body\":${RELEASE_BODY@Q},\"prerelease\":${PRERELEASE}}" \
-    "${API}" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)"
+# atomgit API v5（Gitee 兼容，Base api.atomgit.com）：PRIVATE-TOKEN 认证。
+# 附件上传以 tag 定位（POST /releases/{tag}/attach_files），无需 release id。
+# 先探测是否已存在同名 tag release（幂等），不存在则创建。
+RELEASE_ID="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+    "${API}/tags/${VERSION}" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)"
 if [ -z "$RELEASE_ID" ]; then
-    # 已存在 tag → 查询已有 release
-    RELEASE_ID="$(curl -fsSL --connect-timeout 20 "${API}/${VERSION}?access_token=${ATOMGIT_TOKEN}" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)"
+    curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data-binary "$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'name':'AgentRT '+sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$VERSION" "$RELEASE_BODY" "$PRERELEASE")" \
+        "${API}" >/dev/null 2>&1 || { log_fail "Release 创建失败（检查 ATOMGIT_TOKEN 与 ${ATOMGIT_REPO} 权限）"; exit 1; }
 fi
-[ -n "$RELEASE_ID" ] || { log_fail "Release 创建失败（检查 ATOMGIT_TOKEN 与 ${ATOMGIT_REPO} 权限）"; exit 1; }
-log_ok "Release ID: ${RELEASE_ID}"
+log_ok "Release 就绪: ${VERSION}（${ATOMGIT_REPO}）"
 
 UPLOADED=""
-for f in "${ARTIFACTS[@]}" "$MANIFEST" "$MANIFEST.asc"; do
+# 上传制品 + cosign 签名（*.sig）+ manifest + manifest GPG 签名。
+# cosign 签名必须随制品发布，客户端方可校验供应链完整性（防断链）。
+for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc"; do
     [ -e "$f" ] || continue
     log_info "上传: $(basename "$f")…"
-    run curl -fsSL --connect-timeout 60 -X POST \
-        -F "access_token=${ATOMGIT_TOKEN}" -F "file=@${f}" \
-        "${API}/${RELEASE_ID}/attach_files" >/dev/null && UPLOADED="$UPLOADED $(basename "$f")"
+    run curl -fsSL --connect-timeout 60 --max-time 900 -X POST \
+        -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        -F "file=@${f}" \
+        "${API}/${VERSION}/attach_files" >/dev/null && UPLOADED="$UPLOADED $(basename "$f")"
     log_ok "已上传: $(basename "$f")"
 done
 
@@ -209,9 +230,11 @@ if [ "${SKIP_LATEST:-0}" != "1" ]; then
     LATEST_DIR="$TMP/agentrt-latest"
     run git clone --depth 1 "https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/${ATOMGIT_REPO}.git" "$LATEST_DIR"
     if [ "$DRY_RUN" != "1" ]; then
-        mkdir -p "$LATEST_DIR/latest"
+        mkdir -p "$LATEST_DIR/latest/keys"
         cp -f "$MANIFEST" "$MANIFEST.asc" "$LATEST_DIR/latest/" 2>/dev/null || true
-        cp -f "$KEYS_DIR/agentrt.asc" "$KEYS_DIR/cosign.pub" "$LATEST_DIR/latest/" 2>/dev/null || true
+        # 公钥随 latest/ 发布（latest/keys/），客户端安装器/自更新器在线拉取，
+        # 支持密钥轮换同步（问题 13）。与 install.sh / airymaxrt 拉取路径一致。
+        cp -f "$KEYS_DIR/agentrt.asc" "$KEYS_DIR/cosign.pub" "$LATEST_DIR/latest/keys/" 2>/dev/null || true
         git -C "$LATEST_DIR" add -A latest/
         git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
             commit -m "release: update manifest.${CHANNEL}.json for ${VERSION}" >/dev/null 2>&1 || \

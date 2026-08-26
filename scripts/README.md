@@ -13,7 +13,7 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 - **模块化编排**：每个子模块职责单一、接口清晰，可独立运行也可组合编排
 - **安全优先**：集成安全扫描、编码修复、桩函数检测等多层安全保障
 
-> **版本**: v0.1.1
+> **版本**: v0.1.5
 >
 > **规范**：所有构建脚本遵循 BAN-33 规则（禁止源内构建），构建产物必须输出到独立构建目录中。
 
@@ -21,14 +21,14 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 
 | scripts/ 模块 | 对应的 agentrt/ 模块 | 用途 |
 |---------------|---------------------|------|
-| `ci/pipeline/` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 全模块 CI/CD 流水线（构建→测试→质量→部署） |
-| `ci/quality/` | `toolkit/` | 多语言 SDK 质量分析（C/C++/Python/Go/Rust/TypeScript） |
-| `ci/verify/` | `toolkit/python/`, `toolkit/go/`, `toolkit/rust/`, `toolkit/typescript/` | SDK 构建验证、MemoryRovol 构建模式、安全扫描 |
-| `ci/release/` | 全部模块 | 版本发布与构建产物清理 |
-| `dev/build/` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 跨平台自动化构建（BAN-33 源外构建） |
+| `ci/pipeline/` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 流水线编排（`pipeline/{build,test,deploy}/` 构建→测试→部署） |
+| `ci/quality/` | 全部模块 | 质量门禁与分析（`quality/{src,gates}/`，六语言统一分析） |
+| `ci/verify/` | `toolkit/` | 构建验证与安全扫描（SDK 验证/构建模式/`security/` 安全扫描） |
+| `ci/release/` | 全部模块 | 发布管理（质量门禁→打 tag→打包→双轨签名→上传） |
 | `dev/setup/` | 全部模块 | 交互式开发环境配置（依赖安装、工具链设置） |
-| `dev/cli/` | `daemons/`, `manager/`, `openlab/` | 统一 CLI 入口（服务管理/智能体管理/任务管理） |
-| `dev/cmake/` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助配置（Windows MSVC 兼容性头） |
+| `dev/cli/` | `daemons/`, `manager/`, `openlab/` | 统一 CLI 入口（service/agent/task/protocol/config 等子命令） |
+| `dev/cmake/` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助（Sanitizers/打包配置/构建打印/预包含头/ctest 包装） |
+| `dev/docs/` | 全部模块 | Doxygen 文档生成配置 |
 | `dev/utils/` | 全部模块 | 快速启动/环境验证/BAN 规则批量修复/代码修复工具集 |
 | `ops/bin/` | `daemons/`, `gateway/` | 运维入口脚本（daemon 一键启动/示例项目快速创建） |
 | `ops/deploy/` | `daemons/`, `gateway/` | Docker 容器化部署（gateway_d, llm_d, sched_d, heapstore, monit_d 等） |
@@ -39,24 +39,26 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 | `resources/demos/` | 全部模块 | 技术演示（服务框架/基准测试/工具链/开源治理） |
 | `resources/tutorial/` | `openlab/` | 交互式教程引擎与新贡献者引导 |
 
+> **注**：`dev/` 下无 `build/` 目录（该目录此前存放的构建与安装脚本已移除），
+> 构建统一由 `ci/pipeline/build/` 承担，安装器位置见下文「安装器位置」。
+
 ## 目录结构
 
 ```
 scripts/
 ├── .editorconfig                  # 编辑器配置统一规范
 ├── README.md                      # 本文档
-├── ci/                            # CI/CD 流水线与质量工具
-│   ├── pipeline/                  #   流水线编排（构建/测试/质量门禁/部署/安全检查）
-│   ├── quality/                   #   代码质量分析（统一分析器/编码修复/一致性验证/YAML 检查）
-│   ├── verify/                    #   构建验证与安全扫描（SDK 验证/构建模式测试/SEC-017）
-│   └── release/                   #   发布管理（一键发布/构建清理）
-├── dev/                           # 开发环境工具
-│   ├── build/                     #   跨平台构建（BAN-33 源外构建，Linux/macOS/Windows）
+├── ci/                            # CI/CD 流水线与质量工具（四域：pipeline/quality/verify/release）
+│   ├── pipeline/                  #   流水线编排（build/ 构建、test/ 测试、deploy/ 部署）
+│   ├── quality/                   #   质量门禁与分析（src/ 分析器、gates/ 门禁）
+│   ├── verify/                    #   构建验证与安全扫描（security/ 安全扫描）
+│   └── release/                   #   发布管理（一键发布/打包/签名/构建清理）
+├── dev/                           # 开发环境工具（无 build/，构建统一走 ci/pipeline/build）
 │   ├── setup/                     #   环境配置（交互式安装，Linux/macOS/Windows）
-│   ├── cli/                       #   CLI 入口（agentrt 统一命令行工具）
-│   ├── cmake/                     #   CMake 辅助（Windows MSVC 兼容性预包含头 + Sanitizers 配置）
+│   ├── cli/                       #   CLI 入口（agentrt 统一命令行工具，Python 实现）
+│   ├── cmake/                     #   CMake 辅助（Sanitizers/打包配置/构建打印/预包含头/ctest 包装）
 │   ├── docs/                      #   文档生成（Doxygen 配置）
-│   └── utils/                     #   开发辅助（快速启动/环境验证/错误码生成/代码修复工具集）
+│   └── utils/                     #   开发辅助（快速启动/环境验证/批量修复/代码修复工具集）
 ├── ops/                           # 运维部署与测试
 │   ├── bin/                       #   运维入口脚本（daemon 启动/示例项目快速创建）
 │   ├── deploy/                    #   Docker 部署（双 Dockerfile + 四环境 Compose 编排）
@@ -76,24 +78,22 @@ scripts/
 
 ### ci/ — CI/CD 流水线与质量工具
 
-持续集成与交付的核心模块，包含四个子模块：
+持续集成与交付的核心模块，v0.1.5 重组为四个职责单一的域：
 
-- **pipeline/**：完整的 CI/CD 流水线编排，从依赖安装、模块编译、测试执行、质量门禁到产物部署的全链路自动化。集成 C 语言安全编码静态检查（`security_check.py`）和安全回归测试（`security_regression.sh`），支持 Linux 和 macOS 双平台依赖管理。
-- **quality/**：代码质量分析工具集，核心为 `unified_quality_analyzer.py` 统一质量分析器，支持多语言 SDK 质量检测。`fix_encoding.py` 合并了原有的三个编码修复脚本，提供 `check`、`fix-bom`、`fix-double` 三个子命令。
-- **verify/**：构建验证与安全扫描，覆盖 SDK 构建验证（Linux/macOS/Windows）、MemoryRovol 构建模式测试、SEC-017 桩函数检测、禁止函数检测和动态 memcpy 检查。
-- **release/**：发布管理，支持一键版本发布和历史构建产物清理。
+- **pipeline/**：流水线编排，内含 `build/`（依赖安装、多模块并行/增量构建）、`test/`（CTest/pytest 双引擎测试、连接线集成测试）、`deploy/`（产物归档部署、数据库迁移）三个子目录，`ci-run.sh` 为 CI 主入口。
+- **quality/**：质量门禁与分析，`src/` 为分析器（`unified_quality_analyzer.py` 六语言统一分析、`fix_encoding.py` 编码修复、YAML 检查等），`gates/` 为质量门禁（编译/BAN/安全/合约/跨仓/复杂度）。
+- **verify/**：构建验证与安全扫描，覆盖 SDK 三平台构建验证（Linux/macOS/Windows）、MemoryRovol 构建模式测试，以及 `security/` 下的 10 项综合安全扫描、SEC-017 桩函数检测、禁止函数检测和动态 memcpy 检查。
+- **release/**：发布管理，支持质量门禁 → 打 tag → 完全体打包 → 双轨签名（cosign + GPG）→ 上传发布。
 
 ### dev/ — 开发环境与构建工具
 
-开发者的日常工具集，覆盖环境搭建到项目构建的全流程：
+开发者的日常工具集，覆盖环境搭建、CLI 与构建辅助（`dev/` 下不设独立构建目录，构建统一由 `ci/pipeline/build/` 承担）：
 
-- **build/**：跨平台构建系统，`build.sh` 实现 BAN-33 源外构建规范，`install.sh`/`install.ps1` 分别支持 Unix 和 Windows 平台的自动化安装。
-- **setup/**：交互式开发环境配置，自动检测系统环境并安装所需依赖和工具链。
-- **cli/agentrt**：统一 CLI 命令行入口，提供服务管理、智能体管理、任务管理等子命令。
-- **cmake/windows_preinclude.h**：Windows MSVC 兼容性预包含头，定义 `WIN32_LEAN_AND_MEAN` 等宏以减少 Windows.h 的编译开销。
-- **cmake/Sanitizers.cmake**：CMake Sanitizers 配置模块，支持 AddressSanitizer、MemorySanitizer、UndefinedBehaviorSanitizer 等编译器插桩工具。
+- **setup/**：交互式开发环境配置，`setup.sh`（Linux/macOS，支持 `--deps`/`--build`/`--test`/`--all` 参数）与 `setup.ps1`（Windows，支持 `-BuildType`/`-Generator`/`-SkipDeps`/`-Clean`/`-Test` 参数）。
+- **cli/agentrt**：统一 CLI 命令行入口（Python 实现），提供服务（service）、智能体（agent）、任务（task）、协议（protocol）、配置（config）、监控（monitor）、开发（dev）、数据库迁移（db）等子命令。
+- **cmake/**：CMake 辅助配置，包含 `Sanitizers.cmake`（ASan/LSan/UBSan/TSan/栈保护/FORTIFY）、`AgentRTConfig.cmake.in`（find_package 打包配置）、`agentrt_print.cmake`（统一构建打印系统）、`windows_preinclude.h`（MSVC 兼容性预包含头）和 `ctest_wrapper.sh.in`（sanitizer 环境下的 ctest 包装模板）。
 - **docs/Doxyfile**：Doxygen 文档生成配置文件，用于从源码注释自动生成 API 参考文档。
-- **utils/**：开发辅助工具，包含快速启动脚本、环境完整性验证、BAN 规则批量修复入口（`run_all_fixes.sh`）、`fixes/` 代码修复工具集和 `archive/` 一次性脚本归档。
+- **utils/**：开发辅助工具，包含快速启动脚本（`quickstart.sh`）、环境完整性验证（`validate.sh`）、BAN 规则批量修复入口（`run_all_fixes.sh`，编排 `fixes/` 下 10 个自动修复脚本）、`fixes/` 代码修复工具集和 `archive/` 一次性脚本归档。
 
 ### ops/ — 运维部署与测试
 
@@ -141,18 +141,31 @@ scripts/dev/setup/setup.sh
 
 ### 项目构建
 
+> **构建入口**：`dev/` 下不设独立构建目录，构建统一由 CI 流水线脚本承担。
+
 ```bash
-# BAN-33 源外构建（Release 模式）
-scripts/dev/build/build.sh --release
+# 模块编译（Release 模式，BAN-33 源外构建）
+scripts/ci/pipeline/build/build-module.sh --module all --type Release
 
-# BAN-33 源外构建（Debug 模式）
-scripts/dev/build/build.sh --debug
+# 依赖安装（Linux/macOS）
+scripts/ci/pipeline/build/install-deps.sh
 
-# 自动化安装（Linux/macOS）
-scripts/dev/build/install.sh
+# 测试执行（CTest/pytest 双引擎）
+scripts/ci/pipeline/test/run-tests.sh --module all
+```
 
-# 自动化安装（Windows）
-.\scripts\dev\build\install.ps1
+### 安装器位置
+
+> **迁移说明**：安装器 `install.sh` / `install.ps1` 已迁移至
+> `agent-workload/agentrt/scripts/`，本仓 `tools/scripts/install/` 目录已移除，
+> `dev/` 下亦无 build/install 脚本。
+
+```bash
+# Linux/macOS 安装
+agent-workload/agentrt/scripts/install.sh
+
+# Windows 安装（PowerShell）
+.\agent-workload\agentrt\scripts\install.ps1
 ```
 
 ### CLI 工具
@@ -162,8 +175,8 @@ scripts/dev/build/install.sh
 scripts/dev/cli/agentrt --help
 
 # 服务管理
-scripts/dev/cli/agentrt service start
-scripts/dev/cli/agentrt service status
+scripts/dev/cli/agentrt service list
+scripts/dev/cli/agentrt service health
 
 # 智能体管理
 scripts/dev/cli/agentrt agent list
@@ -181,8 +194,8 @@ scripts/ci/quality/check-quality.sh
 # 安全扫描
 scripts/ci/verify/sec017_scan.sh all
 
-# 版本发布
-scripts/ci/release/release.sh 0.1.1 stable
+# 版本发布（质量门禁 → 打 tag → 打包 → 签名 → 上传）
+scripts/ci/release/release.sh 0.1.5 stable
 ```
 
 ### Docker 部署
@@ -242,9 +255,12 @@ mm.stats()
 |--------|---------|------|
 | `ci/pipeline/` | Bash, CMake, pytest | 流水线运行需要 CMake 构建系统和 pytest 测试框架 |
 | `ci/quality/` | Python 3.8+, PyYAML, Jinja2 | 质量分析工具依赖 Python 生态，详见 `requirements.txt` |
-| `ci/verify/` | Bash, PowerShell | SDK 验证脚本同时支持 Unix Shell 和 Windows PowerShell |
-| `dev/build/` | Bash, CMake, MSVC/Clang/GCC | 构建系统依赖 CMake 和对应平台的 C/C++ 编译器 |
+| `ci/verify/` | Bash, PowerShell, Python 3.8+ | SDK 验证同时支持 Unix Shell 和 Windows PowerShell；安全扫描按检查项可选依赖 grype/trivy/flawfinder/cppcheck |
+| `ci/release/` | Bash, git, gpg, cosign | 发布依赖双轨签名工具（cosign + GPG）与 curl |
 | `dev/setup/` | Bash, PowerShell | 环境配置脚本自动检测并安装所需依赖 |
+| `dev/cli/` | Python 3.8+ | CLI 为纯 Python 实现，通过 HTTP 调用 gateway（默认 `http://localhost:18789`） |
+| `dev/cmake/` | CMake 3.20+, GCC/Clang | Sanitizers 需要 GCC 或 Clang 编译器支持（MSVC 下自动禁用） |
+| `dev/utils/` | Bash, Python 3.8+ | 修复工具为纯 Python 实现，由 `run_all_fixes.sh` 编排 |
 | `ops/deploy/` | Docker, Docker Compose | 容器化部署需要 Docker Engine 和 Docker Compose |
 | `ops/benchmark/` | Python 3.8+, numpy, scipy | 统计计算依赖 numpy/scipy 科学计算库 |
 | `ops/tests/` | Python 3.8+, pytest, bats-core | Python 测试使用 pytest，Shell 测试使用 bats-core |

@@ -271,7 +271,7 @@ def check_license(result: CheckResult) -> CheckResult:
 
     if tool_available("license_finder"):
         proc = run_cmd(["license_finder", "report", "--format=json"], timeout=120,
-                       cwd=PROJECT_ROOT / "agentrt")
+                       cwd=PROJECT_ROOT / "agent-workload" / "agentrt")
         if proc.returncode == 0:
             try:
                 data = json.loads(proc.stdout)

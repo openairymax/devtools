@@ -1,8 +1,8 @@
 # Kubernetes — AgentRT Kubernetes 部署
 
 **模块路径**: `deploy/kubernetes/`
-**Chart 版本**: v0.1.1
-**应用版本**: 0.1.1
+**Chart 版本**: v0.1.5
+**应用版本**: 0.1.5
 
 ## 概述
 
@@ -64,7 +64,7 @@ helm install agentrt ./helm --namespace agentrt --create-namespace
 # 镜像配置
 image:
   repository: spharx/agentrt
-  tag: "0.1.1"
+  tag: "0.1.5"
   pullPolicy: IfNotPresent
 
 # 资源限制
@@ -119,7 +119,7 @@ helm uninstall agentrt
 ```bash
 helm install agentrt ./helm \
   -f ./helm/values-prod.yaml \
-  --set image.tag=0.1.1 \
+  --set image.tag=0.1.5 \
   --set ingress.host=agentrt.production.com
 ```
 

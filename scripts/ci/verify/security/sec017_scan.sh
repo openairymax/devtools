@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../../../../.." && pwd)"
 TOTAL_VIOLATIONS=0
 
 RED='\033[0;31m'
@@ -118,21 +118,21 @@ echo ""
 
 case "$SCAN_TARGET" in
     daemon)
-        scan_directory "$PROJECT_ROOT/agentrt/daemons" "Daemon Module"
+        scan_directory "$PROJECT_ROOT/agent-workload/agentrt/daemons" "Daemon Module"
         TOTAL_VIOLATIONS=$?
         ;;
     gateway)
-        scan_directory "$PROJECT_ROOT/agentrt/gateway" "Gateway Module"
+        scan_directory "$PROJECT_ROOT/agent-workload/agentrt/gateway" "Gateway Module"
         TOTAL_VIOLATIONS=$?
         ;;
     cupolas)
-        scan_directory "$PROJECT_ROOT/agentrt/cupolas" "Cupolas Module"
+        scan_directory "$PROJECT_ROOT/agent-workload/agentrt/cupolas" "Cupolas Module"
         TOTAL_VIOLATIONS=$?
         ;;
     all)
-        V1=0; scan_directory "$PROJECT_ROOT/agentrt/daemons" "Daemon Module" || V1=$?
-        V2=0; scan_directory "$PROJECT_ROOT/agentrt/gateway" "Gateway Module" || V2=$?
-        V3=0; scan_directory "$PROJECT_ROOT/agentrt/cupolas" "Cupolas Module" || V3=$?
+        V1=0; scan_directory "$PROJECT_ROOT/agent-workload/agentrt/daemons" "Daemon Module" || V1=$?
+        V2=0; scan_directory "$PROJECT_ROOT/agent-workload/agentrt/gateway" "Gateway Module" || V2=$?
+        V3=0; scan_directory "$PROJECT_ROOT/agent-workload/agentrt/cupolas" "Cupolas Module" || V3=$?
         TOTAL_VIOLATIONS=$((V1 + V2 + V3))
         ;;
     *)

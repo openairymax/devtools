@@ -282,7 +282,7 @@ phase_quality() {
 
     timer_start
 
-    local quality_script="${CI_DIR}/validate/quality-gate.sh"
+    local quality_script="${CI_DIR}/../quality/gates/quality-gate.sh"
     if [[ -f "$quality_script" ]]; then
         chmod +x "$quality_script"
         if ! bash "$quality_script"; then

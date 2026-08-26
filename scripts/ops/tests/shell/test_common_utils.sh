@@ -7,10 +7,10 @@ AGENTRT_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./test_framework.sh
 source "$AGENTRT_TEST_DIR/test_framework.sh"
 
-# 加载被测模块
-AGENTRT_SCRIPTS_DIR="$(dirname "$AGENTRT_TEST_DIR")"
-# shellcheck source=../library/common.sh
-source "$AGENTRT_SCRIPTS_DIR/library/common.sh"
+# 加载被测模块（公共库实际位于 ops/lib/）
+AGENTRT_SCRIPTS_DIR="$(dirname "$(dirname "$AGENTRT_TEST_DIR")")"
+# shellcheck source=../lib/common.sh
+source "$AGENTRT_SCRIPTS_DIR/lib/common.sh"
 
 ###############################################################################
 # 测试：字符串工具

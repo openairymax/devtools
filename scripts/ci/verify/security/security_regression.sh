@@ -4,7 +4,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+# 伞仓 airymaxhub 根：verify/security 上跳 5 级
+AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+AGENTRT_SRC="$AGENTRT_ROOT/agent-workload/agentrt"
 BUILD_DIR="${AGENTRT_BUILD_DIR:-$(mktemp -d /tmp/airy_build_XXXXXX)}"
 
 COLOR_RED='\033[0;31m'
@@ -123,12 +125,12 @@ if [ "$MEMORYROV_PATH_CHECK" -ge 1 ]; then pass "storage.c: Memory path validati
 
 section "6. Python SDK Syntax Validation"
 PYTHON_FILES=(
-    "$AGENTRT_ROOT/sdk/python/agentrt/exceptions.py"
-    "$AGENTRT_ROOT/sdk/python/agentrt/agent.py"
-    "$AGENTRT_ROOT/sdk/python/agentrt/task.py"
-    "$AGENTRT_ROOT/sdk/python/agentrt/protocol.py"
-    "$AGENTRT_ROOT/sdk/python/agentrt/client/client.py"
-    "$AGENTRT_ROOT/sdk/python/agentrt/session.py"
+    "$AGENTRT_ROOT/agent-workload/sdk/python/agentrt/exceptions.py"
+    "$AGENTRT_ROOT/agent-workload/sdk/python/agentrt/agent.py"
+    "$AGENTRT_ROOT/agent-workload/sdk/python/agentrt/task.py"
+    "$AGENTRT_ROOT/agent-workload/sdk/python/agentrt/protocol.py"
+    "$AGENTRT_ROOT/agent-workload/sdk/python/agentrt/client/client.py"
+    "$AGENTRT_ROOT/agent-workload/sdk/python/agentrt/session.py"
 )
 PYTHON_FAIL=0
 PYTHON_FOUND=0

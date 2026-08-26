@@ -13,7 +13,7 @@
 - **统计驱动**：基准测试框架集成统计计算引擎，支持分布拟合、显著性检验和回归分析
 - **统一基础库**：Shell 公共库提供日志、错误码、平台检测等基础能力，所有运维脚本共享同一套基础设施
 
-> **版本**: v0.1.1
+> **版本**: v0.1.5
 
 ## 与 agentrt/ 模块对应关系
 
@@ -21,8 +21,10 @@
 
 | scripts/ops/ 模块 | 对应的 agentrt/ 模块 | 用途 |
 |-------------------|---------------------|------|
-| `bin/agentrt-bootstrap.sh` | `daemons/`, `gateway/` | 按 DAG 层级顺序一键启动所有 daemon |
+| `bin/agentrt-bootstrap.sh` | `daemons/`, `gateway/` | 按 DAG 层级顺序一键启动所有 daemon（5 层 18 个，与 install.sh EXPECTED_DAEMONS 一致） |
 | `bin/quickstart.sh` | 全部模块 | 5 分钟快速创建示例 Agent 项目 |
+| `bin/agentrt-multiagent.py` | `daemons/sched_d`, `daemons/agent_d` | 多 Agent 协作闭环验证（sched 选后派发 → 产品经理/后端接力） |
+| `bin/agentrt-e2e.py` | `daemons/agent_d` | 端到端调用验证（agent.spawn → agent.invoke → 真实 LLM） |
 | `benchmark/benchmark_core.py` | `atoms/` | 测试框架核心（测试定义/执行/监控/结果收集） |
 | `benchmark/statistics_engine.py` | `atoms/corekern/`, `atoms/coreloopthree/` | 统计计算引擎（分布拟合/显著性检验/回归分析） |
 | `benchmark/report_generator.py` | 全部模块 | 报告生成器（HTML/Markdown/PDF/JSON/Console） |
@@ -45,10 +47,12 @@
 ```
 ops/
 ├── README.md                              # 本文档
-├── bin/                                   # 运维入口脚本（2 个文件）
-│   ├── agentrt-bootstrap.sh               #   AgentRT 一键按序启动所有 daemon
-│   └── quickstart.sh                      #   5 分钟快速创建示例 Agent 项目
-├── deploy/                                # Docker 部署已迁移至 deploy/docker/（仅保留指向 README）
+├── bin/                                   # 运维入口脚本（4 个文件）
+│   ├── agentrt-bootstrap.sh               #   AgentRT 一键按序启动所有 daemon（5 层 DAG，18 个 daemon，支持 watchdog 自愈）
+│   ├── quickstart.sh                      #   5 分钟快速创建示例 Agent 项目
+│   ├── agentrt-multiagent.py              #   多 Agent 协作闭环验证（sched 选后派发 → 双角色接力）
+│   └── agentrt-e2e.py                     #   端到端调用验证（agent.spawn → agent.invoke → 真实 LLM）
+├── deploy/                                # Docker 部署已迁移至 deploy/docker/（保留弃用说明 README 与 systemd/airymaxrt.service 服务单元）
 ├── benchmark/                             # 性能基准测试框架（6 个文件）
 │   ├── README.md                          #   基准测试框架说明文档
 │   ├── benchmark_core.py                  #   测试框架核心（测试定义/执行/监控/结果收集）
@@ -86,8 +90,10 @@ Docker 容器化部署方案已迁移至 `deploy/docker/`，采用单 Dockerfile
 
 运维操作的入口脚本集合：
 
-- **agentrt-bootstrap.sh**：AgentRT 一键启动脚本，按 DAG 层级顺序启动所有 daemon（5 层启动 DAG：基础设施→核心服务→Agent 服务→业务服务→网关），等待每层健康检查通过后再启动下一层。支持 `-c`（配置文件）、`-b`（二进制目录）、`-r`（运行时目录）、`-t`（超时）、`-s`（静默）、`-n`（dry-run）等选项。安装时由 `agentrt/scripts/install.sh` 部署到 `$AIRY_HOME/bin/`。
+- **agentrt-bootstrap.sh**：AgentRT 一键启动脚本，按 DAG 层级顺序启动所有 daemon（5 层启动 DAG：基础设施 5 个 → 核心服务 3 个 → Agent 服务 8 个 → 业务服务 1 个 → 网关 1 个，共 18 个，与 `install.sh` 的 `EXPECTED_DAEMONS` 清单一致），等待每层健康检查通过后再启动下一层。支持 `-H/--home`（安装目录）、`-c`（配置文件）、`-b`（二进制目录）、`-r`（运行时目录）、`-t`（超时）、`--watchdog`（自愈巡检，60s 窗口内单 daemon 最多重启 3 次）、`--sandbox`（工具 OS 沙箱 off/workspace/strict）、`-s`（静默）、`-n`（dry-run）等选项。安装时由 `agentrt/scripts/install.sh` 部署到 `$AIRY_HOME/bin/`。
 - **quickstart.sh**：5 分钟快速创建示例 Agent 项目脚本，从 `examples/` 复制指定示例项目到目标目录，生成默认 `config.yaml` 和 `agents/main.agent.yaml`，引导新用户快速上手。
+- **agentrt-multiagent.py**：多 Agent 协作闭环验证脚本，通过 sched_d 的 Unix socket（`$AIRY_HOME/run/sched.sock`）注册 product_manager/backend 两个角色，调用 `sched.schedule_task` 选后派发两轮任务（产品经理产出 PRD → 后端接力实现要点），并校验两次派发的 agent_id 不同，证明为真实多 Agent 协作。
+- **agentrt-e2e.py**：端到端调用验证脚本，通过 agent_d 的 Unix socket（`$AIRY_HOME/run/agent.sock`）依次调用 `agent.spawn` 与 `agent.invoke`，验证 `client → agent_d → Python runner → openlab → LLM API` 完整链路。
 
 ### benchmark/ — 性能基准测试框架
 
@@ -169,16 +175,28 @@ python scripts/ops/benchmark/history_comparator.py --baseline results/v1.json --
 source scripts/ops/lib/common.sh
 
 # 使用日志功能
-log_info "服务启动成功"
-log_warn "内存使用率较高"
-log_error "连接超时"
+airy_log_info "服务启动成功"
+airy_log_warn "内存使用率较高"
+airy_log_error "连接超时"
 
 # 使用平台检测
-if is_linux; then
+if airy_platform_is_linux; then
     echo "Linux 平台"
-elif is_macos; then
+elif airy_platform_is_macos; then
     echo "macOS 平台"
 fi
+```
+
+### 运行时链路验证
+
+需先通过 `agentrt-bootstrap.sh` 启动 agentrt，再执行验证脚本：
+
+```bash
+# 端到端调用验证（走 agent_d socket）
+python3 scripts/ops/bin/agentrt-e2e.py --role product_manager --input "请介绍一下你自己"
+
+# 多 Agent 协作闭环验证（走 sched_d socket，PM → 后端接力）
+python3 scripts/ops/bin/agentrt-multiagent.py --timeout 600
 ```
 
 ### 运维测试
@@ -205,7 +223,7 @@ bash scripts/ops/tests/shell/test_common_utils.sh
 
 | 子模块 | 核心依赖 | 说明 |
 |--------|---------|------|
-| `bin/` | Bash 4.0+ | 运维入口脚本为纯 Bash 实现，依赖已安装的 daemon 二进制 |
+| `bin/` | Bash 4.0+、Python 3.8+ | `agentrt-bootstrap.sh`/`quickstart.sh` 为纯 Bash（依赖已安装的 daemon 二进制）；`agentrt-multiagent.py`/`agentrt-e2e.py` 为纯 Python（依赖运行中的 daemon） |
 | `deploy/` | Docker Engine 20.10+, Docker Compose v2 | 容器化部署已迁移至 `deploy/docker/`，详见对应 README |
 | `benchmark/` | Python 3.8+, numpy, scipy, matplotlib | 统计计算依赖 numpy/scipy，报告生成依赖 matplotlib |
 | `lib/` | Bash 4.0+ | Shell 公共库为纯 Bash 实现，无外部依赖 |

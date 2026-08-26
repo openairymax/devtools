@@ -4,8 +4,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# 脚本位于 tools/scripts/ci/pipeline/validate/ — 需向上 5 级到达项目根目录
+# 脚本位于 tools/scripts/ci/quality/gates/ — 需向上 5 级到达伞仓根
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+# 伞仓 agent-workload/ 布局：agentrt 源码树（门禁编译/扫描目标）
+AGENTRT_SRC="${PROJECT_ROOT}/agent-workload/agentrt"
+SCRIPTS_ROOT="${PROJECT_ROOT}/tools/scripts"
 
 # ============================================================================
 # 颜色输出
@@ -51,7 +54,7 @@ gate_compile() {
     section "Gate 1: Compilation Check"
     local build_dir="${PROJECT_ROOT}/build-ci"
 
-    if [ ! -f "${PROJECT_ROOT}/CMakeLists.txt" ]; then
+    if [ ! -f "${AGENTRT_SRC}/CMakeLists.txt" ]; then
         log_warn "CMakeLists.txt not found, skipping compilation check"
         check_gate "Compile" 2
         return
@@ -60,7 +63,7 @@ gate_compile() {
     mkdir -p "$build_dir"
     cd "$build_dir"
 
-    if cmake -B . -S "${PROJECT_ROOT}" -DCMAKE_BUILD_TYPE=Debug 2>&1 | tail -5; then
+    if cmake -B . -S "${AGENTRT_SRC}" -DCMAKE_BUILD_TYPE=Debug 2>&1 | tail -5; then
         if cmake --build . 2>&1 | tail -5; then
             check_gate "Compile" 0
         else
@@ -129,7 +132,7 @@ gate_security() {
         return
     fi
 
-    local sec_script="${SCRIPT_DIR}/../security/security-scan.sh"
+    local sec_script="${SCRIPT_DIR}/../../../verify/security/security-scan.sh"
     if [ -x "$sec_script" ]; then
         log_info "Running security scan..."
         if bash "$sec_script" "$@" 2>&1 | tail -20; then

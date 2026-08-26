@@ -41,7 +41,11 @@ log_fail()  { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-VERSION="${1:-v0.1.4}"
+# 版本 SSoT：默认读取 agentrt/VERSION（伞仓 agent-workload/ 布局），
+# 支持 <版本> 参数显式覆盖（问题 7：版本 bump 无需多处置零）。
+AGENTRT_VERSION_FILE="${PROJECT_ROOT}/agent-workload/agentrt/VERSION"
+DEFAULT_VERSION="v$(cat "$AGENTRT_VERSION_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0.1.4)"
+VERSION="${1:-${DEFAULT_VERSION}}"
 PLATFORM="${2:-linux-x86_64}"
 # 目录内使用去 v 的版本号（包内顶层目录 agentrt-<num>，与 install.sh 匹配）
 VERSION_NUM="${VERSION#v}"
@@ -59,12 +63,13 @@ RELEASE_REPO="${RELEASE_REPO:-airymaxhub}"
 # 可用 AIRY_DIST_OUT 覆盖（CI 上传场景可指向共享制品目录）。
 DIST_DIR="${AIRY_DIST_OUT:-${HOME}/.airymaxrt/dist}"
 STAGE_DIR="${DIST_DIR}/.stage-${VERSION}"
-AGENTRT_SRC="${PROJECT_ROOT}/agentrt"
-TUI_SRC="${PROJECT_ROOT}/sdk/tui"
+# 伞仓 agent-workload/ 布局（问题 5：发布脚本曾按扁平布局假设路径）
+AGENTRT_SRC="${PROJECT_ROOT}/agent-workload/agentrt"
+TUI_SRC="${PROJECT_ROOT}/agent-workload/sdk/tui"
 
 # 闭源模块源码（内部 CI 持有；本地开发模式从本地路径取）
 ATOMS_SRC="${ATOMS_SRC:-${AGENTRT_SRC}/atoms}"
-MEMORYROVOL_SRC="${MEMORYROVOL_SRC:-${PROJECT_ROOT}/products/memoryrovol}"
+MEMORYROVOL_SRC="${MEMORYROVOL_SRC:-${PROJECT_ROOT}/agent-workload/products/memoryrovol}"
 
 # 预编译包内容清单
 ATOMS_LIBS="core memory cognition coreloopthree taskflow syscall frameworks"
@@ -179,24 +184,24 @@ build_full_package() {
     run mkdir -p "$out/lib"
     local pkg
     for pkg in airymax_agents airymax_agents_rs; do
-        [ -d "${PROJECT_ROOT}/ecosystem/agents/$pkg" ] || continue
-        run cp -r "${PROJECT_ROOT}/ecosystem/agents/$pkg" "$out/lib/"
+        [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/agents/$pkg" ] || continue
+        run cp -r "${PROJECT_ROOT}/agent-workload/ecosystem/agents/$pkg" "$out/lib/"
     done
     for pkg in openlab markets contrib app; do
-        [ -d "${PROJECT_ROOT}/ecosystem/openlab/$pkg" ] || continue
-        run cp -r "${PROJECT_ROOT}/ecosystem/openlab/$pkg" "$out/lib/"
+        [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/openlab/$pkg" ] || continue
+        run cp -r "${PROJECT_ROOT}/agent-workload/ecosystem/openlab/$pkg" "$out/lib/"
     done
-    [ -d "${PROJECT_ROOT}/sdk/sdk-python/agentrt" ] && \
-        run cp -r "${PROJECT_ROOT}/sdk/sdk-python/agentrt" "$out/lib/"
+    [ -d "${PROJECT_ROOT}/agent-workload/sdk/sdk-python/agentrt" ] && \
+        run cp -r "${PROJECT_ROOT}/agent-workload/sdk/sdk-python/agentrt" "$out/lib/"
 
     # 配置模板
     run mkdir -p "$out/config"
     [ -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" ] && \
         run cp -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" "$out/config/"
-    [ -f "${PROJECT_ROOT}/ecosystem/manager/configs/agentrt.yaml" ] && \
-        run cp -f "${PROJECT_ROOT}/ecosystem/manager/configs/agentrt.yaml" "$out/config/"
-    [ -f "${PROJECT_ROOT}/ecosystem/manager/model/model.yaml" ] && \
-        run cp -f "${PROJECT_ROOT}/ecosystem/manager/model/model.yaml" "$out/config/"
+    [ -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/configs/agentrt.yaml" ] && \
+        run cp -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/configs/agentrt.yaml" "$out/config/"
+    [ -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/model/model.yaml" ] && \
+        run cp -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/model/model.yaml" "$out/config/"
 
     # manifest
     {
@@ -205,7 +210,7 @@ build_full_package() {
         echo "  \"version\": \"${VERSION}\","
         echo "  \"platform\": \"${PLATFORM}\","
         echo "  \"components\": {"
-        echo "    \"daemons\": \"18 (16 + think_d/cupolas_d + maths_d)\","
+        echo "    \"daemons\": \"18 (15 基础 + think_d/cupolas_d/maths_d)\","
         echo "    \"cli\": \"airy_cli\","
         echo "    \"tui\": \"agentrt-tui (rust)\","
         echo "    \"atoms\": \"prebuilt (closed source)\","

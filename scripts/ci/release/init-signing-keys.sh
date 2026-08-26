@@ -35,6 +35,9 @@ log_fail() { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 GPG_NAME="AgentRT Release Signing"
 GPG_EMAIL="release@agentrt.airymax.io"
 PASSPHRASE="${AIRY_GPG_PASSPHRASE:-}"
+if [ -z "$PASSPHRASE" ] && [ -f "$EXPORT_DIR/.passphrase" ]; then
+    PASSPHRASE="$(cat "$EXPORT_DIR/.passphrase" 2>/dev/null)"
+fi
 if [ -z "$PASSPHRASE" ]; then
     PASSPHRASE="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 24)"
 fi
@@ -106,6 +109,13 @@ echo "  3. COSIGN_PRIVATE_KEY = $(base64 -w0 < "$EXPORT_DIR/cosign.key")"
 echo "  4. COSIGN_PASSWORD   = ${PASSPHRASE}"
 echo "  5. ATOMGIT_TOKEN     = <atomgit 个人访问令牌（releases 写权限）>"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "制品验证示例（发布后任一用户可独立校验）："
+echo "  # cosign 验签 tarball（静态密钥场景 --insecure-ignore-tlog）"
+echo "  cosign verify-blob --key keys/cosign.pub --signature agentrt-v0.1.4-linux-x86_64.tar.gz.sig \\"
+echo "      --insecure-ignore-tlog agentrt-v0.1.4-linux-x86_64.tar.gz"
+echo "  # GPG 验签 manifest（权威：manifest 内 sha256 再校验 tarball）"
+echo "  gpg --verify manifest.stable.json.asc manifest.stable.json"
 echo ""
 log_warn "私钥仅存在于 ${EXPORT_DIR}（0600），请立即备份到安全位置并删除本机副本"
 log_ok "初始化完成"

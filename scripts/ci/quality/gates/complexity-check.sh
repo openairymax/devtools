@@ -40,15 +40,15 @@ log_info "lizard 版本: ${LIZARD_VERSION}"
 # 扫描目标目录（排除构建产物和第三方代码）
 # 注：tests/ 单独扫描（测试函数允许略高 CCN，但仍受 FAIL/BLOCK 约束）
 SCAN_DIRS=(
-    "${PROJECT_ROOT}/agentrt/atoms"
-    "${PROJECT_ROOT}/agentrt/commons"
-    "${PROJECT_ROOT}/agentrt/cupolas"
-    "${PROJECT_ROOT}/agentrt/daemons"
-    "${PROJECT_ROOT}/agentrt/gateway"
-    "${PROJECT_ROOT}/agentrt/heapstore"
-    "${PROJECT_ROOT}/agentrt/protocols"
-    "${PROJECT_ROOT}/agentrt/sdk"
-    "${PROJECT_ROOT}/agentrt/tests"
+    "${PROJECT_ROOT}/agent-workload/agentrt/atoms"
+    "${PROJECT_ROOT}/agent-workload/agentrt/commons"
+    "${PROJECT_ROOT}/agent-workload/agentrt/cupolas"
+    "${PROJECT_ROOT}/agent-workload/agentrt/daemons"
+    "${PROJECT_ROOT}/agent-workload/agentrt/gateway"
+    "${PROJECT_ROOT}/agent-workload/agentrt/heapstore"
+    "${PROJECT_ROOT}/agent-workload/agentrt/protocols"
+    "${PROJECT_ROOT}/agent-workload/agentrt/sdk"
+    "${PROJECT_ROOT}/agent-workload/agentrt/tests"
 )
 
 # ============================================================================

@@ -7,9 +7,10 @@
 
 set -e  # 遇到错误立即退出
 
-# 获取脚本所在目录的父目录（即AgentRT根目录）
+# 获取脚本所在目录的根目录（伞仓 airymaxhub 根：release → ci → scripts → tools → 根，
+# 上跳 4 级；修复问题 9：原实现只上跳 2 级指向 tools/scripts，find 范围错误）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 echo "=================================================="
 echo "🧹 AgentRT 构建产物清理脚本 v1.0.0"

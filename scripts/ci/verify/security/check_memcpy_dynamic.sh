@@ -9,10 +9,10 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="${1:-$(cd "$(dirname "$0")/../../../.." && pwd)}"
+PROJECT_ROOT="${1:-$(cd "$(dirname "$0")/../../../../.." && pwd)}"
 
-# 验证 PROJECT_ROOT 指向伞仓根（必须包含 agentrt/ 目录）
-if [[ ! -d "${PROJECT_ROOT}/agentrt" ]]; then
+# 验证 PROJECT_ROOT 指向伞仓根（必须包含 agent-workload/agentrt/ 目录）
+if [[ ! -d "${PROJECT_ROOT}/agent-workload/agentrt" ]]; then
     echo "ERROR: agentrt/ not found under PROJECT_ROOT=${PROJECT_ROOT}" >&2
     echo "       PROJECT_ROOT must be the airymaxhub root directory." >&2
     exit 1
@@ -131,7 +131,7 @@ while IFS= read -r -d '' file; do
                 ;;
         esac
     done < <(grep -rn '\bmemcpy\b\|\bmemmove\b\|\bmemset\b' "$file" 2>/dev/null || true)
-done < <(find "${PROJECT_ROOT}/agentrt" -name "*.c" -print0 2>/dev/null)
+done < <(find "${PROJECT_ROOT}/agent-workload/agentrt" -name "*.c" -print0 2>/dev/null)
 
 # =========================================================================
 # 汇总报告

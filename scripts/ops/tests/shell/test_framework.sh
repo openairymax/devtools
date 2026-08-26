@@ -8,11 +8,12 @@
 ###############################################################################
 
 AGENTRT_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTRT_SCRIPTS_DIR="$(dirname "$AGENTRT_TEST_DIR")"
+# ops/ 目录（tests/shell 上跳 2 级）；公共库实际位于 ops/lib/（非 library/）
+AGENTRT_SCRIPTS_DIR="$(dirname "$(dirname "$AGENTRT_TEST_DIR")")"
 
 # Load dependencies
-# shellcheck source=../library/common.sh
-source "$AGENTRT_SCRIPTS_DIR/library/common.sh"
+# shellcheck source=../lib/common.sh
+source "$AGENTRT_SCRIPTS_DIR/lib/common.sh"
 
 ###############################################################################
 # Test Configuration
