@@ -185,15 +185,22 @@ else
     export AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 fi
 mkdir -p "$AIRY_HOME"/bin "$AIRY_HOME"/lib "$AIRY_HOME"/run \
-         "$AIRY_HOME"/logs "$AIRY_HOME"/config "$AIRY_HOME"/data \
-         "$AIRY_HOME"/tmp "$AIRY_HOME"/cache "$AIRY_HOME"/workspace 2>/dev/null
+         "$AIRY_HOME"/config "$AIRY_HOME"/data \
+         "$AIRY_HOME"/data/agentrt/logs "$AIRY_HOME"/data/agentrt/tmp \
+         "$AIRY_HOME"/data/agentrt/cache "$AIRY_HOME"/data/agentrt/workspaces 2>/dev/null
 
 # 子目录导出（与 daemon airy_paths_init() 的 setenv 一致）
+# 运行时数据全量统一于 $AIRY_HOME/data/agentrt（2026-08-25）：
+# 日志/缓存/临时/持久化工作区均收敛其下，顶层仅保留分发物与易失 run/。
 export AIRY_RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
-export AIRY_LOG_DIR="${AIRY_LOG_DIR:-$AIRY_HOME/logs}"
+export AIRY_LOG_DIR="${AIRY_LOG_DIR:-$AIRY_HOME/data/agentrt/logs}"
 export AIRY_CONFIG_DIR="${AIRY_CONFIG_DIR:-$AIRY_HOME/config}"
 export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
 export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
+export AIRY_DATA_DIR="${AIRY_DATA_DIR:-$AIRY_HOME/data}"
+export AIRY_CACHE_DIR="${AIRY_CACHE_DIR:-$AIRY_HOME/data/agentrt/cache}"
+export AIRY_TMP_DIR="${AIRY_TMP_DIR:-$AIRY_HOME/data/agentrt/tmp}"
+export AIRY_WORKSPACE_DIR="${AIRY_WORKSPACE_DIR:-$AIRY_HOME/data/agentrt/workspaces}"
 
 # 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）。
 # 直接以 AIRY_* 权威子目录为准（空默认值 + 覆盖，等价于旧"强制覆盖"）。
@@ -897,6 +904,17 @@ trap cleanup SIGINT SIGTERM
 
 main() {
     parse_args "$@"
+
+    # 显式 -b/-r 覆盖权威 AIRY_*（历史根因：parse_args 只改 AGENTRT_*
+    # 健康检查路径而不同步 daemon 继承的 AIRY_BIN_DIR/AIRY_RUNTIME_DIR，
+    # 导致 daemon 的 socket/日志落在 $AIRY_HOME（默认 ~/.airymaxrt）
+    # 而健康检查查 -r 路径 → 启动误判 FAILED 并群停）。同步后两者一致。
+    if [[ -n "$AGENTRT_BINDIR" ]]; then
+        export AIRY_BIN_DIR="$AGENTRT_BINDIR"
+    fi
+    if [[ -n "$AGENTRT_RUNTIME_DIR" ]]; then
+        export AIRY_RUNTIME_DIR="$AGENTRT_RUNTIME_DIR"
+    fi
 
     log_info "AgentRT Bootstrap v0.1.3"
     log_info "  Bindir:    $AGENTRT_BINDIR"

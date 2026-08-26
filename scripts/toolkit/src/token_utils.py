@@ -261,7 +261,18 @@ class TokenBudget:
         enable_alerts: bool = True,
         alert_callback: Optional[Callable[[BudgetAlert], None]] = None
     ):
-        self.storage_dir = storage_dir or "/var/lib/agentrt/budget"
+        # P0.19: derive the default storage dir from the runtime env (AIRY_HOME /
+        # AIRY_DATA_DIR), never a hardcoded system path, so multi-instance and
+        # --prefix installs stay isolated. Order: explicit storage_dir > env
+        # AIRY_BUDGET_DIR > $AIRY_HOME/data/agentrt/budget > ~/.airymaxrt fallback.
+        default_budget_dir = os.path.join(
+            os.environ.get("AIRY_DATA_DIR", ""),
+            "budget",
+        ) if os.environ.get("AIRY_DATA_DIR") else os.path.join(
+            os.environ.get("AIRY_HOME", os.path.join(str(Path.home()), ".airymaxrt")),
+            "data", "agentrt", "budget",
+        )
+        self.storage_dir = storage_dir or os.environ.get("AIRY_BUDGET_DIR", default_budget_dir)
         self.default_warning_threshold = default_warning_threshold
         self.enable_alerts = enable_alerts
         self.alert_callback = alert_callback

@@ -337,6 +337,15 @@ if(AGENTRT_HAS_CJSON OR CJSON_FOUND)
     target_link_libraries(test_llm_d_routing PRIVATE cjson)
 endif()
 
+# libyaml：service_config.c 的 YAML 分支由 HAVE_YAML 保护，须与主目标
+# airy_llm_service / llm_d/tests 同步（否则 load_pricing_rules_from_yaml
+# 等 YAML 符号未定义引用，test_llm_d_routing 链接失败）
+if(AIRY_HAS_YAML)
+    target_include_directories(test_llm_d_routing PRIVATE ${YAML_INCLUDE_DIRS})
+    target_compile_definitions(test_llm_d_routing PRIVATE HAVE_YAML=1)
+    target_link_libraries(test_llm_d_routing PRIVATE ${YAML_LIBRARIES})
+endif()
+
 if(AGENTRT_HAS_CURL)
     if(CURL_INCLUDE_DIRS)
         target_include_directories(test_llm_d_routing PRIVATE ${CURL_INCLUDE_DIRS})
