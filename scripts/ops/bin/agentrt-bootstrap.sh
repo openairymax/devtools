@@ -273,8 +273,9 @@ DAEMON_LAYER_0=("monit_d" "observe_d" "info_d" "notify_d" "cupolas_d")
 # Layer 1: 核心服务
 DAEMON_LAYER_1=("sched_d" "channel_d" "mem_d")
 
-# Layer 2: Agent 服务（think_d：双思考 GCCP+GRAD，gateway 经 think.sock 调用）
-DAEMON_LAYER_2=("llm_d" "think_d" "tool_d" "hook_d" "plugin_d" "agent_d" "a2a_d")
+# Layer 2: Agent 服务（think_d：双思考 GCCP+GRAD，gateway 经 think.sock 调用；
+#           maths_d：数学外挂计算，gateway/CLI 经 maths.sock 调用）
+DAEMON_LAYER_2=("llm_d" "think_d" "tool_d" "hook_d" "plugin_d" "agent_d" "a2a_d" "maths_d")
 
 # Layer 3: 业务服务
 DAEMON_LAYER_3=("market_d")
@@ -290,6 +291,7 @@ declare -A DAEMON_HEALTH_TIMEOUT=(
     [sched_d]=20    [channel_d]=20   [mem_d]=20
     [llm_d]=30      [think_d]=30     [tool_d]=30     [hook_d]=20     [plugin_d]=30
     [agent_d]=30    [a2a_d]=20
+    [maths_d]=20
     [market_d]=30
     [gateway_d]=30
 )
@@ -320,6 +322,7 @@ declare -A DAEMON_BIN_NAME=(
     [plugin_d]="plugin_d"
     [agent_d]="agent_d"
     [a2a_d]="a2a_d"
+    [maths_d]="maths_d"
     [market_d]="market_d"
     [gateway_d]="gateway_d"
 )
@@ -357,7 +360,7 @@ Options:
 Startup DAG:
   Layer 0: monit_d, observe_d, info_d, notify_d
   Layer 1: sched_d, channel_d, mem_d
-  Layer 2: llm_d, tool_d, hook_d, plugin_d, agent_d, a2a_d
+  Layer 2: llm_d, think_d, tool_d, hook_d, plugin_d, agent_d, a2a_d, maths_d
   Layer 3: market_d
   Layer 4: gateway_d
 

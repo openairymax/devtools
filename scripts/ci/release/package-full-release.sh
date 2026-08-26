@@ -205,7 +205,7 @@ build_full_package() {
         echo "  \"version\": \"${VERSION}\","
         echo "  \"platform\": \"${PLATFORM}\","
         echo "  \"components\": {"
-        echo "    \"daemons\": \"16 + think_d/cupolas_d\","
+        echo "    \"daemons\": \"18 (16 + think_d/cupolas_d + maths_d)\","
         echo "    \"cli\": \"airy_cli\","
         echo "    \"tui\": \"agentrt-tui (rust)\","
         echo "    \"atoms\": \"prebuilt (closed source)\","
