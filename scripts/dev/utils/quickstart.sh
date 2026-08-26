@@ -109,7 +109,7 @@ build_kernel() {
         print_info "构建 C++ 内核..."
 
         local PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-        local BUILD_DIR="${PROJECT_ROOT}/../AgentRT-build"
+        local BUILD_DIR="${AGENTRT_BUILD_DIR:-${HOME}/.airymaxrt-build/AgentRT-build}"
 
         mkdir -p "${BUILD_DIR}"
         cd "${BUILD_DIR}"

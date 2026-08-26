@@ -77,9 +77,10 @@ find . -maxdepth 4 -type d -name "_build" 2>/dev/null | while read dir; do
     rm -rf "$dir"
 done
 
-# 删除AgentRT-build目录（如果存在）
+# 删除AgentRT-build目录（如果存在，源码区内禁止保留任何构建产物）
 if [ -d "$AGENTRT_ROOT/AgentRT-build" ]; then
-    echo "  ⚠️  AgentRT-build目录存在（保留，不删除）"
+    echo "  🗑️  删除目录: $AGENTRT_ROOT/AgentRT-build"
+    rm -rf "$AGENTRT_ROOT/AgentRT-build"
 fi
 
 echo "✅ 构建输出目录清理完成"

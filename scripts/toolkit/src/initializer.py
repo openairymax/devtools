@@ -55,7 +55,7 @@ DEFAULT_CONFIGS = {
 # Version: 0.1.3
 
 # System
-version = "0.1.3"
+version = "0.1.4"
 log_level = "info"
 data_dir = "${HOME}/.agentrt/data"
 run_dir = "/var/run/agentrt"

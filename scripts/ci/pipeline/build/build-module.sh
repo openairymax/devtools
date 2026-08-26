@@ -35,7 +35,7 @@ CLEAN_BUILD=false
 VERBOSE=false
 INSTALL_PREFIX="${AGENTRT_INSTALL_PREFIX:-/usr/local}"
 CMAKE_EXTRA_ARGS=()
-BUILD_DIR="${AGENTRT_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
+BUILD_DIR="${AGENTRT_BUILD_DIR:-${HOME}/.airymaxrt-build/AgentRT-build}"
 
 # 模块定义（含源码路径和 CMake 选项）
 declare -A MODULE_SOURCES=(

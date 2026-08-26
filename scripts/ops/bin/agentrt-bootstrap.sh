@@ -456,9 +456,12 @@ check_daemon_health_tcp() {
         return $?
     fi
 
-    # TCP 端口检查
+    # TCP 端口检查。nc 必须带 -w 超时：本机防火墙对未监听端口可能 DROP
+    # 而非 REFUSE（历史根因：无超时 nc 在 8080 空闲时挂起 30s+，bootstrap
+    # 卡在 Layer 4 gateway 健康检查，导致 gateway 启动极慢或失败，系统
+    # 表现为"启动不稳定"）。
     if command -v nc &>/dev/null; then
-        nc -z 127.0.0.1 "$port" 2>/dev/null && return 0
+        nc -z -w 2 127.0.0.1 "$port" 2>/dev/null && return 0
     elif command -v curl &>/dev/null; then
         curl -sf --max-time 2 "http://127.0.0.1:${port}/health" &>/dev/null && return 0
     elif command -v ss &>/dev/null; then
@@ -524,8 +527,27 @@ start_daemon() {
         local tcp_port="${DAEMON_PORT[$name]:-0}"
         if [[ "$tcp_port" -gt 0 ]]; then
             if check_daemon_health_tcp "$name"; then
-                log_warn "$name already running (port $tcp_port), skipping"
-                return 0
+                # 端口被监听但 pidfile 无效（stale：旧实例正在退出/残留半死
+                # 进程）时不可直接跳过——否则旧实例退出后该 daemon 永久缺失
+                # （历史竞态：gateway_d 被跳过 → 8080 无监听 → 对话全断）。
+                local _pid_ok
+                _pid_ok="$(get_daemon_pid "$name")"
+                if [[ -n "$_pid_ok" ]]; then
+                    log_warn "$name already running (port $tcp_port, pid=$_pid_ok), skipping"
+                    return 0
+                fi
+                log_warn "$name: port $tcp_port occupied but no valid pidfile (stale instance), reaping..."
+                local stale_pid
+                stale_pid="$(ss -tlnp 2>/dev/null | grep ":${tcp_port}[[:space:]]" \
+                    | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)"
+                if [[ -n "$stale_pid" ]] && kill -0 "$stale_pid" 2>/dev/null; then
+                    kill "$stale_pid" 2>/dev/null || true
+                    local _w=0
+                    while check_daemon_health_tcp "$name" && [[ $_w -lt 10 ]]; do
+                        sleep 1; ((_w++))
+                    done
+                fi
+                rm -f "${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"
             fi
         elif [[ -S "$sock_path" ]]; then
             if sock_is_listening "$sock_path"; then
@@ -916,7 +938,7 @@ main() {
         export AIRY_RUNTIME_DIR="$AGENTRT_RUNTIME_DIR"
     fi
 
-    log_info "AgentRT Bootstrap v0.1.3"
+    log_info "AgentRT Bootstrap v0.1.4"
     log_info "  Bindir:    $AGENTRT_BINDIR"
     log_info "  Runtime:   $AGENTRT_RUNTIME_DIR"
     log_info "  Config:    ${AGENTRT_CONFIG:-<none>}"

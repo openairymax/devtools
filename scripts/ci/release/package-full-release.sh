@@ -41,7 +41,7 @@ log_fail()  { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
-VERSION="${1:-v0.1.3}"
+VERSION="${1:-v0.1.4}"
 PLATFORM="${2:-linux-x86_64}"
 # 目录内使用去 v 的版本号（包内顶层目录 agentrt-<num>，与 install.sh 匹配）
 VERSION_NUM="${VERSION#v}"

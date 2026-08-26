@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────
 # AgentRT 5-Minute QuickStart Script
-# Version: 0.1.3
+# Version: 0.1.4
 # ──────────────────────────────────────────────────────────
 set -euo pipefail
 

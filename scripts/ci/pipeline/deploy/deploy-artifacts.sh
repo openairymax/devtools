@@ -43,7 +43,7 @@ BUILD_NUMBER="${GITHUB_RUN_NUMBER:-$(date +%Y%m%d%H%M)}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io/spharx}"
 DOCKER_PUSH="${DOCKER_PUSH:-false}"
 PACKAGE_TYPE="${PACKAGE_TYPE:-tar.gz}"
-BUILD_DIR="${AGENTRT_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
+BUILD_DIR="${AGENTRT_BUILD_DIR:-${HOME}/.airymaxrt-build/AgentRT-build}"
 
 # 版本信息
 extract_version() {
