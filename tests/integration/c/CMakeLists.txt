@@ -295,7 +295,12 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/cost_tracker.c
     ${LLM_D_DIR}/src/providers/registry.c
     ${LLM_D_DIR}/src/providers/provider.c
+    ${LLM_D_DIR}/src/providers/provider_http.c
+    ${LLM_D_DIR}/src/providers/provider_codec.c
+    ${LLM_D_DIR}/src/providers/provider_stream.c
     ${LLM_D_DIR}/src/providers/openai.c
+    ${LLM_D_DIR}/src/providers/openai_rate_limit.c
+    ${LLM_D_DIR}/src/providers/openai_stream.c
     ${LLM_D_DIR}/src/providers/anthropic.c
     ${LLM_D_DIR}/src/providers/deepseek.c
     ${LLM_D_DIR}/src/providers/google.c
