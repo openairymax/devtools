@@ -125,6 +125,6 @@ EOF
 
 ( cd "$WORK/pkg" && tar -czf "$DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz" \
     "agentrt-${VERSION_NUM}" )
-sha256sum "$DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz" \
-    > "$DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz.sha256"
+( cd "$DIST_DIR" && sha256sum "agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz" \
+    > "agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz.sha256" )
 log_ok "产物: $DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
