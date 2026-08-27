@@ -169,6 +169,10 @@ build_full_package() {
     run cmake --build "$build_dir" -j"$JOBS"
     run cmake --install "$build_dir" || true
     [ -d "$build_dir/bin" ] && run cp -f "$build_dir"/bin/* "$out/bin/" 2>/dev/null || true
+    # 包内架构标记：install.sh install_binary 依 platform-<arch> 做交叉校验，
+    # 防止异架构包被静默安装（跨架构 daemon 启动即崩溃）。PLATFORM=linux-x86_64
+    # → platform-x86_64（与 install.sh detect_arch 输出一致）。
+    run touch "$out/platform-${PLATFORM#linux-}"
 
     # Rust TUI
     if [ -d "$TUI_SRC" ] && command -v cargo >/dev/null 2>&1; then
@@ -225,7 +229,8 @@ build_full_package() {
         echo "}"
     } > "$out/manifest.json"
 
-    ( cd "$DIST_DIR" && run tar -czf "agentrt-${VERSION}-${PLATFORM}.tar.gz" \
+    # 打包：out 位于 ${STAGE_DIR}，须 cd STAGE_DIR（同 build_atoms_prebuilt 修复）。
+    ( cd "$STAGE_DIR" && run tar -czf "${DIST_DIR}/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
         "$(basename "$out")" )
     run sha256sum "$DIST_DIR/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
         > "$DIST_DIR/agentrt-${VERSION}-${PLATFORM}.tar.gz.sha256"
