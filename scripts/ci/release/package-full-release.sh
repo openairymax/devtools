@@ -187,13 +187,9 @@ build_full_package() {
     # Python 运行时依赖
     run mkdir -p "$out/lib"
     local pkg
-    for pkg in airymax_agents airymax_agents_rs; do
+    for pkg in airymax_agents airymax_agents_rs orchestration; do
         [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/agents/$pkg" ] || continue
         run cp -r "${PROJECT_ROOT}/agent-workload/ecosystem/agents/$pkg" "$out/lib/"
-    done
-    for pkg in openlab markets contrib app; do
-        [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/openlab/$pkg" ] || continue
-        run cp -r "${PROJECT_ROOT}/agent-workload/ecosystem/openlab/$pkg" "$out/lib/"
     done
     [ -d "${PROJECT_ROOT}/agent-workload/sdk/sdk-python/agentrt" ] && \
         run cp -r "${PROJECT_ROOT}/agent-workload/sdk/sdk-python/agentrt" "$out/lib/"

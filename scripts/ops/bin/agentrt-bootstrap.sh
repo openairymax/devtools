@@ -105,7 +105,7 @@ if [ -z "${AGENTRT_MODEL_CONFIG:-}" ]; then
     fi
 fi
 
-# ==================== Agent Python SDK 依赖（airymax_agents / openlab / agentrt） ====================
+# ==================== Agent Python SDK 依赖（airymax_agents / orchestration / agentrt） ====================
 #
 # agent_d 的 Python runner 子进程以 `python3 -m airymax_agents.runner` 启动，
 # 依赖三个 SDK 包可导入（service_child.c 采用标准包安装解析——pip install -e
@@ -113,22 +113,40 @@ fi
 # 检查并显式告知，避免 spawn 阶段 ModuleNotFoundError 静默回退。
 # 本地源码构建（AIRYMAXHUB_ROOT 存在）时自动 editable 安装三包（幂等，
 # --user 避免污染系统 Python）；生产 lib 布局依赖 $AIRY_HOME/lib 下已安装
-# 的 SDK（由发行包安装器负责），检查失败仅告警不阻断 bootstrap。
+# 的 SDK（由发行包安装器负责，检查时注入 PYTHONPATH），检查失败仅告警不阻断。
 AGENT_SDK_OK=1
-if ! python3 -c "import airymax_agents, openlab, agentrt" >/dev/null 2>&1; then
-    AGENT_SDK_OK=0
-    if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
-        log_info "Agent SDK packages not importable — editable-installing from source tree"
-        if python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/sdk/sdk-python" >/dev/null 2>&1 \
-           && python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/ecosystem/openlab" >/dev/null 2>&1 \
-           && python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/ecosystem/agents" >/dev/null 2>&1; then
-            AGENT_SDK_OK=1
-            log_info "Agent SDK editable install OK"
+AIRY_SDK_CHECK="import airymax_agents, orchestration, agentrt"
+if [ -d "${AIRY_HOME}/lib" ]; then
+    if ! PYTHONPATH="${AIRY_HOME}/lib" python3 -c "${AIRY_SDK_CHECK}" >/dev/null 2>&1; then
+        AGENT_SDK_OK=0
+        if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
+            log_info "Agent SDK packages not importable — editable-installing from source tree"
+            if python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/sdk/sdk-python" >/dev/null 2>&1 \
+               && python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/ecosystem/agents" >/dev/null 2>&1; then
+                AGENT_SDK_OK=1
+                log_info "Agent SDK editable install OK"
+            else
+                log_warn "Agent SDK auto-install failed — agents will not execute"
+            fi
         else
-            log_warn "Agent SDK auto-install failed — agents will not execute"
+            log_warn "Agent SDK packages not importable and no source tree — agents will not execute"
         fi
-    else
-        log_warn "Agent SDK packages not importable and no source tree — agents will not execute"
+    fi
+else
+    if ! python3 -c "${AIRY_SDK_CHECK}" >/dev/null 2>&1; then
+        AGENT_SDK_OK=0
+        if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
+            log_info "Agent SDK packages not importable — editable-installing from source tree"
+            if python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/sdk/sdk-python" >/dev/null 2>&1 \
+               && python3 -m pip install --user -e "${AIRYMAXHUB_ROOT}/ecosystem/agents" >/dev/null 2>&1; then
+                AGENT_SDK_OK=1
+                log_info "Agent SDK editable install OK"
+            else
+                log_warn "Agent SDK auto-install failed — agents will not execute"
+            fi
+        else
+            log_warn "Agent SDK packages not importable and no source tree — agents will not execute"
+        fi
     fi
 fi
 export AGENT_SDK_OK

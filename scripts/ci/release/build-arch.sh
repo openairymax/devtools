@@ -95,10 +95,7 @@ cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
 mkdir -p /pkg/out/lib
 for p in agent-workload/ecosystem/agents/airymax_agents \
          agent-workload/ecosystem/agents/airymax_agents_rs \
-         agent-workload/ecosystem/openlab/openlab \
-         agent-workload/ecosystem/openlab/markets \
-         agent-workload/ecosystem/openlab/contrib \
-         agent-workload/ecosystem/openlab/app \
+         agent-workload/ecosystem/agents/orchestration \
          agent-workload/sdk/sdk-python/agentrt; do
   [ -d "/src/$p" ] && cp -r "/src/$p" /pkg/out/lib/ || true
 done
