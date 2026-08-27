@@ -13,7 +13,7 @@
 #      URL: https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/manifest.<channel>.json
 #
 # 用法：
-#   ./publish-release.sh v0.1.4 [DIST_DIR]              # stable 发布
+#   ./publish-release.sh v0.1.5 [DIST_DIR]              # stable 发布
 #   ./publish-release.sh v0.1.5-beta.1 [DIST_DIR]       # beta 发布
 # 环境变量：
 #   COSIGN_PRIVATE_KEY / COSIGN_PASSWORD   cosign 私钥（base64 或文件路径）

@@ -44,7 +44,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 # 版本 SSoT：默认读取 agentrt/VERSION（伞仓 agent-workload/ 布局），
 # 支持 <版本> 参数显式覆盖（问题 7：版本 bump 无需多处置零）。
 AGENTRT_VERSION_FILE="${PROJECT_ROOT}/agent-workload/agentrt/VERSION"
-DEFAULT_VERSION="v$(cat "$AGENTRT_VERSION_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0.1.4)"
+DEFAULT_VERSION="v$(cat "$AGENTRT_VERSION_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0.1.5)"
 VERSION="${1:-${DEFAULT_VERSION}}"
 PLATFORM="${2:-linux-x86_64}"
 # 目录内使用去 v 的版本号（包内顶层目录 agentrt-<num>，与 install.sh 匹配）
