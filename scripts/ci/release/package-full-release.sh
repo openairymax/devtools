@@ -149,7 +149,8 @@ build_atoms_prebuilt() {
         echo "}"
     } > "$out/manifest.json"
 
-    ( cd "$DIST_DIR" && run tar -czf "airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz" \
+    # 打包：out 位于 ${STAGE_DIR}（与 build_full_package 一致，须 cd STAGE_DIR）。
+    ( cd "$STAGE_DIR" && run tar -czf "${DIST_DIR}/airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz" \
         "$(basename "$out")" )
     run sha256sum "$DIST_DIR/airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz" \
         > "$DIST_DIR/airy-atoms-prebuilt-${VERSION}-${PLATFORM}.tar.gz.sha256"
@@ -182,6 +183,14 @@ build_full_package() {
         run bash -c "cd '$TUI_SRC' && CARGO_TARGET_DIR='${DIST_DIR}/target' cargo build --release"
         [ -f "${DIST_DIR}/target/release/agentrt-tui" ] && \
             run cp -f "${DIST_DIR}/target/release/agentrt-tui" "$out/bin/"
+    fi
+
+    # daemon 启动编排脚本（install.sh 部署依赖；build-arch.sh 亦含此文件，
+    # 两处打包路径保持一致——缺此文件则安装后 daemon 群无法编排拉起）
+    if [ -f "${PROJECT_ROOT}/tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+        run cp -f "${PROJECT_ROOT}/tools/scripts/ops/bin/agentrt-bootstrap.sh" "$out/bin/"
+    else
+        log_warn "agentrt-bootstrap.sh 未找到（${PROJECT_ROOT}/tools/scripts/ops/bin/）"
     fi
 
     # Python 运行时依赖

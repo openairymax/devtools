@@ -42,15 +42,41 @@ log_ok()   { echo -e "\033[0;32m[ OK ]\033[0m $*"; }
 mkdir -p "$WORK/build" "$WORK/pkg"
 [ -n "$VERSION_NUM" ] || { echo "[FAIL] 无法读取 agentrt/VERSION"; exit 1; }
 
+# TUI 离线 vendor 依赖（容器内 cargo 构建 agentrt-tui 用；与 build.sh
+# setup_bundled_vendor 同源，避免容器内 crates.io 网络不可达导致 TUI 降级）
+TUI_VENDOR_TGZ="${UMBRELLA}/developbuild/agentrt/tools/tui-vendor-linux.tar.gz"
+TUI_VENDOR_DIR="${DIST_DIR}/tui-vendor"
+if [ -f "$TUI_VENDOR_TGZ" ] && [ ! -d "$TUI_VENDOR_DIR" ]; then
+    log_info "准备 TUI vendor 依赖…"
+    mkdir -p "${DIST_DIR}/tmp-vendor"
+    tar -xzf "$TUI_VENDOR_TGZ" -C "${DIST_DIR}/tmp-vendor"
+    mv "${DIST_DIR}/tmp-vendor/vendor" "$TUI_VENDOR_DIR"
+    rmdir "${DIST_DIR}/tmp-vendor"
+fi
+TUI_CFG_DIR="${DIST_DIR}/tui-cfg"
+if [ -d "$TUI_VENDOR_DIR" ]; then
+    mkdir -p "$TUI_CFG_DIR"
+    cat > "$TUI_CFG_DIR/config.toml" <<EOF
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "/tui-vendor"
+EOF
+fi
+
 log_info "构建 ${PLATFORM} 包（${AIRY_VERSION}）…"
 log_info "源码树: $UMBRELLA（只读挂载） 产物: ${DIST_DIR}/"
 
 # 容器内构建（源码只读挂载；构建/打包目录写挂载）。
 # 与 CI riscv64 job 相同步骤：依赖 → cJSON/OpenSSL 源码 → cmake → TUI(降级) → 打包。
+DEPS_DIR="${DIST_DIR}/deps"
 docker run --rm --platform "linux/${ARCH}" \
     -v "$UMBRELLA":/src:ro \
     -v "$WORK/build":/build \
     -v "$WORK/pkg":/pkg \
+    $([ -d "$DEPS_DIR" ] && echo "-v $DEPS_DIR:/deps:ro") \
+    $([ -d "$TUI_VENDOR_DIR" ] && echo "-v $TUI_VENDOR_DIR:/tui-vendor:ro -v $TUI_CFG_DIR:/src/agent-workload/sdk/tui/.cargo:ro") \
     "$IMAGE" bash -euxo pipefail -c '
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -60,21 +86,32 @@ apt-get install -y -qq --no-install-recommends \
   libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
 pip3 install --no-cache-dir cmake ninja
 
-# cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue）
-curl -fsSL -o /tmp/cjson.tar.gz \
-  https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+# cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue；优先 /deps 离线包，
+# 网络受限环境无需访问 GitHub）
+if [ -f /deps/cJSON-1.7.18.tar.gz ]; then
+    cp -f /deps/cJSON-1.7.18.tar.gz /tmp/cjson.tar.gz
+else
+    curl -fsSL -o /tmp/cjson.tar.gz \
+      https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+fi
 tar -xzf /tmp/cjson.tar.gz -C /tmp
-cmake -S /tmp/cJSON-1.7.18 -B /tmp/cjson-build \
+CJSON_DIR="$(ls -d /tmp/cJSON-* 2>/dev/null | head -1)"
+cmake -S "$CJSON_DIR" -B /tmp/cjson-build \
   -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
 cmake --build /tmp/cjson-build --parallel
 cmake --install /tmp/cjson-build
 
-# OpenSSL 3.0.17（20.04 libssl 1.1.1 头触发 poison 编译失败）
-curl -fsSL -o /tmp/openssl.tar.gz \
-  https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
+# OpenSSL 3.0.17（20.04 libssl 1.1.1 头触发 poison 编译失败；优先 /deps 离线包）
+if [ -f /deps/openssl-3.0.17.tar.gz ]; then
+    cp -f /deps/openssl-3.0.17.tar.gz /tmp/openssl.tar.gz
+else
+    curl -fsSL -o /tmp/openssl.tar.gz \
+      https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
+fi
 tar -xzf /tmp/openssl.tar.gz -C /tmp
-(cd /tmp/openssl-3.0.17 && ./config --prefix=/usr/local \
+OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
+(cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
   --openssldir=/usr/local/ssl shared && make -j"$(nproc)" && make install_sw)
 
 # cmake 构建（Release，无测试；安装到 /pkg）
@@ -85,8 +122,11 @@ cmake --build /build -j"$(nproc)"
 cmake --install /build
 
 # Rust TUI（agentrt-tui，失败降级不阻断）
+# 容器内 GitHub 不可达：rustup 走国内镜像 rsproxy；crates-io 依赖由
+# /tui-vendor 离线 vendor 提供（.cargo/config.toml 已挂载到源码树）。
 export PATH="$HOME/.cargo/bin:$PATH"
-curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+export RUSTUP_DIST_SERVER="https://rsproxy.cn" RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
+curl --proto =https --tlsv1.2 -sSf https://rsproxy.cn/rustup/rustup-init.sh | sh -s -- -y --profile minimal
 export CARGO_TARGET_DIR=/tmp/tui-target
 (cd /src/agent-workload/sdk/tui && cargo build --release) || echo "warn: ${ARCH} TUI 构建失败（降级）"
 cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
