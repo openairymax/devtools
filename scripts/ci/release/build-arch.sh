@@ -145,7 +145,11 @@ mkdir -p /pkg/out/config
 cp -f /src/agent-workload/ecosystem/manager/configs/agentrt.yaml /pkg/out/config/ 2>/dev/null || true
 cp -f /src/agent-workload/ecosystem/manager/model/model.yaml /pkg/out/config/ 2>/dev/null || true
 cp -f /src/tools/scripts/ops/templates/secrets.env.example /pkg/out/config/ 2>/dev/null || true
+cp -f /src/tools/scripts/ops/templates/permission_rules.yaml /pkg/out/config/ 2>/dev/null || true
 cp -f /src/tools/scripts/ops/bin/agentrt-bootstrap.sh /pkg/out/bin/ 2>/dev/null || true
+# 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖，随包分发）
+mkdir -p /pkg/out/modules
+cp -rf /src/agent-workload/ecosystem/markets/tools/maths-toolkit /pkg/out/modules/ 2>/dev/null || true
 ' || { echo "[FAIL] 容器内构建失败"; exit 1; }
 
 # 整理顶层目录 agentrt-<num> 并打包（与 install.sh 二进制模式匹配）

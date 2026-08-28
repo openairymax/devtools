@@ -207,10 +207,18 @@ build_full_package() {
     run mkdir -p "$out/config"
     [ -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" ] && \
         run cp -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" "$out/config/"
+    [ -f "${PROJECT_ROOT}/tools/scripts/ops/templates/permission_rules.yaml" ] && \
+        run cp -f "${PROJECT_ROOT}/tools/scripts/ops/templates/permission_rules.yaml" "$out/config/"
     [ -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/configs/agentrt.yaml" ] && \
         run cp -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/configs/agentrt.yaml" "$out/config/"
     [ -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/model/model.yaml" ] && \
         run cp -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/model/model.yaml" "$out/config/"
+
+    # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖，随包分发）
+    if [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/markets/tools/maths-toolkit" ]; then
+        run mkdir -p "$out/modules"
+        run cp -rf "${PROJECT_ROOT}/agent-workload/ecosystem/markets/tools/maths-toolkit" "$out/modules/"
+    fi
 
     # manifest
     {
