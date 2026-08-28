@@ -236,12 +236,9 @@ build_full_package() {
         echo "    \"atoms\": \"prebuilt (closed source)\","
         echo "    \"memoryrovol\": \"prebuilt (commercial, optional)\""
         echo "  },"
-        echo "  \"checksums\": {"
-        for f in "$DIST_DIR"/*.tar.gz; do
-            [ -e "$f" ] || continue
-            echo "    \"$(basename "$f")\": \"$(sha256sum "$f" | cut -d' ' -f1)\","
-        done
-        echo "  }"
+        # 校验 SSoT：包内不内嵌 checksums（打包时刻快照必然漂移），
+        # 权威校验一律以发布清单 latest/manifest.stable.json 为准。
+        echo "  \"checksum_source\": \"latest/manifest.stable.json\""
         echo "}"
     } > "$out/manifest.json"
 
