@@ -43,16 +43,13 @@ mkdir -p "$WORK/build" "$WORK/pkg"
 [ -n "$VERSION_NUM" ] || { echo "[FAIL] 无法读取 agentrt/VERSION"; exit 1; }
 
 # TUI 离线 vendor 依赖（容器内 cargo 构建 agentrt-tui 用；与 build.sh
-# setup_bundled_vendor 同源，避免容器内 crates.io 网络不可达导致 TUI 降级）
-TUI_VENDOR_TGZ="${UMBRELLA}/developbuild/agentrt/tools/tui-vendor-linux.tar.gz"
-TUI_VENDOR_DIR="${DIST_DIR}/tui-vendor"
-if [ -f "$TUI_VENDOR_TGZ" ] && [ ! -d "$TUI_VENDOR_DIR" ]; then
-    log_info "准备 TUI vendor 依赖…"
-    mkdir -p "${DIST_DIR}/tmp-vendor"
-    tar -xzf "$TUI_VENDOR_TGZ" -C "${DIST_DIR}/tmp-vendor"
-    mv "${DIST_DIR}/tmp-vendor/vendor" "$TUI_VENDOR_DIR"
-    rmdir "${DIST_DIR}/tmp-vendor"
-fi
+# setup_bundled_vendor 同源，避免容器内 crates.io 网络不可达导致 TUI 降级）。
+# 2026-08-28 布局收敛：离线缓存统一在 developbuild 打包工作区的
+# .build-cache/（deps + tui-vendor 单一落点，git 忽略），容器只读挂载，
+# 不做 tgz 解包。不再引用已废弃的 developbuild/agentrt/tools/ 路径。
+CACHE_BASE="${UMBRELLA}/developbuild/agentrt/.build-cache"
+TUI_VENDOR_DIR="${CACHE_BASE}/tui-vendor"
+DEPS_DIR="${CACHE_BASE}/deps"
 TUI_CFG_DIR="${DIST_DIR}/tui-cfg"
 if [ -d "$TUI_VENDOR_DIR" ]; then
     mkdir -p "$TUI_CFG_DIR"
@@ -70,7 +67,6 @@ log_info "源码树: $UMBRELLA（只读挂载） 产物: ${DIST_DIR}/"
 
 # 容器内构建（源码只读挂载；构建/打包目录写挂载）。
 # 与 CI riscv64 job 相同步骤：依赖 → cJSON/OpenSSL 源码 → cmake → TUI(降级) → 打包。
-DEPS_DIR="${DIST_DIR}/deps"
 docker run --rm --platform "linux/${ARCH}" \
     -v "$UMBRELLA":/src:ro \
     -v "$WORK/build":/build \
