@@ -83,8 +83,11 @@ apt-get install -y -qq --no-install-recommends \
 # cmake/ninja 安装：riscv64 无预编译 wheel，PEP 517 源码构建需在线下载
 # 构建后端依赖；官方源（pypi.org）对非主流架构偶发断连/挂起，直接强制
 # 清华镜像（国内可达稳定，2026-08-28 实测官方源两次失败）。
+# 版本固定：cmake 4.x 自带的 cmcurl 在 riscv64/gcc9 + OpenSSL 1.1.1 下
+# openssl.c 编译失败（PEP 517 wheel 构建中断，2026-08-29 实测）→ 固定
+# 3.29.6（自带 curl 与 20.04 工具链兼容，曾成功构建）。
 export PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
-pip3 install --no-cache-dir cmake ninja
+pip3 install --no-cache-dir "cmake==3.29.6" ninja
 
 # cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue；优先 /deps 离线包，
 # 网络受限环境无需访问 GitHub）
