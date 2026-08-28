@@ -84,7 +84,10 @@ apt-get install -y -qq --no-install-recommends \
   build-essential make perl curl git ca-certificates python3 python3-pip python3-venv \
   libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
   libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
-pip3 install --no-cache-dir cmake ninja
+# cmake/ninja 安装：官方源优先，失败回退国内镜像（riscv64 无预编译
+# wheel，PEP 517 源码构建需在线下载构建依赖，官方源偶发断连）。
+pip3 install --no-cache-dir cmake ninja || \
+    pip3 install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple cmake ninja
 
 # cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue；优先 /deps 离线包，
 # 网络受限环境无需访问 GitHub）
