@@ -212,9 +212,10 @@ fi
 log_ok "Release 就绪: ${VERSION}（${ATOMGIT_REPO}）"
 
 UPLOADED=""
-# 上传制品 + cosign 签名（*.sig）+ manifest + manifest GPG 签名。
-# cosign 签名必须随制品发布，客户端方可校验供应链完整性（防断链）。
-for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc"; do
+# 上传制品 + sha256 校验件 + cosign 签名（*.sig）+ manifest + manifest GPG 签名。
+# cosign 签名必须随制品发布，客户端方可校验供应链完整性（防断链）；
+# sha256 校验件同步发布，供手动完整性核验（sha256sum -c）。
+for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc"; do
     [ -e "$f" ] || continue
     log_info "上传: $(basename "$f")…"
     run curl -fsSL --connect-timeout 60 --max-time 900 -X POST \
