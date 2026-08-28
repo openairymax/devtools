@@ -208,11 +208,10 @@ API="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
 RELEASE_BODY="${NOTES:-AgentRT ${VERSION}}"
 log_info "创建/更新 Release ${VERSION}…"
 # atomgit API v5（Gitee 兼容，Base api.atomgit.com）：PRIVATE-TOKEN 认证。
-# 附件上传以 tag 定位（POST /releases/{tag}/attach_files），无需 release id。
-# 先探测是否已存在同名 tag release（幂等），不存在则创建。
-RELEASE_ID="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-    "${API}/tags/${VERSION}" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)"
-if [ -z "$RELEASE_ID" ]; then
+# release 对象无 id 字段，以 tag_name 存在性探测（幂等），不存在则创建。
+TAG_EXISTS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+    "${API}/tags/${VERSION}" 2>/dev/null | python3 -c "import sys,json;print(1 if (json.load(sys.stdin) or {}).get('tag_name') else '')" 2>/dev/null || true)"
+if [ -z "$TAG_EXISTS" ]; then
     curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
         -H "Content-Type: application/json" \
         --data-binary "$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'name':'AgentRT '+sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$VERSION" "$RELEASE_BODY" "$PRERELEASE")" \
@@ -220,19 +219,53 @@ if [ -z "$RELEASE_ID" ]; then
 fi
 log_ok "Release 就绪: ${VERSION}（${ATOMGIT_REPO}）"
 
-UPLOADED=""
+# 附件上传走预签名两步流（POST /releases/{tag}/attach_files 端点不存在，
+# 服务端 404）：GET /releases/{tag}/upload_url?file_name=X 返回 OBS 预签名
+# {url, headers}，再 PUT 文件体到预签名 URL。
+# 同名附件已存在则跳过（重跑幂等续传）；任一失败累计后 fail-closed，
+# 绝不假报成功——自更新链依赖附件与 manifest 一致。
+UP_FAILED=0
+EXISTING_ASSETS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+    "${API}/tags/${VERSION}" 2>/dev/null \
+    | python3 -c "import sys,json;print('\n'.join(a.get('name','') for a in (json.load(sys.stdin).get('assets') or [])))" 2>/dev/null || true)"
+
+upload_asset() {
+    local f="$1" b upjson upurl
+    b="$(basename "$f")"
+    if grep -qxF "$b" <<<"$EXISTING_ASSETS"; then
+        log_warn "跳过（远端已存在同名附件）: ${b}"
+        return 0
+    fi
+    log_info "上传: ${b}…"
+    upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        --data-urlencode "file_name=${b}" "${API}/${VERSION}/upload_url")" \
+        || { log_fail "upload_url 获取失败: ${b}"; return 1; }
+    upurl="$(python3 -c 'import json,sys;print((json.load(sys.stdin) or {}).get("url",""))' <<<"$upjson")"
+    [ -n "$upurl" ] || { log_fail "upload_url 为空: ${b}"; return 1; }
+    local -a uphdr=()
+    mapfile -t uphdr < <(python3 -c 'import json,sys
+for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
+    print("-H"); print(f"{k}: {v}")' <<<"$upjson")
+    if curl -fsS --connect-timeout 20 --max-time 900 -X PUT \
+        "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null; then
+        log_ok "已上传: ${b}"
+    else
+        log_fail "上传失败: ${b}"
+        return 1
+    fi
+}
+
 # 上传制品 + sha256 校验件 + cosign 签名（*.sig）+ manifest + manifest GPG 签名。
 # cosign 签名必须随制品发布，客户端方可校验供应链完整性（防断链）；
 # sha256 校验件同步发布，供手动完整性核验（sha256sum -c）。
 for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc"; do
     [ -e "$f" ] || continue
-    log_info "上传: $(basename "$f")…"
-    run curl -fsSL --connect-timeout 60 --max-time 900 -X POST \
-        -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-        -F "file=@${f}" \
-        "${API}/${VERSION}/attach_files" >/dev/null && UPLOADED="$UPLOADED $(basename "$f")"
-    log_ok "已上传: $(basename "$f")"
+    upload_asset "$f" || UP_FAILED=1
 done
+if [ "$UP_FAILED" != "0" ]; then
+    log_fail "存在上传失败附件，中止发布（修复后重跑可续传，已成功附件自动跳过）"
+    exit 1
+fi
 
 # ─── 阶段 5：更新 latest/ 固定入口（更新器轮询） ─────────────────────────
 if [ "${SKIP_LATEST:-0}" != "1" ]; then
@@ -245,7 +278,9 @@ if [ "${SKIP_LATEST:-0}" != "1" ]; then
         # 公钥随 latest/ 发布（latest/keys/），客户端安装器/自更新器在线拉取，
         # 支持密钥轮换同步（问题 13）。与 install.sh / airymaxrt 拉取路径一致。
         cp -f "$KEYS_DIR/agentrt.asc" "$KEYS_DIR/cosign.pub" "$LATEST_DIR/latest/keys/" 2>/dev/null || true
-        git -C "$LATEST_DIR" add -A latest/
+        # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
+        # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
+        git -C "$LATEST_DIR" add -A -f latest/
         git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
             commit -m "release: update manifest.${CHANNEL}.json for ${VERSION}" >/dev/null 2>&1 || \
             log_warn "latest/ 无变更或提交失败"
