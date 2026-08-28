@@ -37,6 +37,8 @@ log_fail() { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 VERSION="${1:-}"
 DIST_DIR="${2:-${HOME}/.airymaxrt/dist}"
 SKIP_SIGN="${SKIP_SIGN:-0}"
+SKIP_COSIGN="${SKIP_COSIGN:-0}"
+SKIP_GPG="${SKIP_GPG:-0}"
 SKIP_UPLOAD="${SKIP_UPLOAD:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 ATOMGIT_REPO="${ATOMGIT_REPO:-openairymax/agentrt}"
@@ -71,8 +73,8 @@ log_info "制品清单:"
 for f in "${ARTIFACTS[@]}"; do log_info "  $(basename "$f")"; done
 
 # ─── 阶段 1：cosign 签名每个制品 ──────────────────────────────────────────
-if [ "$SKIP_SIGN" = "1" ]; then
-    log_warn "跳过签名（SKIP_SIGN=1）"
+if [ "$SKIP_SIGN" = "1" ] || [ "$SKIP_COSIGN" = "1" ]; then
+    log_warn "跳过 cosign 制品签名（SKIP_SIGN/SKIP_COSIGN）"
 else
     command -v cosign >/dev/null 2>&1 || { log_fail "cosign 未安装"; exit 1; }
     COSIGN_KEY_FILE="${COSIGN_PRIVATE_KEY:-}"
@@ -107,6 +109,12 @@ if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
     NOTES="$(cat "$RELEASE_NOTES_FILE")"
 fi
 log_info "生成 manifest（${CHANNEL}）…"
+# 幂等保护：manifest 已存在则不重生成——updated_at 漂移会使既有 .asc 签名
+# 失配（GPG 对整文件签名），断点重跑场景下绝不能静默漂移已签名内容。
+# 需强制重建时删除旧 manifest 再跑。
+if [ -s "$MANIFEST" ]; then
+    log_ok "manifest 已存在，跳过重生成（保护既有签名一致性）: $(basename "$MANIFEST")"
+else
 python3 - "$VERSION" "$CHANNEL" "$DIST_DIR" "$RELEASE_BASE" "$NOTES" "$MANIFEST" <<'PYEOF'
 import json, os, sys, datetime
 
@@ -153,11 +161,12 @@ with open(out, "w", encoding="utf-8") as f:
     f.write("\n")
 print(f"manifest 已生成: {out}（{len(artifacts)} 平台）")
 PYEOF
+fi
 log_ok "manifest: $(basename "$MANIFEST")"
 
 # ─── 阶段 3：GPG 签名 manifest（权威） ───────────────────────────────────
-if [ "$SKIP_SIGN" = "1" ]; then
-    log_warn "跳过 manifest GPG 签名（SKIP_SIGN=1）"
+if [ "$SKIP_SIGN" = "1" ] || [ "$SKIP_GPG" = "1" ]; then
+    log_warn "跳过 manifest GPG 签名（SKIP_SIGN/SKIP_GPG）"
 else
     command -v gpg >/dev/null 2>&1 || { log_fail "gpg 未安装"; exit 1; }
     if [ -n "${GPG_PRIVATE_KEY:-}" ]; then
