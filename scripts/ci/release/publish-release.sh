@@ -258,7 +258,18 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
 # 上传制品 + sha256 校验件 + cosign 签名（*.sig）+ manifest + manifest GPG 签名。
 # cosign 签名必须随制品发布，客户端方可校验供应链完整性（防断链）；
 # sha256 校验件同步发布，供手动完整性核验（sha256sum -c）。
-for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc"; do
+# 安装器一并随附件发布（releases/download/<tag>/install.sh）：AtomGit raw
+# 域对 .sh 返回 HTML 预览页不可直连，contents API 拉取需 curl+python3 三段
+# 管道，社区用户体验差；release 附件域匿名 GET 直连可用（2026-08-28 实测，
+# HEAD 会被 WAF 拒 401，GET 正常），一键安装命令缩短为一行 curl | bash。
+INSTALLER_SRC="${AIRY_INSTALLER_SRC:-${SCRIPT_DIR}/../../../agent-workload/agentrt/scripts/install.sh}"
+INSTALLER=""
+if [ -f "$INSTALLER_SRC" ]; then
+    INSTALLER="$INSTALLER_SRC"
+else
+    log_warn "未找到安装器源: ${INSTALLER_SRC}（一键安装短链将不可用）"
+fi
+for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc" "$INSTALLER"; do
     [ -e "$f" ] || continue
     upload_asset "$f" || UP_FAILED=1
 done
