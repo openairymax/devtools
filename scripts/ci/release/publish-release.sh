@@ -263,13 +263,22 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
 # 管道，社区用户体验差；release 附件域匿名 GET 直连可用（2026-08-28 实测，
 # HEAD 会被 WAF 拒 401，GET 正常），一键安装命令缩短为一行 curl | bash。
 INSTALLER_SRC="${AIRY_INSTALLER_SRC:-${SCRIPT_DIR}/../../../../agent-workload/agentrt/scripts/install.sh}"
+INSTALLER_PS1_SRC="${AIRY_INSTALLER_PS1_SRC:-${SCRIPT_DIR}/../../../../agent-workload/agentrt/scripts/install.ps1}"
 INSTALLER=""
 if [ -f "$INSTALLER_SRC" ]; then
     INSTALLER="$INSTALLER_SRC"
 else
     log_warn "未找到安装器源: ${INSTALLER_SRC}（一键安装短链将不可用）"
 fi
-for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc" "$INSTALLER"; do
+# Windows 安装器随附件一并发布（raw 域对 .ps1 返回 HTML 不可直连，
+# release 附件域匿名 GET 直连可用，PowerShell 一键安装命令缩短为一行）。
+INSTALLER_PS1=""
+if [ -f "$INSTALLER_PS1_SRC" ]; then
+    INSTALLER_PS1="$INSTALLER_PS1_SRC"
+else
+    log_warn "未找到 Windows 安装器源: ${INSTALLER_PS1_SRC}（PowerShell 一键安装将不可用）"
+fi
+for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc" "$INSTALLER" "$INSTALLER_PS1"; do
     [ -e "$f" ] || continue
     upload_asset "$f" || UP_FAILED=1
 done
