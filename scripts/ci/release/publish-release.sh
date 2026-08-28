@@ -262,7 +262,7 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
 # 域对 .sh 返回 HTML 预览页不可直连，contents API 拉取需 curl+python3 三段
 # 管道，社区用户体验差；release 附件域匿名 GET 直连可用（2026-08-28 实测，
 # HEAD 会被 WAF 拒 401，GET 正常），一键安装命令缩短为一行 curl | bash。
-INSTALLER_SRC="${AIRY_INSTALLER_SRC:-${SCRIPT_DIR}/../../../agent-workload/agentrt/scripts/install.sh}"
+INSTALLER_SRC="${AIRY_INSTALLER_SRC:-${SCRIPT_DIR}/../../../../agent-workload/agentrt/scripts/install.sh}"
 INSTALLER=""
 if [ -f "$INSTALLER_SRC" ]; then
     INSTALLER="$INSTALLER_SRC"
@@ -292,7 +292,7 @@ if [ "${SKIP_LATEST:-0}" != "1" ]; then
         # 完整更新器随 latest/ 发布（latest/airymaxrt）：二进制模式轻量启动器
         # 的 update 自举源。sdk 仓私有，匿名 contents API 不可达，自举源必须
         # 在公开 agentrt 仓内（与 manifest 同路径域，无需额外凭据）。
-        LAUNCHER_SRC="${AIRY_LAUNCHER_SRC:-${SCRIPT_DIR}/../../../agent-workload/sdk/tui/scripts/airymaxrt}"
+        LAUNCHER_SRC="${AIRY_LAUNCHER_SRC:-${SCRIPT_DIR}/../../../../agent-workload/sdk/tui/scripts/airymaxrt}"
         if [ -f "$LAUNCHER_SRC" ]; then
             cp -f "$LAUNCHER_SRC" "$LATEST_DIR/latest/airymaxrt"
         else
