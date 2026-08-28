@@ -71,6 +71,7 @@ docker run --rm --platform "linux/${ARCH}" \
     -v "$UMBRELLA":/src:ro \
     -v "$WORK/build":/build \
     -v "$WORK/pkg":/pkg \
+    -v "$WORK/toolchain":/usr/local \
     $([ -d "$DEPS_DIR" ] && echo "-v $DEPS_DIR:/deps:ro") \
     $([ -d "$TUI_VENDOR_DIR" ] && echo "-v $TUI_VENDOR_DIR:/tui-vendor:ro -v $TUI_CFG_DIR:/src/agent-workload/sdk/tui/.cargo:ro") \
     "$IMAGE" bash -euxo pipefail -c '
@@ -80,59 +81,96 @@ apt-get install -y -qq --no-install-recommends \
   build-essential make perl curl git ca-certificates python3 python3-pip python3-venv \
   libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
   libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
-# cmake/ninja 安装：riscv64 无预编译 wheel，PEP 517 源码构建需在线下载
-# 构建后端依赖；官方源（pypi.org）对非主流架构偶发断连/挂起，直接强制
-# 清华镜像（国内可达稳定，2026-08-28 实测官方源两次失败）。
-# 版本固定：cmake 4.x 自带的 cmcurl 在 riscv64/gcc9 + OpenSSL 1.1.1 下
-# openssl.c 编译失败（PEP 517 wheel 构建中断，2026-08-29 实测）→ 固定
-# 3.29.6（自带 curl 与 20.04 工具链兼容，曾成功构建）。
-export PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
-pip3 install --no-cache-dir "cmake==3.29.6" ninja
+# cmake 安装：riscv64 无预编译 wheel，pip PEP 517 源码构建在 qemu/网络下
+# 不稳定（tuna 下载大 sdist 偶发 RemoteDisconnected 断连、cmake 4.x 自带
+# cmcurl 在 gcc9 + OpenSSL 1.1.1 下 openssl.c 编译失败，2026-08-29 实测两次；
+# GitHub 在容器/内网亦不可达）。改为离线源码构建：
+#   cmake 3.29.6：优先 /deps/cmake-v3.29.6.tar.gz（本地构建工作区缓存，
+#   源自主仓 gitee.com/mirrors/cmake v3.29.6，bootstrap+make 与 20.04 工具链
+#   兼容）；无缓存时回退 cmake.org 官方 tarball（海外直连，慢但可达）。
+#   幂等：/usr/local 持久化挂载，已装则跳过（断点续传，qemu 下省时）。
+if ! cmake --version 2>/dev/null | grep -q "3\.29\.6"; then
+  if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
+      tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
+  else
+      curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
+        https://cmake.org/files/v3.29/cmake-3.29.6.tar.gz
+      tar -xzf /tmp/cmake.tar.gz -C /tmp
+  fi
+  (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$(nproc)" --no-qt-gui --no-debugger \
+    -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
+    && make -j"$(nproc)" && make install)
+fi
 
 # cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue；优先 /deps 离线包，
 # 网络受限环境无需访问 GitHub）
-if [ -f /deps/cJSON-1.7.18.tar.gz ]; then
-    cp -f /deps/cJSON-1.7.18.tar.gz /tmp/cjson.tar.gz
-else
-    curl -fsSL -o /tmp/cjson.tar.gz \
-      https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ]; then
+  if [ -f /deps/cJSON-1.7.18.tar.gz ]; then
+      cp -f /deps/cJSON-1.7.18.tar.gz /tmp/cjson.tar.gz
+  else
+      curl -fsSL -o /tmp/cjson.tar.gz \
+        https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+  fi
+  tar -xzf /tmp/cjson.tar.gz -C /tmp
+  CJSON_DIR="$(ls -d /tmp/cJSON-* 2>/dev/null | head -1)"
+  cmake -S "$CJSON_DIR" -B /tmp/cjson-build \
+    -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
+  cmake --build /tmp/cjson-build --parallel
+  cmake --install /tmp/cjson-build
 fi
-tar -xzf /tmp/cjson.tar.gz -C /tmp
-CJSON_DIR="$(ls -d /tmp/cJSON-* 2>/dev/null | head -1)"
-cmake -S "$CJSON_DIR" -B /tmp/cjson-build \
-  -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-  -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
-cmake --build /tmp/cjson-build --parallel
-cmake --install /tmp/cjson-build
 
 # OpenSSL 3.0.17（20.04 libssl 1.1.1 头触发 poison 编译失败；优先 /deps 离线包）
-if [ -f /deps/openssl-3.0.17.tar.gz ]; then
-    cp -f /deps/openssl-3.0.17.tar.gz /tmp/openssl.tar.gz
-else
-    curl -fsSL -o /tmp/openssl.tar.gz \
-      https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
+if [ ! -f /usr/local/lib/libcrypto.a ] && [ ! -f /usr/local/lib64/libcrypto.a ]; then
+  if [ -f /deps/openssl-3.0.17.tar.gz ]; then
+      cp -f /deps/openssl-3.0.17.tar.gz /tmp/openssl.tar.gz
+  else
+      curl -fsSL -o /tmp/openssl.tar.gz \
+        https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
+  fi
+  tar -xzf /tmp/openssl.tar.gz -C /tmp
+  OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
+  (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
+    --openssldir=/usr/local/ssl shared && make -j"$(nproc)" build_sw && make install_sw)
 fi
-tar -xzf /tmp/openssl.tar.gz -C /tmp
-OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
-(cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
-  --openssldir=/usr/local/ssl shared && make -j"$(nproc)" build_sw && make install_sw)
 
-# cmake 构建（Release，无测试；安装到 /pkg）
-cmake -S /src/agent-workload/agentrt -B /build \
-  -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
-  -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX=/pkg/out
+# cmake 构建（Release，无测试；安装到 /pkg）。/build 持久化挂载，CMakeCache
+# 存在时增量构建（断点续传），全新时完整配置。
+if [ ! -f /build/CMakeCache.txt ]; then
+  cmake -S /src/agent-workload/agentrt -B /build \
+    -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
+    -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX=/pkg/out
+fi
 cmake --build /build -j"$(nproc)"
 cmake --install /build
 
 # Rust TUI（agentrt-tui，失败降级不阻断）
 # 容器内 GitHub 不可达：rustup 走国内镜像 rsproxy；crates-io 依赖由
 # /tui-vendor 离线 vendor 提供（.cargo/config.toml 已挂载到源码树）。
+# riscv64 链接陷阱（2026-08-29 实测）：GNU ld 2.34（20.04）无法合并
+# RISC-V attributes（"failed to merge target specific data"），libc 等
+# crate 的 build script 链接即失败。系统无 lld 包（riscv64 20.04 仓库
+# 无 lld）。修复（两轮实测后定案）：
+#   1) -C linker=rust-lld 直链 → 丢系统库路径（unable to find -lc 等）
+#   2) -fuse-ld=<绝对路径> → gcc9 不支持（GCC 10+ 特性）
+#   最终：把工具链自带 rust-lld 复制为 /usr/local/bin/ld.lld，gcc driver
+#   保留库路径查找，-fuse-ld=lld 仅换链接器（gcc8+ 官方支持）。
+# 降级保护用 if ! 结构，杜绝 set -e 下误中断整体构建。
 export PATH="$HOME/.cargo/bin:$PATH"
 export RUSTUP_DIST_SERVER="https://rsproxy.cn" RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
-curl --proto =https --tlsv1.2 -sSf https://rsproxy.cn/rustup/rustup-init.sh | sh -s -- -y --profile minimal
+command -v cargo >/dev/null 2>&1 || \
+  curl --proto =https --tlsv1.2 -sSf https://rsproxy.cn/rustup/rustup-init.sh | sh -s -- -y --profile minimal
+RUST_LLD="$(find "$HOME/.rustup" -name rust-lld -path '*riscv64*' 2>/dev/null | head -1)"
+if [ -n "$RUST_LLD" ]; then
+  cp -f "$RUST_LLD" /usr/local/bin/ld.lld
+  chmod +x /usr/local/bin/ld.lld
+fi
 export CARGO_TARGET_DIR=/tmp/tui-target
-(cd /src/agent-workload/sdk/tui && cargo build --release) || echo "warn: ${ARCH} TUI 构建失败（降级）"
-cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
+if ! (cd /src/agent-workload/sdk/tui && RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --release); then
+  echo "warn: ${ARCH} TUI 构建失败（降级为 C CLI 包装）"
+else
+  cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
+fi
 
 # Python 运行时依赖
 mkdir -p /pkg/out/lib
