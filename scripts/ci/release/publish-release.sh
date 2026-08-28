@@ -278,6 +278,15 @@ if [ "${SKIP_LATEST:-0}" != "1" ]; then
         # 公钥随 latest/ 发布（latest/keys/），客户端安装器/自更新器在线拉取，
         # 支持密钥轮换同步（问题 13）。与 install.sh / airymaxrt 拉取路径一致。
         cp -f "$KEYS_DIR/agentrt.asc" "$KEYS_DIR/cosign.pub" "$LATEST_DIR/latest/keys/" 2>/dev/null || true
+        # 完整更新器随 latest/ 发布（latest/airymaxrt）：二进制模式轻量启动器
+        # 的 update 自举源。sdk 仓私有，匿名 contents API 不可达，自举源必须
+        # 在公开 agentrt 仓内（与 manifest 同路径域，无需额外凭据）。
+        LAUNCHER_SRC="${AIRY_LAUNCHER_SRC:-${SCRIPT_DIR}/../../../agent-workload/sdk/tui/scripts/airymaxrt}"
+        if [ -f "$LAUNCHER_SRC" ]; then
+            cp -f "$LAUNCHER_SRC" "$LATEST_DIR/latest/airymaxrt"
+        else
+            log_warn "未找到更新器源: ${LAUNCHER_SRC}（二进制模式 update 自举将不可用）"
+        fi
         # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
         # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
         git -C "$LATEST_DIR" add -A -f latest/
