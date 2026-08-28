@@ -112,7 +112,7 @@ fi
 tar -xzf /tmp/openssl.tar.gz -C /tmp
 OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
 (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
-  --openssldir=/usr/local/ssl shared && make -j"$(nproc)" && make install_sw)
+  --openssldir=/usr/local/ssl shared && make -j"$(nproc)" build_sw && make install_sw)
 
 # cmake 构建（Release，无测试；安装到 /pkg）
 cmake -S /src/agent-workload/agentrt -B /build \
