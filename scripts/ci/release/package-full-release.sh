@@ -176,8 +176,11 @@ build_full_package() {
     run touch "$out/platform-${PLATFORM#linux-}"
 
     # Rust TUI
-    if [ -d "$TUI_SRC" ] && command -v cargo >/dev/null 2>&1; then
+    # cargo 定位：PATH 直查 → rustup 默认安装路径回退（CI 与开发机 PATH
+    # 差异——rustup 未 source 时 command -v cargo 失败，TUI 曾静默缺失）。
+    if [ -d "$TUI_SRC" ] && { command -v cargo >/dev/null 2>&1 || [ -x "${HOME}/.cargo/bin/cargo" ]; }; then
         log_info "构建 agentrt-tui…"
+        export PATH="${HOME}/.cargo/bin:$PATH"
         # 构建产物收敛（铁律 4.7）：CARGO_TARGET_DIR 指向 DIST_DIR/target，
         # 禁止 cargo 在源码树 sdk/tui/target 落盘。
         run bash -c "cd '$TUI_SRC' && CARGO_TARGET_DIR='${DIST_DIR}/target' cargo build --release"
