@@ -163,10 +163,27 @@ mkdir -p "$PKG_DIR"
 cp -rf "$WORK/pkg/out/." "$PKG_DIR/"
 # 架构标记（install.sh install_binary 交叉校验）
 touch "$PKG_DIR/platform-${PLATFORM#linux-}"
-# 包内 manifest
+# 包内 manifest（与 package-full-release.sh 同格式，SSoT：checksum 权威在
+# latest/manifest.stable.json，包内不内嵌校验值，防打包时刻快照漂移）
 cat > "$PKG_DIR/manifest.json" <<EOF
-{"name":"agentrt","version":"${AIRY_VERSION}","platform":"${PLATFORM}","components":{"daemons":"18","cli":"airy_cli","tui":"agentrt-tui"}}
+{
+  "name": "agentrt",
+  "version": "${AIRY_VERSION}",
+  "platform": "${PLATFORM}",
+  "components": {
+    "daemons": "18 (15 基础 + think_d/cupolas_d/maths_d)",
+    "cli": "airy_cli",
+    "tui": "agentrt-tui (rust)",
+    "atoms": "prebuilt (closed source)",
+    "memoryrovol": "prebuilt (commercial, optional)"
+  },
+  "checksum_source": "latest/manifest.stable.json"
+}
 EOF
+
+# 清理 Python 缓存（pyc 无害但污染制品：__pycache__/.pytest_cache 不入包）
+find "$PKG_DIR" -type d \( -name "__pycache__" -o -name ".pytest_cache" \) \
+    -exec rm -rf {} + 2>/dev/null || true
 
 ( cd "$WORK/pkg" && tar -czf "$DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz" \
     "agentrt-${VERSION_NUM}" )

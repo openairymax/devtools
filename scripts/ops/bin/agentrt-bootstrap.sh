@@ -9,7 +9,8 @@
 #          健康检查通过后再启动下一层。
 #
 # 用法:
-#   bash agentrt-bootstrap.sh [选项]
+#   bash agentrt-bootstrap.sh [选项]         启动全部 daemon
+#   bash agentrt-bootstrap.sh stop           停止全部 daemon
 #
 # 选项:
 #   -c <config>    指定 agentrt.yaml 配置文件
@@ -947,6 +948,16 @@ trap cleanup SIGINT SIGTERM
 
 main() {
     parse_args "$@"
+
+    # 子命令支持：stop（停止全部 daemon）。历史问题：getopts 忽略位置参数，
+    # 传 "stop" 会被当作启动执行（实际重启 daemon 群）。此处显式识别并走
+    # 停止路径（并行 TERM → 等待 → KILL 兜底，与信号处理同语义）。
+    if [[ "${1:-}" == "stop" ]]; then
+        log_info "Stopping all daemons..."
+        stop_all_daemons
+        log_info "All daemons stopped"
+        exit 0
+    fi
 
     # 显式 -b/-r 覆盖权威 AIRY_*（历史根因：parse_args 只改 AGENTRT_*
     # 健康检查路径而不同步 daemon 继承的 AIRY_BIN_DIR/AIRY_RUNTIME_DIR，

@@ -242,6 +242,10 @@ build_full_package() {
         echo "}"
     } > "$out/manifest.json"
 
+    # 清理 Python 缓存（pyc 无害但污染制品：__pycache__/.pytest_cache 不入包）
+    find "$out" -type d \( -name "__pycache__" -o -name ".pytest_cache" \) \
+        -exec rm -rf {} + 2>/dev/null || true
+
     # 打包：out 位于 ${STAGE_DIR}，须 cd STAGE_DIR（同 build_atoms_prebuilt 修复）。
     ( cd "$STAGE_DIR" && run tar -czf "${DIST_DIR}/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
         "$(basename "$out")" )
