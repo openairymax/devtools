@@ -181,9 +181,27 @@ build_full_package() {
     if [ -d "$TUI_SRC" ] && { command -v cargo >/dev/null 2>&1 || [ -x "${HOME}/.cargo/bin/cargo" ]; }; then
         log_info "构建 agentrt-tui…"
         export PATH="${HOME}/.cargo/bin:$PATH"
+        # MemoryRovol OSS 库（L1+L2，无 agentrt 运行时符号依赖）：TUI 独立
+        # 链接专用。PRO 全功能库依赖 agentrt 平台符号（airy_thread_* 等），
+        # 无法被 TUI 独立二进制链接——历史根因：环境残留 AIRY_HOME 指向含
+        # PRO 库目录时 build.rs 误选 PRO 库 → airy_thread_* 未定义链接失败。
+        # 显式构建 OSS 库并注入 MEMORYROVOL_OSS_LIB，同时注入 sanitizer-free
+        # libairy_common.a（IME），并 unset AIRY_HOME 屏蔽环境残留。
+        local mr_oss_lib=""
+        if [ -d "${PROJECT_ROOT}/agent-workload/products/memoryrovol" ]; then
+            local mr_oss_build="${STAGE_DIR}/build-mr-oss"
+            run cmake -S "${PROJECT_ROOT}/agent-workload/products/memoryrovol" \
+                -B "$mr_oss_build" \
+                -DCMAKE_BUILD_TYPE=Release -DMEMORYROVOL_OSS=ON -DBUILD_TESTS=OFF >/dev/null
+            run cmake --build "$mr_oss_build" -j"$JOBS"
+            mr_oss_lib="$(find "$mr_oss_build" -name "libagentrt_memoryrovol.a" | head -1)"
+        fi
         # 构建产物收敛（铁律 4.7）：CARGO_TARGET_DIR 指向 DIST_DIR/target，
         # 禁止 cargo 在源码树 sdk/tui/target 落盘。
-        run bash -c "cd '$TUI_SRC' && CARGO_TARGET_DIR='${DIST_DIR}/target' cargo build --release"
+        run bash -c "cd '$TUI_SRC' && env -u AIRY_HOME \
+            MEMORYROVOL_OSS_LIB='${mr_oss_lib:-}' \
+            AIRY_COMMON_LIB='${build_dir}/commons/libairy_common.a' \
+            CARGO_TARGET_DIR='${DIST_DIR}/target' cargo build --release"
         [ -f "${DIST_DIR}/target/release/agentrt-tui" ] && \
             run cp -f "${DIST_DIR}/target/release/agentrt-tui" "$out/bin/"
     fi
