@@ -237,8 +237,9 @@ build_full_package() {
     # 打包：out 位于 ${STAGE_DIR}，须 cd STAGE_DIR（同 build_atoms_prebuilt 修复）。
     ( cd "$STAGE_DIR" && run tar -czf "${DIST_DIR}/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
         "$(basename "$out")" )
-    run sha256sum "$DIST_DIR/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
-        > "$DIST_DIR/agentrt-${VERSION}-${PLATFORM}.tar.gz.sha256"
+    # sha256 文件内为相对文件名（sha256sum -c 兼容），不得带绝对路径。
+    ( cd "$DIST_DIR" && run sha256sum "agentrt-${VERSION}-${PLATFORM}.tar.gz" \
+        > "agentrt-${VERSION}-${PLATFORM}.tar.gz.sha256" )
     log_ok "完全体包: dist/agentrt-${VERSION}-${PLATFORM}.tar.gz"
 }
 
