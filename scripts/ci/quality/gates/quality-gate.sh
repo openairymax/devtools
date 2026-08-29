@@ -223,6 +223,26 @@ gate_complexity() {
 }
 
 # ============================================================================
+# Gate 7: SSoT 技术点权威源校验 (0.1.6 P2-3)
+# ============================================================================
+gate_ssot() {
+    section "Gate 7: SSoT Authority Validation"
+
+    local ssot_script="${SCRIPT_DIR}/../../verify/validate-ssot.py"
+    if [ -x "$ssot_script" ] || [ -f "$ssot_script" ]; then
+        log_info "Running SSoT authority validation..."
+        if python3 "$ssot_script" "${PROJECT_ROOT}" 2>&1 | tail -20; then
+            check_gate "SSoT-Validate" 0
+        else
+            check_gate "SSoT-Validate" 1
+        fi
+    else
+        log_warn "SSoT validation script not found: ${ssot_script}"
+        check_gate "SSoT-Validate" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -291,6 +311,7 @@ main() {
         gate_contract
         $skip_cross_repo || gate_cross_repo
         $skip_complexity || gate_complexity
+        gate_ssot
     fi
 
     # 输出结果
