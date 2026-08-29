@@ -163,9 +163,18 @@ export AGENT_SDK_OK
 SCAN_ARGS=("$@")
 FILTERED_ARGS=()
 CUSTOM_AIRY_HOME=""
+STOP_REQUESTED=0
 i=0
 while [[ $i -lt ${#SCAN_ARGS[@]} ]]; do
     case "${SCAN_ARGS[$i]}" in
+        stop)
+            # stop 子命令预扫描（消费掉，避免被 main 的 $1 检查遗漏）：
+            # getopts 不消费位置参数，main 里 `${1:-}` 只看到 $1——当 stop
+            # 排在选项之后（如 `-s stop` / `--home /x stop`）时 $1 是选项，
+            # 原实现会误走启动路径实际重启 daemon 群。此处从全部参数中
+            # 提取 stop 标记，与参数顺序无关。
+            STOP_REQUESTED=1
+            i=$((i + 1)) ;;
         --home|-H)
             CUSTOM_AIRY_HOME="${SCAN_ARGS[$((i + 1))]:-}"
             i=$((i + 2)) ;;
@@ -952,7 +961,9 @@ main() {
     # 子命令支持：stop（停止全部 daemon）。历史问题：getopts 忽略位置参数，
     # 传 "stop" 会被当作启动执行（实际重启 daemon 群）。此处显式识别并走
     # 停止路径（并行 TERM → 等待 → KILL 兜底，与信号处理同语义）。
-    if [[ "${1:-}" == "stop" ]]; then
+    # STOP_REQUESTED 由顶部预扫描从全部参数提取（与选项顺序无关）：
+    # `-s stop` / `--home /x stop` 等组合同样正确进入停止路径。
+    if (( STOP_REQUESTED )); then
         log_info "Stopping all daemons..."
         stop_all_daemons
         log_info "All daemons stopped"
