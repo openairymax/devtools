@@ -216,20 +216,21 @@ EOF
         $([ -d "$DEPS_DIR" ] && echo "-v $DEPS_DIR:/deps:ro") \
         $([ -d "$TUI_VENDOR_DIR" ] && echo "-v $TUI_VENDOR_DIR:/tui-vendor:ro -v $TUI_CFG_DIR:/src/agent-workload/sdk/tui/.cargo:ro") \
         -e SKIP_TUI="${SKIP_TUI:-0}" \
+        -e ARCH="${qemu_arch}" \
         "$image" bash -euxo pipefail -s <<'CONTAINER_EOF'
 export DEBIAN_FRONTEND=noninteractive
-# 依赖仅首装一次：toolchain 持久挂载 /usr/local（.agentrt-deps-installed
-# 标志文件判定），后续构建跳过 apt 与源码编译（断点续传，qemu 下省时）。
-# 历史慢因根治：旧脚本每次 docker run 重建容器后都重新 apt-get update+install
-# 全部依赖（几分钟）；固化到 toolchain 后仅首装一次。
-if [ ! -f /usr/local/.agentrt-deps-installed ]; then
-  apt-get update -qq
-  apt-get install -y -qq --no-install-recommends \
-    build-essential make perl curl git ca-certificates python3 python3-pip python3-venv \
-    libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
-    libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
-  touch /usr/local/.agentrt-deps-installed
-fi
+# 0.1.6b 系统性修复：apt 依赖在容器系统层，docker run 每次新建实例即丢失。
+# 历史 bug：.agentrt-deps-installed 标志固化在持久 /usr/local 卷，导致新容器
+# 实例跳过 apt 安装而 gcc 等已随旧实例销毁（2026-08-30 实测 cmake bootstrap
+# 报 Cannot find appropriate C compiler）。改为每次实例都安装（1-2 分钟，
+# apt 层缓存命中快）；cmake/openssl/cJSON 等源码级依赖仍由持久 /usr/local
+# 缓存（断点续传），两套机制解耦，不再用标志文件把系统层安装与持久层
+# 缓存错误绑定。
+apt-get update -qq
+apt-get install -y -qq --no-install-recommends \
+  build-essential make perl curl git ca-certificates python3 python3-pip python3-venv \
+  libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
+  libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
 if ! cmake --version 2>/dev/null | grep -q "3\.29\.6"; then
   if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
       tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
@@ -257,7 +258,17 @@ if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ];
   cmake --build /tmp/cjson-build --parallel
   cmake --install /tmp/cjson-build
 fi
-if [ ! -f /usr/local/lib/libcrypto.a ] && [ ! -f /usr/local/lib64/libcrypto.a ]; then
+# 0.1.6b 系统性修复（SSoT 单一权威）：openssl 唯一权威 = 自编译 3.0.17，
+# 且必须装到 /usr/local/lib。历史 bug：默认 Configure 在 64 位主机把
+# libdir 解析为 lib64，而 CMake FindOpenSSL/pkg-config 默认不搜
+# /usr/local/lib64 → find_package 错解析到系统 1.1.1f（Ubuntu 20.04 的
+# libcrypto.so.1.1 不导出 EVP_DigestSignUpdate@@OPENSSL_3.0.0）→
+# license_sign 链接失败（0.1.6b 容器构建实测）。
+# 自愈逻辑：lib 缺失或 lib64 有残留（历史产物）→ 容器内（root）清理重装。
+if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] || [ -f /usr/local/lib64/libssl.so ]; then
+  rm -rf /usr/local/lib64/libcrypto* /usr/local/lib64/libssl* \
+         /usr/local/lib64/pkgconfig/libcrypto.pc /usr/local/lib64/pkgconfig/libssl.pc \
+         /usr/local/include/openssl /usr/local/ssl
   if [ -f /deps/openssl-3.0.17.tar.gz ]; then
       cp -f /deps/openssl-3.0.17.tar.gz /tmp/openssl.tar.gz
   else
@@ -267,15 +278,43 @@ if [ ! -f /usr/local/lib/libcrypto.a ] && [ ! -f /usr/local/lib64/libcrypto.a ];
   tar -xzf /tmp/openssl.tar.gz -C /tmp
   OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
   (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
-    --openssldir=/usr/local/ssl shared && make -j"$(nproc)" build_sw && make install_sw)
+    --openssldir=/usr/local/ssl shared --libdir=lib \
+    && make -j"$(nproc)" build_sw && make install_sw)
 fi
-if [ ! -f /build/CMakeCache.txt ]; then
+# 配置漂移自愈：0.1.6b 起 configure 必须携带 -DOPENSSL_ROOT_DIR=/usr/local
+# （FindOpenSSL 唯一解析到自编译 3.0.17）；旧 CMakeCache 缺该变量 → 重配。
+if [ ! -f /build/CMakeCache.txt ] || ! grep -q "OPENSSL_ROOT_DIR:.*=/usr/local" /build/CMakeCache.txt; then
+  rm -f /build/CMakeCache.txt
   cmake -S /src/agent-workload/agentrt -B /build \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
-    -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX=/pkg/out
+    -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX=/pkg/out \
+    -DOPENSSL_ROOT_DIR=/usr/local
 fi
 cmake --build /build -j"$(nproc)"
 cmake --install /build
+
+# 0.1.6b 缺陷修复：运行时 .so 自包含收集（在容器内按目标 glibc 基线
+# ldd 解析，宿主收集会带入构建主机更新的系统库破坏可移植性）。系统
+# 核心库（libc/libm/libgcc_s/ld-linux 等）豁免，由目标系统提供。
+# 注意：不依赖 file 命令（基础镜像未装，2026-08-30 实测收集全跳过）；
+# ldd 对脚本/静态链接二进制输出 "not a dynamic executable"/"statically
+# linked"，awk 解析无有效路径自然跳过，无需 file 预判。
+# 0.1.6b 第二坑（2026-08-30 实测）：自编译 openssl/cJSON 装 /usr/local/lib
+# 后未跑 ldconfig → 动态链接器不知道 /usr/local/lib → 收集时 ldd 对
+# libcrypto.so.3 等报 not found → lib/ 漏收自编译库。ldconfig 注册
+# /usr/local/lib（Ubuntu 默认 /etc/ld.so.conf.d/libc.conf 已含）后 ldd
+# 才能解析全部依赖。
+ldconfig 2>/dev/null || true
+mkdir -p /pkg/out/lib
+for b in /pkg/out/bin/*; do
+  ldd "$b" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
+    case "$n" in
+      linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
+    esac
+    [ -n "$p" ] && [ -f "$p" ] && cp -f "$p" /pkg/out/lib/ 2>/dev/null || true
+  done
+done
+touch /pkg/out/lib/.collected
 
 # Rust TUI（agentrt-tui，失败降级不阻断；已装则跳过——qemu 下 cargo 全量
 # 重编极慢）。riscv64 链接陷阱（2026-08-29 实测）：GNU ld 2.34 无法合并
@@ -286,13 +325,20 @@ if [ ! -f /pkg/out/bin/agentrt-tui ] && [ "${SKIP_TUI:-0}" != "1" ]; then
   export RUSTUP_DIST_SERVER="https://rsproxy.cn" RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
   command -v cargo >/dev/null 2>&1 || \
     curl --proto =https --tlsv1.2 -sSf https://rsproxy.cn/rustup/rustup-init.sh | sh -s -- -y --profile minimal
-  RUST_LLD="$(find "$HOME/.rustup" -name rust-lld -path '*riscv64*' 2>/dev/null | head -1)"
+  # 0.1.6b：链接器按需。riscv64 必须换 lld（GNU ld 2.34 无法合并 RISC-V
+  # attributes）；arm64/x86_64 GNU ld 正常，且容器内未必有 rust-lld
+  # （2026-08-30 实测 arm64 容器无 riscv64 路径的 rust-lld → 无条件
+  # -fuse-ld=lld 报 collect2: cannot find ld）。有 rust-lld 才切 lld。
+  RUST_LD_ARG=""
+  RUST_LLD="$(find "$HOME/.rustup" -name rust-lld 2>/dev/null | head -1)"
   if [ -n "$RUST_LLD" ]; then
     cp -f "$RUST_LLD" /usr/local/bin/ld.lld
     chmod +x /usr/local/bin/ld.lld
+    RUST_LD_ARG="-C link-arg=-fuse-ld=lld"
   fi
   export CARGO_TARGET_DIR=/tmp/tui-target
-  if ! (cd /src/agent-workload/sdk/tui && RUSTFLAGS="-C link-arg=-fuse-ld=lld -C link-arg=-Wl,-rpath,\$ORIGIN/../lib" cargo build --release); then
+  if ! (cd /src/agent-workload/sdk/tui && \
+      RUSTFLAGS="-C link-arg=-Wl,-rpath,\$ORIGIN/../lib ${RUST_LD_ARG}" cargo build --release); then
     echo "warn: ${ARCH} TUI 构建失败（降级为 C CLI 包装）"
   else
     cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
@@ -308,6 +354,8 @@ CONTAINER_EOF
     mkdir -p "$stage"
     cp -rf "$pkg_dir/out/." "$out/"
     pkg_assemble "$out"
+    # 容器内收集标记不入包（lib/.collected 仅宿主跳过收集用）
+    rm -f "$out/lib/.collected"
     pkg_tar_package "$stage" "agentrt-${VERSION_NUM}" "$DIST_DIR" \
         "agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
     log_ok "产物: $DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
@@ -417,7 +465,17 @@ build_cross() {
 }
 
 case "$ARCH" in
-    x86_64) build_native ;;
+    x86_64)
+        # 0.1.6b：x86_64 默认走 ubuntu:20.04 容器构建（glibc 2.31 基线，
+        # 保证旧发行版可运行；--platform linux/amd64 在 x86 主机原生执行，
+        # 无 qemu 开销）。容器内同时完成 .so 收集（目标基线）。开发迭代
+        # 可用 AIRY_NATIVE=1 切回宿主原生构建（仅本机可跑，不可发布）。
+        if [ "${AIRY_NATIVE:-0}" = "1" ]; then
+            build_native
+        else
+            build_qemu x86_64
+        fi
+        ;;
     arm64)
         if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/cross-sysroot/arm64-sysroot/toolchain-aarch64.cmake" ] \
             && command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then

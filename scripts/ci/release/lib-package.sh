@@ -29,6 +29,14 @@ pkg_setup_version() {
 # pkg_verify_deps <out> 校验无未解析依赖。
 pkg_runtime_libs() {
     local out="$1" b n p
+    # 0.1.6b：容器构建已在容器内按目标 glibc 基线收集 lib/（标记文件
+    # 判定）。宿主 ldd 收集会把构建主机更新的系统库带入包内（0.1.6a
+    # 实测可移植性破坏：二进制/库要求 GLIBC≥2.38，旧发行版无法运行），
+    # 容器产物绝不在宿主重新收集。
+    if [ -f "$out/lib/.collected" ]; then
+        echo "[INFO] lib/ 已由容器收集（跳过宿主 ldd 收集，保目标 glibc 基线）"
+        return 0
+    fi
     mkdir -p "$out/lib"
     for b in "$out"/bin/*; do
         [ -f "$b" ] || continue
@@ -46,13 +54,20 @@ pkg_runtime_libs() {
 
 # 校验包内所有 ELF 无未解析依赖（缺库则警告并返回非零）
 pkg_verify_deps() {
-    local out="$1" b missing=0
+    local out="$1" b missing=0 _ldpath=""
+    # 0.1.6b：容器收集产物（.collected 标记）必须带包内 lib/ 验证——
+    # 宿主 ldd 不知道包内自包含的 .so（libcrypto.so.3 等），不带
+    # LD_LIBRARY_PATH 必报"误报 not found"（2026-08-30 实测 8 个二进制）。
+    # 用命令前缀注入，不污染调用方环境。
+    if [ -f "$out/lib/.collected" ]; then
+        _ldpath="$out/lib"
+    fi
     for b in "$out"/bin/*; do
         [ -f "$b" ] || continue
         file "$b" 2>/dev/null | grep -q 'ELF' || continue
-        if ldd "$b" 2>/dev/null | grep -q "not found"; then
+        if LD_LIBRARY_PATH="${_ldpath:+$_ldpath:}${LD_LIBRARY_PATH:-}" ldd "$b" 2>/dev/null | grep -q "not found"; then
             echo "warn: $(basename "$b") 存在未解析依赖:"
-            ldd "$b" 2>/dev/null | grep "not found"
+            LD_LIBRARY_PATH="${_ldpath:+$_ldpath:}${LD_LIBRARY_PATH:-}" ldd "$b" 2>/dev/null | grep "not found"
             missing=$((missing + 1))
         fi
     done
