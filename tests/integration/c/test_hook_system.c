@@ -790,23 +790,32 @@ static void test_concurrent_hook_registration(void) {
     int ret = airy_hook_init();
     CHECK_EQ(ret, 0, "airy_hook_init failed");
 
-    /* 批量注册不同类型的 Hook */
-    const char *hook_names[] = {
+    /* 批量注册全部 Hook 类型（与 HOOK_TYPE_COUNT 对齐，2026-08-29 修复：
+     * P1-5 新增 HOOK_TYPE_SESSION_START 后类型数由 8 增至 9，原测试仅注册
+     * 8 类导致断言循环 i=8 时 count=0 失败——注册列表与断言均由权威枚举驱动，
+     * 禁止硬编码类型数） */
+    static const char *hook_names[] = {
         "hook_pre_exec", "hook_post_exec",
         "hook_pre_llm", "hook_post_llm",
         "hook_pre_tool", "hook_post_tool",
-        "hook_on_error", "hook_on_memory"
+        "hook_on_error", "hook_on_memory",
+        "hook_session_start"
     };
-    hook_type_t hook_types[] = {
+    static const hook_type_t hook_types[] = {
         HOOK_TYPE_PRE_EXEC, HOOK_TYPE_POST_EXEC,
         HOOK_TYPE_PRE_LLM, HOOK_TYPE_POST_LLM,
         HOOK_TYPE_PRE_TOOL, HOOK_TYPE_POST_TOOL,
-        HOOK_TYPE_ON_ERROR, HOOK_TYPE_ON_MEMORY_EVOLVE
+        HOOK_TYPE_ON_ERROR, HOOK_TYPE_ON_MEMORY_EVOLVE,
+        HOOK_TYPE_SESSION_START
     };
+    static const size_t hook_reg_count = sizeof(hook_types) / sizeof(hook_types[0]);
+    /* 编译期断言：注册覆盖必须与权威枚举一致 */
+    CHECK(hook_reg_count == HOOK_TYPE_COUNT,
+          "Registration list must cover all HOOK_TYPE_COUNT types");
 
-    for (int i = 0; i < 8; i++) {
+    for (size_t i = 0; i < hook_reg_count; i++) {
         ret = airy_hook_register(
-            hook_names[i], hook_types[i], audit_callback, NULL, 100 - i, true);
+            hook_names[i], hook_types[i], audit_callback, NULL, 100 - (int)i, true);
         CHECK_EQ(ret, 0, "Register hook type failed");
     }
 
@@ -818,7 +827,7 @@ static void test_concurrent_hook_registration(void) {
 
     /* 验证总数 */
     size_t total = airy_hook_count();
-    CHECK_EQ(total, 8, "Total should be 8 hooks");
+    CHECK_EQ(total, HOOK_TYPE_COUNT, "Total should equal HOOK_TYPE_COUNT");
 
     airy_hook_shutdown();
     PASS();
