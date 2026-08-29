@@ -286,6 +286,11 @@ set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/service.c
     ${LLM_D_DIR}/src/service_config.c
+    ${LLM_D_DIR}/src/service_config_json.c
+    ${LLM_D_DIR}/src/service_config_yaml.c
+    ${LLM_D_DIR}/src/service_config_yaml_models.c
+    ${LLM_D_DIR}/src/service_config_yaml_providers.c
+    ${LLM_D_DIR}/src/service_config_yaml_pricing.c
     ${LLM_D_DIR}/src/service_providers.c
     ${LLM_D_DIR}/src/service_request.c
     ${LLM_D_DIR}/src/service_metrics.c
@@ -293,6 +298,7 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/token_counter.c
     ${LLM_D_DIR}/src/response.c
     ${LLM_D_DIR}/src/cost_tracker.c
+    ${LLM_D_DIR}/src/llm_svc_adapter.c
     ${LLM_D_DIR}/src/providers/registry.c
     ${LLM_D_DIR}/src/providers/provider.c
     ${LLM_D_DIR}/src/providers/provider_http.c
