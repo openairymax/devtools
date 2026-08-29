@@ -123,11 +123,52 @@ pkg_clean_pyc() {
         -exec rm -rf {} + 2>/dev/null || true
 }
 
+# 交叉产物运行时库收集：宿主 ldd 无法分析异架构 ELF（riscv64/aarch64），
+# 改用 readelf 解析 NEEDED 并在 sysroot 中定位 .so；系统核心库由目标系统
+# 提供（libc/libm/libgcc_s/ld-linux 等），不入包。
+pkg_runtime_libs_cross() {
+    local out="$1" sysroot="$2" readelf="$3" b n
+    mkdir -p "$out/lib"
+    for b in "$out"/bin/*; do
+        [ -f "$b" ] || continue
+        file "$b" 2>/dev/null | grep -q 'ELF' || continue
+        while read -r n; do
+            [ -f "$sysroot/usr/lib/riscv64-linux-gnu/$n" ] && \
+                cp -f "$sysroot/usr/lib/riscv64-linux-gnu/$n" "$out/lib/" 2>/dev/null || true
+        done < <("$readelf" -d "$b" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
+            | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|ld-linux)')
+    done
+}
+
+# 校验交叉产物无未解析依赖（包内 NEEDED 均在 out/lib 或系统核心库）
+pkg_verify_deps_cross() {
+    local out="$1" readelf="$2" tmp bad=0 n
+    tmp="$(mktemp)"
+    for b in "$out"/bin/*; do
+        [ -f "$b" ] || continue
+        file "$b" 2>/dev/null | grep -q 'ELF' || continue
+        "$readelf" -d "$b" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
+            | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|ld-linux)' \
+            >> "$tmp"
+    done
+    while read -r n; do
+        [ -f "$out/lib/$n" ] || { echo "warn: 包内缺依赖 $n"; bad=1; }
+    done < <(sort -u "$tmp")
+    rm -f "$tmp"
+    return $bad
+}
+
 # 完整包组装（bin/lib/config/modules/manifest/架构标记一次到位）
+# 可选第 5/6 参数 readelf/sysroot：提供则按交叉产物收集 .so（宿主 ldd 不可用）
 pkg_assemble_full() {
     local out="$1" version="$2" platform="$3" root="$4"
-    pkg_runtime_libs "$out"
-    pkg_verify_deps "$out" || true
+    if [ -n "${5:-}" ] && [ -n "${6:-}" ]; then
+        pkg_runtime_libs_cross "$out" "$6" "$5"
+        pkg_verify_deps_cross "$out" "$5" || true
+    else
+        pkg_runtime_libs "$out"
+        pkg_verify_deps "$out" || true
+    fi
     pkg_stage_python "$out" "$root"
     pkg_stage_config "$out" "$root"
     pkg_stage_bootstrap "$out" "$root"

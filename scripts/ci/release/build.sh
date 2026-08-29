@@ -7,7 +7,8 @@
 # 三架构统一入口：
 #   x86_64   原生构建（ccache + CMakeCache 持久增量）
 #   arm64    qemu 用户态模拟（toolchain/apt 持久挂载 + 离线 deps 缓存）
-#   riscv64  qemu 用户态模拟（同上）
+#   riscv64  交叉编译优先（gcc-13 riscv64 cross + sysroot 依赖库，10-20×
+#            快于 qemu；工具链缺失或 AIRY_CROSS=0 时回退 qemu 模拟）
 #
 # 目录约定（唯一构建台，均位于源码区外）：
 #   ${AIRY_WORKSPACE:-$HOME/SpharxWorks/works-engineering}/airymaxrt-build/
@@ -16,6 +17,9 @@
 #     tui-target/           cargo 统一 target（杜绝源码树内 target 落盘）
 #     deps/                 cJSON/OpenSSL/cmake 离线 tarball（迁移自 developbuild）
 #     tui-vendor/           cargo 离线 vendor
+#     riscv64-toolchain/    riscv64 交叉工具链（gcc-13 + sysroot 依赖库 +
+#                           toolchain-riscv64.cmake，从 ports.ubuntu.com deb 解压）
+#     riscv64-cross/        riscv64 交叉 build（CMakeCache 持久 → 增量）
 #     <arch>/ <arch>-toolchain/ <arch>-pkg/   qemu 容器构建/工具链/打包工作区
 #   ${AIRY_DIST_OUT:-$AIRY_WORKSPACE/airymaxrt-dist}/   统一产物台
 #
@@ -27,6 +31,7 @@
 #   AIRY_VERSION     版本覆盖（默认读 agentrt/VERSION，SSoT）
 #   AIRY_ARCH_IMAGE  arm64/riscv64 基础镜像
 #   AIRY_BUILD_JOBS  并行编译数（默认 nproc）
+#   AIRY_CROSS       0=riscv64 强制 qemu 模拟（默认 1 交叉编译）
 #   SKIP_TUI=1       跳过 Rust TUI 构建（快速迭代）
 # ============================================================================
 
@@ -277,10 +282,63 @@ CONTAINER_EOF
     log_ok "产物: $DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
 }
 
+# ══════════════ riscv64：交叉编译（默认，10-20× 快于 qemu 模拟）══════════
+build_cross() {
+    local tc="$BUILD_ROOT/riscv64-toolchain"
+    log_info "riscv64 交叉编译（gcc-13 cross + sysroot 依赖库）…"
+    local build="$BUILD_ROOT/riscv64-cross"
+    local stage="$BUILD_ROOT/stage-${VERSION_NUM}"
+    local out="$stage/agentrt-${VERSION_NUM}"
+    if [ "$CLEAN" = "1" ]; then rm -rf "$build" "$stage"; fi
+    mkdir -p "$build" "$stage"
+    # binutils 运行库（libopcodes/libbfd-riscv64）在工具链 root 内，非标准
+    # RUNPATH，必须显式 LD_LIBRARY_PATH，否则 as/ld 报 libopcodes not found
+    export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu"
+    if [ ! -f "$build/CMakeCache.txt" ]; then
+        cmake -S "$AGENTRT_TREE" -B "$build" \
+            -DCMAKE_TOOLCHAIN_FILE="$tc/toolchain-riscv64.cmake" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
+            -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX="$out"
+    fi
+    cmake --build "$build" -j"$JOBS"
+    cmake --install "$build" >/dev/null || true
+    for d in "$build"/bin/*; do
+        [ -f "$d" ] && cp -f "$d" "$out/bin/" 2>/dev/null || true
+    done
+    [ -d "$out/bin" ] || mkdir -p "$out/bin"
+    # Rust TUI 交叉编译（rustup target riscv64gc；宿主无 cargo/工具链则降级）
+    if [ "$SKIP_TUI" != "1" ] && [ -d "$TUI_SRC" ] && { command -v cargo >/dev/null 2>&1 || [ -x "${HOME}/.cargo/bin/cargo" ]; }; then
+        export PATH="${HOME}/.cargo/bin:$PATH"
+        rustup target list --installed 2>/dev/null | grep -q 'riscv64gc-unknown-linux-gnu' || \
+            rustup target add riscv64gc-unknown-linux-gnu 2>/dev/null || true
+        export CARGO_TARGET_DIR="$BUILD_ROOT/riscv64-tui-target"
+        export CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER="$tc/root/usr/bin/riscv64-linux-gnu-gcc"
+        if ( cd "$TUI_SRC" && cargo build --release --target riscv64gc-unknown-linux-gnu 2>/dev/null ); then
+            cp -f "$BUILD_ROOT/riscv64-tui-target/riscv64gc-unknown-linux-gnu/release/agentrt-tui" \
+                "$out/bin/" 2>/dev/null || true
+        else
+            echo "warn: riscv64 TUI 交叉构建失败（降级为 C CLI 包装）"
+        fi
+    fi
+    # 打包：交叉产物用 readelf 收集 NEEDED（宿主 ldd 无法分析异架构 ELF）
+    pkg_assemble_full "$out" "$AIRY_VERSION" "$PLATFORM" "$UMBRELLA" \
+        "$tc/root/usr/bin/riscv64-linux-gnu-readelf" "$tc/sysroot"
+    pkg_tar_package "$stage" "agentrt-${VERSION_NUM}" "$DIST_DIR" \
+        "agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
+    log_ok "产物: $DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
+}
+
 case "$ARCH" in
     x86_64) build_native ;;
     arm64)  build_qemu arm64 ;;
-    riscv64) build_qemu riscv64 ;;
+    riscv64)
+        if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/riscv64-toolchain/toolchain-riscv64.cmake" ]; then
+            build_cross
+        else
+            log_warn "交叉工具链缺失或 AIRY_CROSS=0，回退 qemu 模拟"
+            build_qemu riscv64
+        fi
+        ;;
 esac
 
 log_ok "${PLATFORM} 构建完成"
