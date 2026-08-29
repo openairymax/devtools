@@ -106,8 +106,27 @@ build_native() {
         log_warn "ccache 未安装，建议 apt install ccache（跨次构建大幅加速）"
     fi
 
-    if [ "$CLEAN" = "1" ]; then rm -rf "$build" "$stage"; fi
+    # stage 打包目录每次全新组装（防跨架构污染：三架构共用
+    # stage-<ver> 时 riscv64 交叉产物会覆盖 x86_64 bin/，0.1.6 实测）。
+    # build/ 构建目录保留（CMakeCache 增量），CLEAN 时连 build 一起清。
+    if [ "$CLEAN" = "1" ]; then rm -rf "$build" "$stage"; else rm -rf "$stage"; fi
     mkdir -p "$build" "$stage"
+
+    # INSTALL_PREFIX 漂移检测：CMakeCache 固化的是上次版本的 stage
+    # 路径（0.1.5a → stage-0.1.5a），版本 bump 后若不重新配置，
+    # cmake --install 落错目录导致包内缺二进制/.so（0.1.6 实测）。
+    if [ -f "$build/CMakeCache.txt" ]; then
+        local cached_prefix
+        cached_prefix="$(sed -n 's/^CMAKE_INSTALL_PREFIX:\([A-Za-z]*\)=//p' "$build/CMakeCache.txt" | head -1)"
+        if [ -n "$cached_prefix" ] && [ "$cached_prefix" != "$out" ]; then
+            log_warn "INSTALL_PREFIX 漂移（缓存 ${cached_prefix} → ${out}），重新 cmake 配置"
+            cmake -S "$AGENTRT_TREE" -B "$build" \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+                -DCMAKE_INSTALL_PREFIX="$out" \
+                $CCACHE_LAUNCHER
+        fi
+    fi
 
     if [ ! -f "$build/CMakeCache.txt" ]; then
         cmake -S "$AGENTRT_TREE" -B "$build" \
@@ -119,10 +138,10 @@ build_native() {
     cmake --build "$build" -j"$JOBS"
     cmake --install "$build" >/dev/null || true
     # 未装 INSTALL 的二进制（CLI 等）直接从 build 目录收集
+    [ -d "$out/bin" ] || mkdir -p "$out/bin"
     for d in "$build"/bin/*; do
         [ -f "$d" ] && cp -f "$d" "$out/bin/" 2>/dev/null || true
     done
-    [ -d "$out/bin" ] || mkdir -p "$out/bin"
 
     # Rust TUI（CARGO_TARGET_DIR 统一到构建台，杜绝源码树 target 落盘）
     if [ "$SKIP_TUI" != "1" ] && [ -d "$TUI_SRC" ] && { command -v cargo >/dev/null 2>&1 || [ -x "${HOME}/.cargo/bin/cargo" ]; }; then
@@ -294,21 +313,76 @@ CONTAINER_EOF
     log_ok "产物: $DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
 }
 
-# ══════════════ riscv64：交叉编译（默认，10-20× 快于 qemu 模拟）══════════
+# ═══════════ riscv64 / arm64：交叉编译（默认，10-20× 快于 qemu 模拟）═══════
+# 两架构共用一套交叉构建逻辑，按 arch 区分工具链/sysroot/TUI target。
 build_cross() {
-    local tc="$BUILD_ROOT/riscv64-toolchain"
-    log_info "riscv64 交叉编译（gcc-13 cross + sysroot 依赖库）…"
-    local build="$BUILD_ROOT/riscv64-cross"
+    local arch="$1"
+    local tc build toolchain_file readelf sysroot tui_target tui_linker tui_var
+    case "$arch" in
+        riscv64)
+            tc="$BUILD_ROOT/riscv64-toolchain"
+            build="$BUILD_ROOT/riscv64-cross"
+            toolchain_file="$tc/toolchain-riscv64.cmake"
+            readelf="$tc/root/usr/bin/riscv64-linux-gnu-readelf"
+            sysroot="$tc/sysroot"
+            tui_target="riscv64gc-unknown-linux-gnu"
+            tui_linker="$tc/root/usr/bin/riscv64-linux-gnu-gcc"
+            # binutils 运行库（libopcodes/libbfd-riscv64）在工具链 root 内，
+            # 非标准 RUNPATH，必须显式 LD_LIBRARY_PATH；后续 lld 需要的
+            # rustup libLLVM 同样经 LD_LIBRARY_PATH，两者合并（勿覆盖）。
+            export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+            # RISC-V TUI 链接定案（2026-08-29 三轮回测）：
+            #   GNU ld 2.34 无法合并 RISC-V attributes（failed to merge target
+            #   specific data）→ 必须换 lld；rust-lld 直链又丢系统库路径
+            #   （unable to find -lc）→ 以 gcc 为 driver，仅 `-fuse-ld=lld`
+            #   换链接器，配合 `--sysroot` 让 lld 解析 cross multiarch libc。
+            #   ld.lld 取自 rustup 工具链自带 rust-lld，复制到 GNU ld 同目录
+            #   （riscv64-linux-gnu/bin/），collect2 按 -B 路径即可找到。
+            #   gcc9 不支持 -fuse-ld=绝对路径（GCC10+ 特性），勿再尝试。
+            if [ ! -x "$tc/root/usr/riscv64-linux-gnu/bin/ld.lld" ]; then
+                local rust_lld
+                rust_lld="$(find "$HOME/.rustup/toolchains" -name rust-lld -path '*/lib/rustlib/x86_64-unknown-linux-gnu/bin/*' 2>/dev/null | head -1)"
+                [ -n "$rust_lld" ] && cp -f "$rust_lld" "$tc/root/usr/riscv64-linux-gnu/bin/ld.lld"
+                chmod 755 "$tc/root/usr/riscv64-linux-gnu/bin/ld.lld" 2>/dev/null || true
+            fi
+            # lld 运行依赖 rustup 工具链的 libLLVM 共享库（追加，勿覆盖
+            # 上面已合并的 binutils 路径）
+            export RUSTFLAGS="-C link-arg=-fuse-ld=lld -C link-arg=-Wl,--sysroot=${tc}/root"
+            export LD_LIBRARY_PATH="${HOME}/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib:${LD_LIBRARY_PATH:-}"
+            ;;
+        arm64)
+            tc="$BUILD_ROOT/cross-sysroot/arm64-sysroot"
+            build="$BUILD_ROOT/arm64-cross"
+            toolchain_file="$tc/toolchain-aarch64.cmake"
+            readelf="/usr/bin/aarch64-linux-gnu-readelf"
+            sysroot="$tc"
+            tui_target="aarch64-unknown-linux-gnu"
+            tui_linker="aarch64-linux-gnu-gcc"
+            ;;
+        *) log_err "build_cross: 不支持的架构 $arch"; return 1 ;;
+    esac
+    log_info "${arch} 交叉编译（${toolchain_file}）…"
     local stage="$BUILD_ROOT/stage-${VERSION_NUM}"
     local out="$stage/agentrt-${VERSION_NUM}"
-    if [ "$CLEAN" = "1" ]; then rm -rf "$build" "$stage"; fi
+    # stage 每次全新组装（与 build_native 同规则，防跨架构污染）
+    if [ "$CLEAN" = "1" ]; then rm -rf "$build" "$stage"; else rm -rf "$stage"; fi
     mkdir -p "$build" "$stage"
-    # binutils 运行库（libopcodes/libbfd-riscv64）在工具链 root 内，非标准
-    # RUNPATH，必须显式 LD_LIBRARY_PATH，否则 as/ld 报 libopcodes not found
-    export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu"
+    # INSTALL_PREFIX 漂移检测（同 build_native：版本 bump 后 CMakeCache
+    # 固化旧 stage 路径，install 落错目录导致包内缺二进制/.so）
+    if [ -f "$build/CMakeCache.txt" ]; then
+        local cached_prefix
+        cached_prefix="$(sed -n 's/^CMAKE_INSTALL_PREFIX:\([A-Za-z]*\)=//p' "$build/CMakeCache.txt" | head -1)"
+        if [ -n "$cached_prefix" ] && [ "$cached_prefix" != "$out" ]; then
+            log_warn "INSTALL_PREFIX 漂移（缓存 ${cached_prefix} → ${out}），重新 cmake 配置"
+            cmake -S "$AGENTRT_TREE" -B "$build" \
+                -DCMAKE_TOOLCHAIN_FILE="$toolchain_file" \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
+                -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX="$out"
+        fi
+    fi
     if [ ! -f "$build/CMakeCache.txt" ]; then
         cmake -S "$AGENTRT_TREE" -B "$build" \
-            -DCMAKE_TOOLCHAIN_FILE="$tc/toolchain-riscv64.cmake" \
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain_file" \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
             -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX="$out"
     fi
@@ -318,23 +392,25 @@ build_cross() {
         [ -f "$d" ] && cp -f "$d" "$out/bin/" 2>/dev/null || true
     done
     [ -d "$out/bin" ] || mkdir -p "$out/bin"
-    # Rust TUI 交叉编译（rustup target riscv64gc；宿主无 cargo/工具链则降级）
+    # Rust TUI 交叉编译（rustup target；宿主无 cargo/工具链则降级）
     if [ "$SKIP_TUI" != "1" ] && [ -d "$TUI_SRC" ] && { command -v cargo >/dev/null 2>&1 || [ -x "${HOME}/.cargo/bin/cargo" ]; }; then
         export PATH="${HOME}/.cargo/bin:$PATH"
-        rustup target list --installed 2>/dev/null | grep -q 'riscv64gc-unknown-linux-gnu' || \
-            rustup target add riscv64gc-unknown-linux-gnu 2>/dev/null || true
-        export CARGO_TARGET_DIR="$BUILD_ROOT/riscv64-tui-target"
-        export CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER="$tc/root/usr/bin/riscv64-linux-gnu-gcc"
-        if ( cd "$TUI_SRC" && cargo build --release --target riscv64gc-unknown-linux-gnu 2>/dev/null ); then
-            cp -f "$BUILD_ROOT/riscv64-tui-target/riscv64gc-unknown-linux-gnu/release/agentrt-tui" \
+        rustup target list --installed 2>/dev/null | grep -q "$tui_target" || \
+            rustup target add "$tui_target" 2>/dev/null || true
+        export CARGO_TARGET_DIR="$BUILD_ROOT/${arch}-tui-target"
+        # cargo 按 target 名大写（- → _）约定 linker 环境变量
+        tui_var="CARGO_TARGET_$(printf '%s' "$tui_target" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_LINKER"
+        export "$tui_var=$tui_linker"
+        if ( cd "$TUI_SRC" && cargo build --release --target "$tui_target" 2>/dev/null ); then
+            cp -f "$BUILD_ROOT/${arch}-tui-target/$tui_target/release/agentrt-tui" \
                 "$out/bin/" 2>/dev/null || true
         else
-            echo "warn: riscv64 TUI 交叉构建失败（降级为 C CLI 包装）"
+            echo "warn: ${arch} TUI 交叉构建失败（降级为 C CLI 包装）"
         fi
     fi
     # 打包：交叉产物用 readelf 收集 NEEDED（宿主 ldd 无法分析异架构 ELF）
     pkg_assemble_full "$out" "$AIRY_VERSION" "$PLATFORM" "$UMBRELLA" \
-        "$tc/root/usr/bin/riscv64-linux-gnu-readelf" "$tc/sysroot"
+        "$readelf" "$sysroot"
     pkg_tar_package "$stage" "agentrt-${VERSION_NUM}" "$DIST_DIR" \
         "agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
     log_ok "产物: $DIST_DIR/agentrt-${AIRY_VERSION}-${PLATFORM}.tar.gz"
@@ -342,10 +418,18 @@ build_cross() {
 
 case "$ARCH" in
     x86_64) build_native ;;
-    arm64)  build_qemu arm64 ;;
+    arm64)
+        if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/cross-sysroot/arm64-sysroot/toolchain-aarch64.cmake" ] \
+            && command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
+            build_cross arm64
+        else
+            log_warn "arm64 交叉工具链缺失或 AIRY_CROSS=0，回退 qemu 模拟"
+            build_qemu arm64
+        fi
+        ;;
     riscv64)
         if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/riscv64-toolchain/toolchain-riscv64.cmake" ]; then
-            build_cross
+            build_cross riscv64
         else
             log_warn "交叉工具链缺失或 AIRY_CROSS=0，回退 qemu 模拟"
             build_qemu riscv64

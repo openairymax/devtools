@@ -129,12 +129,17 @@ pkg_clean_pyc() {
 pkg_runtime_libs_cross() {
     local out="$1" sysroot="$2" readelf="$3" b n
     mkdir -p "$out/lib"
+    # 自动探测 sysroot 的 multiarch 库目录（riscv64-linux-gnu /
+    # aarch64-linux-gnu / x86_64-linux-gnu…），避免硬编码单架构路径
+    # （0.1.6 实测：arm64 交叉产物 .so 未收集，因路径写死 riscv64）。
+    local archdir
+    archdir="$(ls -d "$sysroot"/usr/lib/*-linux-gnu 2>/dev/null | head -1)"
+    [ -n "$archdir" ] || archdir="$sysroot/usr/lib"
     for b in "$out"/bin/*; do
         [ -f "$b" ] || continue
         file "$b" 2>/dev/null | grep -q 'ELF' || continue
         while read -r n; do
-            [ -f "$sysroot/usr/lib/riscv64-linux-gnu/$n" ] && \
-                cp -f "$sysroot/usr/lib/riscv64-linux-gnu/$n" "$out/lib/" 2>/dev/null || true
+            [ -f "$archdir/$n" ] && cp -f "$archdir/$n" "$out/lib/" 2>/dev/null || true
         done < <("$readelf" -d "$b" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
             | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|ld-linux)')
     done
@@ -175,6 +180,9 @@ pkg_assemble_full() {
     pkg_stage_toolkit "$out" "$root"
     pkg_make_manifest "$out" "$version" "$platform"
     pkg_clean_pyc "$out"
+    # 架构标记单一：stage 目录三架构共用（build.sh stage-<ver>），
+    # 先清历史标记防跨架构污染（0.1.5a 实测 x86_64 包混入 platform-riscv64）
+    rm -f "$out"/platform-*
     touch "$out/platform-${platform#linux-}"
 }
 
