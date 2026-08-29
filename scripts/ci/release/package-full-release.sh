@@ -40,6 +40,10 @@ log_fail()  { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+# 打包内容白名单共享（SSoT）：包内 bin/lib/config/modules 组装与打包函数
+# 唯一定义于 lib-package.sh，杜绝多脚本手写 cp 清单导致的漏包/多包漂移。
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib-package.sh"
 
 # 版本 SSoT：默认读取 agentrt/VERSION（伞仓 agent-workload/ 布局），
 # 支持 <版本> 参数显式覆盖（问题 7：版本 bump 无需多处置零）。
@@ -88,7 +92,9 @@ run() {
 quality_gates() {
     [ "$SKIP_GATES" = "1" ] && { log_warn "跳过质量门禁（SKIP_GATES=1）"; return 0; }
     log_info "阶段0：质量门禁（源码构建回归）…"
-    local gates_build="${PROJECT_ROOT}/dist/.gates-build"
+    # 铁律 4.7：构建目录必须在源码区外（历史版本曾用 ${PROJECT_ROOT}/dist
+    # 与源码区根 build-release/，污染伞仓源码区）
+    local gates_build="${DIST_DIR}/.gates-build"
     run cmake -S "$AGENTRT_SRC" -B "$gates_build" \
         -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON >/dev/null
     run cmake --build "$gates_build" -j"$JOBS"
@@ -207,94 +213,10 @@ build_full_package() {
             run cp -f "${DIST_DIR}/target/release/agentrt-tui" "$out/bin/"
     fi
 
-    # daemon 启动编排脚本（install.sh 部署依赖；build-arch.sh 亦含此文件，
-    # 两处打包路径保持一致——缺此文件则安装后 daemon 群无法编排拉起）
-    if [ -f "${PROJECT_ROOT}/tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
-        run cp -f "${PROJECT_ROOT}/tools/scripts/ops/bin/agentrt-bootstrap.sh" "$out/bin/"
-    else
-        log_warn "agentrt-bootstrap.sh 未找到（${PROJECT_ROOT}/tools/scripts/ops/bin/）"
-    fi
-
-    # Python 运行时依赖
-    run mkdir -p "$out/lib"
-    local pkg
-    for pkg in airymax_agents airymax_agents_rs orchestration; do
-        [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/agents/$pkg" ] || continue
-        run cp -r "${PROJECT_ROOT}/agent-workload/ecosystem/agents/$pkg" "$out/lib/"
-    done
-    [ -d "${PROJECT_ROOT}/agent-workload/sdk/sdk-python/agentrt" ] && \
-        run cp -r "${PROJECT_ROOT}/agent-workload/sdk/sdk-python/agentrt" "$out/lib/"
-
-    # 配置模板
-    run mkdir -p "$out/config"
-    [ -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" ] && \
-        run cp -f "${PROJECT_ROOT}/tools/scripts/ops/templates/secrets.env.example" "$out/config/"
-    [ -f "${PROJECT_ROOT}/tools/scripts/ops/templates/permission_rules.yaml" ] && \
-        run cp -f "${PROJECT_ROOT}/tools/scripts/ops/templates/permission_rules.yaml" "$out/config/"
-    [ -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/configs/agentrt.yaml" ] && \
-        run cp -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/configs/agentrt.yaml" "$out/config/"
-    [ -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/model/model.yaml" ] && \
-        run cp -f "${PROJECT_ROOT}/agent-workload/ecosystem/manager/model/model.yaml" "$out/config/"
-
-    # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖，随包分发）
-    if [ -d "${PROJECT_ROOT}/agent-workload/ecosystem/markets/tools/maths-toolkit" ]; then
-        run mkdir -p "$out/modules"
-        run cp -rf "${PROJECT_ROOT}/agent-workload/ecosystem/markets/tools/maths-toolkit" "$out/modules/"
-    fi
-
-    # manifest
-    {
-        echo "{"
-        echo "  \"name\": \"agentrt\","
-        echo "  \"version\": \"${VERSION}\","
-        echo "  \"platform\": \"${PLATFORM}\","
-        echo "  \"components\": {"
-        echo "    \"daemons\": \"18 (15 基础 + think_d/cupolas_d/maths_d)\","
-        echo "    \"cli\": \"airy_cli\","
-        echo "    \"tui\": \"agentrt-tui (rust)\","
-        echo "    \"atoms\": \"prebuilt (closed source)\","
-        echo "    \"memoryrovol\": \"prebuilt (commercial, optional)\""
-        echo "  },"
-        # 校验 SSoT：包内不内嵌 checksums（打包时刻快照必然漂移），
-        # 权威校验一律以发布清单 latest/manifest.stable.json 为准。
-        echo "  \"checksum_source\": \"latest/manifest.stable.json\""
-        echo "}"
-    } > "$out/manifest.json"
-
-    # 清理 Python 缓存（pyc 无害但污染制品：__pycache__/.pytest_cache 不入包）
-    find "$out" -type d \( -name "__pycache__" -o -name ".pytest_cache" \) \
-        -exec rm -rf {} + 2>/dev/null || true
-
-    # 运行时依赖自包含（2026-08-29 社区 bug 根治）：二进制依赖 libcjson.so.1
-    # 等非系统核心 .so，目标机未必存在。将非系统核心 .so 随包放入 lib/，
-    # 配合二进制的 $ORIGIN/../lib RUNPATH（CMake CMAKE_INSTALL_RPATH 全局
-    # 生效 + TUI 构建 RUSTFLAGS），安装后无需目标机预装 cJSON/OpenSSL 等。
-    # 遍历 bin/ 全部 ELF 二进制收集依赖并集：各 daemon 依赖不同库
-    # （gateway_d→libmicrohttpd/libwebsockets、mem_d→libyaml 等），
-    # 仅以单一参考二进制收集会漏包，目标机仍会缺库。
-    bundle_runtime_libs() {
-        local missing=0 b n p
-        run mkdir -p "$out/lib"
-        for b in "$out"/bin/*; do
-            [ -f "$b" ] || continue
-            ldd "$b" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
-                case "$n" in
-                    linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
-                esac
-                [ -n "$p" ] && [ -f "$p" ] && cp -f "$p" "$out/lib/" 2>/dev/null || true
-            done
-        done
-        # 校验：包内所有 ELF 二进制不得有未解析依赖
-        for b in "$out"/bin/*; do
-            [ -f "$b" ] || continue
-            if ldd "$b" 2>/dev/null | grep -q "not found"; then
-                log_warn "$(basename "$b") 存在未解析依赖:"; ldd "$b" 2>/dev/null | grep "not found"
-                missing=$((missing+1))
-            fi
-        done
-        [ "$missing" = "0" ] || log_warn "bundle_runtime_libs: ${missing} 个二进制存在未解析依赖"
-    }
-    bundle_runtime_libs
+    # 包内内容白名单组装（SSoT，lib-package.sh）：bootstrap/python 运行时/
+    # config 模板/maths-toolkit/manifest/.so 自包含/平台标记一次到位，
+    # 与 build.sh 共用同一清单，杜绝多脚本手写 cp 漂移导致的漏包/多包。
+    run pkg_assemble_full "$out" "$VERSION" "$PLATFORM" "$PROJECT_ROOT"
 
     # 打包：out 位于 ${STAGE_DIR}，须 cd STAGE_DIR（同 build_atoms_prebuilt 修复）。
     ( cd "$STAGE_DIR" && run tar -czf "${DIST_DIR}/agentrt-${VERSION}-${PLATFORM}.tar.gz" \

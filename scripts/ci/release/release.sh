@@ -24,6 +24,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 # CMakeLists / 协议测试）
 AGENTRT_TREE="${PROJECT_ROOT}/agent-workload/agentrt"
 PROTOCOL_TEST="${PROJECT_ROOT}/tools/tests/integration/python/test_protocol_compatibility.py"
+# 铁律 4.7：门禁构建目录必须在源码区外（历史版本曾在伞仓根建 build-release/
+# 与 in-source 构建，残留 CPackConfig/compile_commands/bin 污染源码区）。
+GATE_BUILD="${GATE_BUILD_DIR:-${HOME}/SpharxWorks/works-engineering/airymaxrt-build/release-gate}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -140,13 +143,13 @@ gate_build() {
         return
     fi
 
-    mkdir -p build-release && cd build-release
-    if cmake -S "$AGENTRT_TREE" . -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF 2>&1 | tail -1 | grep -qi "error"; then
+    mkdir -p "$GATE_BUILD"
+    if cmake -S "$AGENTRT_TREE" -B "$GATE_BUILD" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF 2>&1 | tail -1 | grep -qi "error"; then
         check_gate "CMake Configure" 1
         return
     fi
 
-    if cmake --build . --parallel "$(nproc 2>/dev/null || echo 2)" 2>&1 | tail -5 | grep -qi "error"; then
+    if cmake --build "$GATE_BUILD" --parallel "$(nproc 2>/dev/null || echo 2)" 2>&1 | tail -5 | grep -qi "error"; then
         check_gate "Build" 1
         return
     fi
@@ -174,8 +177,8 @@ gate_tests() {
         check_gate "Protocol Tests" 1
     fi
 
-    if [ -d "build-release" ] && [ -f "build-release/CTestTestfile.cmake" ]; then
-        cd build-release
+    if [ -d "$GATE_BUILD" ] && [ -f "$GATE_BUILD/CTestTestfile.cmake" ]; then
+        cd "$GATE_BUILD"
         if ctest --output-on-failure --timeout 120 2>&1 | tail -1 | grep -qi "failed"; then
             check_gate "Unit Tests" 1
         else
@@ -273,17 +276,15 @@ gate_cpack() {
         return
     fi
 
-    if [ ! -d "build-release" ]; then
-        log_warn "No build-release directory, running build first..."
-        mkdir -p build-release && cd build-release
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF 2>/dev/null || true
-    else
-        cd build-release
+    if [ ! -d "$GATE_BUILD/CMakeFiles" ]; then
+        log_warn "门禁构建目录未配置，运行构建…"
+        cmake -S "$AGENTRT_TREE" -B "$GATE_BUILD" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF 2>/dev/null || true
     fi
 
-    if cpack -G TGZ 2>&1 | tail -3; then
+    if ( cd "$GATE_BUILD" && cpack -G TGZ 2>&1 | tail -3 ); then
         local pkg_count
-        pkg_count=$(find . -maxdepth 1 -name "*.tar.gz" -o -name "*.deb" -o -name "*.rpm" 2>/dev/null | wc -l)
+        pkg_count=$(find "$GATE_BUILD" -maxdepth 1 \( -name "*.tar.gz" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null | wc -l)
         log_ok "CPack generated $pkg_count package(s)"
         check_gate "CPack" 0
     else
