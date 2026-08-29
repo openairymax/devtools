@@ -21,13 +21,15 @@
 #                           toolchain-riscv64.cmake，从 ports.ubuntu.com deb 解压）
 #     riscv64-cross/        riscv64 交叉 build（CMakeCache 持久 → 增量）
 #     <arch>/ <arch>-toolchain/ <arch>-pkg/   qemu 容器构建/工具链/打包工作区
-#   ${AIRY_DIST_OUT:-$AIRY_WORKSPACE/airymaxrt-dist}/   统一产物台
+#   ${AIRY_DIST_OUT:-$UMBRELLA/developbuild/agentrt/dist}   统一产物台
+#       （developbuild 为发布工作区：出包后由 publish-release.sh 上传 atomgit；
+#         可用 AIRY_DIST_OUT 覆盖到其他目录）
 #
 # 用法：
 #   build.sh <x86_64|arm64|riscv64> [--clean]
 # 环境变量：
 #   AIRY_WORKSPACE   构建台根（默认 $HOME/SpharxWorks/works-engineering）
-#   AIRY_DIST_OUT    产物台（默认 ${AIRY_WORKSPACE}/airymaxrt-dist）
+#   AIRY_DIST_OUT    产物台（默认 $UMBRELLA/developbuild/agentrt/dist）
 #   AIRY_VERSION     版本覆盖（默认读 agentrt/VERSION，SSoT）
 #   AIRY_ARCH_IMAGE  arm64/riscv64 基础镜像
 #   AIRY_BUILD_JOBS  并行编译数（默认 nproc）
@@ -56,10 +58,12 @@ case "$ARCH" in
     *) echo "[FAIL] 仅支持 x86_64 / arm64 / riscv64"; exit 1 ;;
 esac
 
-# ─── 构建台与产物台（源码区外唯一落点） ────────────────────────────────
+# ─── 构建台与产物台（构建台源码区外；产物台=发布工作区 developbuild） ───
 AIRY_WORKSPACE="${AIRY_WORKSPACE:-${HOME}/SpharxWorks/works-engineering}"
 BUILD_ROOT="${AIRY_WORKSPACE}/airymaxrt-build"
-DIST_DIR="${AIRY_DIST_OUT:-${AIRY_WORKSPACE}/airymaxrt-dist}"
+# 产物台默认 developbuild/agentrt/dist（发布工作区：build.sh 出包 →
+# publish-release.sh 上传 atomgit 的单一落点）；AIRY_DIST_OUT 可覆盖。
+DIST_DIR="${AIRY_DIST_OUT:-${UMBRELLA}/developbuild/agentrt/dist}"
 JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 SKIP_TUI="${SKIP_TUI:-0}"
 
@@ -135,9 +139,17 @@ replace-with = "vendored-sources"
 directory = "$TUI_VENDOR_DIR"
 EOF
         fi
-        CARGO_TARGET_DIR="$BUILD_ROOT/tui-target"
-        if ( cd "$TUI_SRC" && cargo build --release ${TUI_CFG_DIR:+-c "$TUI_CFG_DIR/config.toml"} ); then
-            cp -f "$BUILD_ROOT/tui-target/release/agentrt-tui" "$out/bin/" 2>/dev/null || true
+        # CARGO_TARGET_DIR 必须 export：未 export 时 cargo 落盘源码树
+        # sdk/tui/target（0.1.6 实测 376MB 污染 + TUI 未进包，cp 静默失败）
+        export CARGO_TARGET_DIR="$BUILD_ROOT/tui-target"
+        # cargo 无 -c 选项（0.1.6 实测 Usage 报错）；vendor 配置经
+        # --config 注入（cargo 1.66+），不写源码树 .cargo/ 避免污染。
+        if ( cd "$TUI_SRC" && cargo build --release ${TUI_CFG_DIR:+--config "$TUI_CFG_DIR/config.toml"} ); then
+            if cp -f "$BUILD_ROOT/tui-target/release/agentrt-tui" "$out/bin/" 2>/dev/null; then
+                log_ok "agentrt-tui 已就位（$(ls -la "$out/bin/agentrt-tui" | awk '{print $5}') 字节）"
+            else
+                echo "warn: agentrt-tui 复制失败（cargo 产物未找到）"
+            fi
         else
             echo "warn: x86_64 TUI 构建失败（降级为 C CLI 包装）"
         fi
