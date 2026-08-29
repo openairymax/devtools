@@ -67,14 +67,19 @@ log_info "源码树: $UMBRELLA（只读挂载） 产物: ${DIST_DIR}/"
 
 # 容器内构建（源码只读挂载；构建/打包目录写挂载）。
 # 与 CI riscv64 job 相同步骤：依赖 → cJSON/OpenSSL 源码 → cmake → TUI(降级) → 打包。
-docker run --rm --platform "linux/${ARCH}" \
+# 容器脚本经 stdin heredoc 注入（bash -s）：容器脚本内含单引号（如
+# find -path '*riscv64*'），若嵌在 docker run -c '…' 单引号字符串中会
+# 提前闭合外层引号导致 host bash 解析错乱（2026-08-29 实测 "$3:
+# unbound variable"）。heredoc 引用定界符杜绝一切 host 展开。
+(
+docker run -i --rm --platform "linux/${ARCH}" \
     -v "$UMBRELLA":/src:ro \
     -v "$WORK/build":/build \
     -v "$WORK/pkg":/pkg \
     -v "$WORK/toolchain":/usr/local \
     $([ -d "$DEPS_DIR" ] && echo "-v $DEPS_DIR:/deps:ro") \
     $([ -d "$TUI_VENDOR_DIR" ] && echo "-v $TUI_VENDOR_DIR:/tui-vendor:ro -v $TUI_CFG_DIR:/src/agent-workload/sdk/tui/.cargo:ro") \
-    "$IMAGE" bash -euxo pipefail -c '
+    "$IMAGE" bash -euxo pipefail -s <<'CONTAINER_EOF'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends \
@@ -221,7 +226,8 @@ cp -f /src/tools/scripts/ops/bin/agentrt-bootstrap.sh /pkg/out/bin/ 2>/dev/null 
 # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖，随包分发）
 mkdir -p /pkg/out/modules
 cp -rf /src/agent-workload/ecosystem/markets/tools/maths-toolkit /pkg/out/modules/ 2>/dev/null || true
-' || { echo "[FAIL] 容器内构建失败"; exit 1; }
+CONTAINER_EOF
+) || { echo "[FAIL] 容器内构建失败"; exit 1; }
 
 # 整理顶层目录 agentrt-<num> 并打包（与 install.sh 二进制模式匹配）
 PKG_DIR="$WORK/pkg/agentrt-${VERSION_NUM}"
