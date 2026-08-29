@@ -166,11 +166,41 @@ if [ -n "$RUST_LLD" ]; then
   chmod +x /usr/local/bin/ld.lld
 fi
 export CARGO_TARGET_DIR=/tmp/tui-target
-if ! (cd /src/agent-workload/sdk/tui && RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --release); then
+if ! (cd /src/agent-workload/sdk/tui && RUSTFLAGS="-C link-arg=-fuse-ld=lld -C link-arg=-Wl,-rpath,\$ORIGIN/../lib" cargo build --release); then
   echo "warn: ${ARCH} TUI 构建失败（降级为 C CLI 包装）"
 else
   cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
 fi
+
+# 运行时依赖自包含（2026-08-29 社区 bug 根治）：二进制依赖 libcjson.so.1
+# 等非系统核心 .so（容器内 /usr/local 与 apt 安装），目标机未必存在。
+# 将非系统核心 .so 随包放入 lib/，配合二进制的 $ORIGIN/../lib RUNPATH，
+# 安装后无需目标机预装 cJSON/OpenSSL/libmicrohttpd 等。
+bundle_runtime_libs() {
+    local refbin=""
+    for cand in agentrt-tui airy_cli gateway_d; do
+        [ -f "/pkg/out/bin/$cand" ] && refbin="/pkg/out/bin/$cand" && break
+    done
+    [ -n "$refbin" ] || { echo "warn: bundle_runtime_libs: no reference binary"; return 0; }
+    mkdir -p /pkg/out/lib
+    ldd "$refbin" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
+        case "$n" in
+            linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
+        esac
+        [ -n "$p" ] && [ -f "$p" ] && cp -f "$p" /pkg/out/lib/ 2>/dev/null || true
+    done
+    # 校验：包内所有 ELF 二进制不得有未解析依赖（除系统核心库）
+    local missing=0
+    for b in /pkg/out/bin/*; do
+        [ -f "$b" ] || continue
+        if ldd "$b" 2>/dev/null | grep -q "not found"; then
+            echo "warn: $b has unresolved deps:"; ldd "$b" 2>/dev/null | grep "not found"
+            missing=$((missing+1))
+        fi
+    done
+    [ "$missing" = "0" ] || echo "warn: bundle_runtime_libs: $missing binary(ies) with unresolved deps"
+}
+bundle_runtime_libs
 
 # Python 运行时依赖
 mkdir -p /pkg/out/lib

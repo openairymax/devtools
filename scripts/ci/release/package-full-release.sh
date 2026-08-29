@@ -201,6 +201,7 @@ build_full_package() {
         run bash -c "cd '$TUI_SRC' && env -u AIRY_HOME \
             MEMORYROVOL_OSS_LIB='${mr_oss_lib:-}' \
             AIRY_COMMON_LIB='${build_dir}/commons/libairy_common.a' \
+            RUSTFLAGS='-C link-arg=-Wl,-rpath,\$ORIGIN/../lib' \
             CARGO_TARGET_DIR='${DIST_DIR}/target' cargo build --release"
         [ -f "${DIST_DIR}/target/release/agentrt-tui" ] && \
             run cp -f "${DIST_DIR}/target/release/agentrt-tui" "$out/bin/"
@@ -263,6 +264,36 @@ build_full_package() {
     # 清理 Python 缓存（pyc 无害但污染制品：__pycache__/.pytest_cache 不入包）
     find "$out" -type d \( -name "__pycache__" -o -name ".pytest_cache" \) \
         -exec rm -rf {} + 2>/dev/null || true
+
+    # 运行时依赖自包含（2026-08-29 社区 bug 根治）：二进制依赖 libcjson.so.1
+    # 等非系统核心 .so，目标机未必存在。将非系统核心 .so 随包放入 lib/，
+    # 配合二进制的 $ORIGIN/../lib RUNPATH（CMake CMAKE_INSTALL_RPATH 全局
+    # 生效 + TUI 构建 RUSTFLAGS），安装后无需目标机预装 cJSON/OpenSSL 等。
+    bundle_runtime_libs() {
+        local refbin=""
+        for cand in "agentrt-tui" "airy_cli" "gateway_d"; do
+            [ -f "$out/bin/$cand" ] && refbin="$out/bin/$cand" && break
+        done
+        [ -n "$refbin" ] || { log_warn "bundle_runtime_libs: 无参考二进制"; return 0; }
+        run mkdir -p "$out/lib"
+        ldd "$refbin" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
+            case "$n" in
+                linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
+            esac
+            [ -n "$p" ] && [ -f "$p" ] && cp -f "$p" "$out/lib/" 2>/dev/null || true
+        done
+        # 校验：包内所有 ELF 二进制不得有未解析依赖
+        local missing=0 b
+        for b in "$out"/bin/*; do
+            [ -f "$b" ] || continue
+            if ldd "$b" 2>/dev/null | grep -q "not found"; then
+                log_warn "$(basename "$b") 存在未解析依赖:"; ldd "$b" 2>/dev/null | grep "not found"
+                missing=$((missing+1))
+            fi
+        done
+        [ "$missing" = "0" ] || log_warn "bundle_runtime_libs: ${missing} 个二进制存在未解析依赖"
+    }
+    bundle_runtime_libs
 
     # 打包：out 位于 ${STAGE_DIR}，须 cd STAGE_DIR（同 build_atoms_prebuilt 修复）。
     ( cd "$STAGE_DIR" && run tar -czf "${DIST_DIR}/agentrt-${VERSION}-${PLATFORM}.tar.gz" \
