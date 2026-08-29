@@ -176,21 +176,21 @@ fi
 # 等非系统核心 .so（容器内 /usr/local 与 apt 安装），目标机未必存在。
 # 将非系统核心 .so 随包放入 lib/，配合二进制的 $ORIGIN/../lib RUNPATH，
 # 安装后无需目标机预装 cJSON/OpenSSL/libmicrohttpd 等。
+# 遍历 bin/ 全部 ELF 二进制收集依赖并集：各 daemon 依赖不同库，
+# 仅以单一参考二进制收集会漏包，目标机仍会缺库。
 bundle_runtime_libs() {
-    local refbin=""
-    for cand in agentrt-tui airy_cli gateway_d; do
-        [ -f "/pkg/out/bin/$cand" ] && refbin="/pkg/out/bin/$cand" && break
-    done
-    [ -n "$refbin" ] || { echo "warn: bundle_runtime_libs: no reference binary"; return 0; }
+    local missing=0 b n p
     mkdir -p /pkg/out/lib
-    ldd "$refbin" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
-        case "$n" in
-            linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
-        esac
-        [ -n "$p" ] && [ -f "$p" ] && cp -f "$p" /pkg/out/lib/ 2>/dev/null || true
+    for b in /pkg/out/bin/*; do
+        [ -f "$b" ] || continue
+        ldd "$b" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
+            case "$n" in
+                linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
+            esac
+            [ -n "$p" ] && [ -f "$p" ] && cp -f "$p" /pkg/out/lib/ 2>/dev/null || true
+        done
     done
     # 校验：包内所有 ELF 二进制不得有未解析依赖（除系统核心库）
-    local missing=0
     for b in /pkg/out/bin/*; do
         [ -f "$b" ] || continue
         if ldd "$b" 2>/dev/null | grep -q "not found"; then
