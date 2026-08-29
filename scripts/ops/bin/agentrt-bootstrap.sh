@@ -94,6 +94,20 @@ if [ -z "${AIRY_HOME:-}" ]; then
 fi
 AIRY_HOME="$(echo "$AIRY_HOME" | sed 's#/$##')"
 
+# 0.1.6b 缺陷修复（社区"很多库找不到 / daemon 群全部起不来"根因）：
+# 包内 lib/ 自带全部第三方 .so（curl/gnutls/ssh/rtmp/ldap…），但
+# DT_RUNPATH 非传递性——daemon 的直接依赖可经 $ORIGIN/../lib 找到，
+# 而 libcurl 等库的传递依赖只能走系统路径；宿主缺这些库时 daemon
+# 启动即失败。经 LD_LIBRARY_PATH 注入包内 lib/（传递生效，覆盖全部
+# daemon 与其子进程）；优先 source 安装期生成的 agentrt-env.sh
+# （同源唯一，含 LD_LIBRARY_PATH/AIRY_* 全量运行环境）。
+if [ -f "${AIRY_HOME}/bin/agentrt-env.sh" ]; then
+    # shellcheck disable=SC1090
+    . "${AIRY_HOME}/bin/agentrt-env.sh"
+else
+    export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"
+fi
+
 # LLM 模型配置（SSoT）：llm_d 的唯一模型来源。
 # 不传 --manager 时 llm_d 模型注册表为空（历史 P1-1：total_endpoints=0 →
 # COMPLETE-FAIL INVALID_MODEL），必须显式指定。
