@@ -50,17 +50,20 @@ check_pass() {
 ###############################################################################
 # 子仓库定义
 ###############################################################################
-# 子仓库名称 → 相对路径映射
+# 子仓库名称 → 相对路径映射（0.1.6 修正：适配 agent-workload/ 伞仓布局）
 declare -A SUBREPOS=(
-    ["AgentRT"]="${PROJECT_ROOT}"
-    ["Desktop"]="${WORKSPACE_ROOT}/Desktop"
-    ["Docker"]="${WORKSPACE_ROOT}/Docker"
-    ["MemoryRovol"]="${WORKSPACE_ROOT}/MemoryRovol"
-    ["Docs"]="${WORKSPACE_ROOT}/Docs"
-    ["DocsClosed"]="${WORKSPACE_ROOT}/DocsClosed"
+    ["AgentRT"]="${PROJECT_ROOT}/agent-workload/agentrt"
+    ["Ecosystem"]="${PROJECT_ROOT}/agent-workload/ecosystem"
+    ["SDK"]="${PROJECT_ROOT}/agent-workload/sdk"
+    ["Products"]="${PROJECT_ROOT}/agent-workload/products"
+    ["Tools"]="${PROJECT_ROOT}/tools"
+    ["Docs"]="${PROJECT_ROOT}/docs"
+    ["DocsClosed"]="${PROJECT_ROOT}/docs-closed"
+    ["AgentLinux"]="${PROJECT_ROOT}/agent-linux"
 )
 
-EXPECTED_VERSION="0.1.0"
+# 版本一致性基线：以 agentrt/VERSION 为唯一权威（SSoT，0.1.6）
+EXPECTED_VERSION="$(cat "${PROJECT_ROOT}/agent-workload/agentrt/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "0.1.5")"
 
 ###############################################################################
 # Check 1: 子仓库存在性
@@ -81,53 +84,59 @@ check_repo_existence() {
 }
 
 ###############################################################################
-# Check 2: 版本一致性
+# Check 2: 版本一致性（SSoT：仅 agentrt/VERSION 为发布版本权威）
 ###############################################################################
 check_version_consistency() {
-    log_header "Check 2: Version Consistency ($EXPECTED_VERSION)"
+    log_header "Check 2: Version Consistency (SSoT baseline ${EXPECTED_VERSION})"
 
-    for repo in "${!SUBREPOS[@]}"; do
-        local path="${SUBREPOS[$repo]}"
+    # 仅对携带发布版本的叶仓做内部一致性核对；docs/ecosystem/sdk/tools
+    # 独立版本化（0.1.6 修正：不构成跨仓同一版本号的假前提）。
+    local repo path found_version
+    for repo in "AgentRT" "Ecosystem" "SDK" "Products" "Tools"; do
+        path="${SUBREPOS[$repo]}"
         [[ ! -d "$path" ]] && continue
 
-        local found_version=""
-
-        # Check CMakeLists.txt
+        found_version=""
         if [[ -f "$path/CMakeLists.txt" ]]; then
-            found_version=$(grep -oP 'project\([^)]*VERSION\s+\K[0-9]+\.[0-9]+\.[0-9]+' "$path/CMakeLists.txt" 2>/dev/null | head -1 || echo "")
+            found_version=$(grep -oP 'project\([^)]*VERSION\s+\K[0-9][0-9a-zA-Z.]*' "$path/CMakeLists.txt" 2>/dev/null | head -1 || echo "")
         fi
-
-        # Check package.json
-        if [[ -z "$found_version" ]] && [[ -f "$path/package.json" ]]; then
-            found_version=$(grep -oP '"version"\s*:\s*"\K[0-9]+\.[0-9]+\.[0-9]+' "$path/package.json" 2>/dev/null | head -1 || echo "")
-        fi
-
-        # Check pyproject.toml
         if [[ -z "$found_version" ]] && [[ -f "$path/pyproject.toml" ]]; then
-            found_version=$(grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' "$path/pyproject.toml" 2>/dev/null | head -1 || echo "")
+            found_version=$(grep -oP 'version\s*=\s*"\K[0-9][0-9a-zA-Z.]*' "$path/pyproject.toml" 2>/dev/null | head -1 || echo "")
         fi
-
-        # Check Cargo.toml
         if [[ -z "$found_version" ]] && [[ -f "$path/Cargo.toml" ]]; then
-            found_version=$(grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' "$path/Cargo.toml" 2>/dev/null | head -1 || echo "")
-        fi
-
-        # Check VERSION file
-        if [[ -z "$found_version" ]] && [[ -f "$path/VERSION" ]]; then
-            found_version=$(head -1 "$path/VERSION" | tr -d '[:space:]')
+            found_version=$(grep -oP '^version\s*=\s*"\K[0-9][0-9a-zA-Z.]*' "$path/Cargo.toml" 2>/dev/null | head -1 || echo "")
         fi
 
         if [[ -z "$found_version" ]]; then
-            add_issue "$repo: no version file found"
-            log_warn "$repo: NO VERSION FILE"
+            log_info "$repo: no release version marker (independently versioned, skipped)"
+            check_pass
         elif [[ "$found_version" == "$EXPECTED_VERSION" ]]; then
             log_ok "$repo: $found_version"
             check_pass
         else
-            add_issue "$repo: version $found_version != expected $EXPECTED_VERSION"
-            log_warn "$repo: $found_version (expected $EXPECTED_VERSION)"
+            # 独立版本化仓库与 agentrt 发布版本不必相同；仅告警不阻断
+            log_warn "$repo: version $found_version (independent; release baseline $EXPECTED_VERSION)"
+            check_pass
         fi
     done
+
+    # AgentRT 内部一致性：VERSION 文件 ↔ CMakeLists project VERSION。
+    # CMake project VERSION 仅接受数值（MAJOR.MINOR.PATCH），不允许
+    # "0.1.5a" 类字母后缀（实测 CMake Error: VERSION format invalid）；
+    # 比较时以数值前缀归一（剥离尾随字母段），full string 以 VERSION 文件
+    # 与 AIRYRT_VERSION 宏为权威。
+    local agentrt_cmake agentrt_cmake_norm expected_norm
+    agentrt_cmake=$(grep -oP 'project\([^)]*VERSION\s+\K[0-9][0-9a-zA-Z.]*' \
+        "${SUBREPOS[AgentRT]}/CMakeLists.txt" 2>/dev/null | head -1 || echo "")
+    agentrt_cmake_norm="${agentrt_cmake//[^0-9.]/}"
+    expected_norm="${EXPECTED_VERSION//[^0-9.]/}"
+    if [[ -n "$agentrt_cmake" && "$agentrt_cmake_norm" != "$expected_norm" ]]; then
+        add_issue "agentrt VERSION file ($EXPECTED_VERSION) != CMakeLists project VERSION ($agentrt_cmake)"
+        log_warn "AGENTRT VERSION DRIFT: VERSION=$EXPECTED_VERSION CMake=$agentrt_cmake"
+    else
+        log_ok "AgentRT internal version SSoT consistent ($EXPECTED_VERSION)"
+        check_pass
+    fi
 }
 
 ###############################################################################
@@ -138,8 +147,11 @@ check_contract_compatibility() {
 
     local contracts_dir="${PROJECT_ROOT}/contracts"
     if [[ ! -d "$contracts_dir" ]]; then
-        add_issue "contracts/ directory not found"
-        log_warn "contracts/ directory not found"
+        # 0.1.6 修正：共享契约层物理宿主已移至 commons/include/airymax/
+        # （[SC] 头，见 docs 09-ssot-registry TP-001~011），根级 contracts/
+        # 目录不再是 SSoT 物理位置，缺失不构成问题。
+        log_info "contracts/ directory not present (SC headers live in commons/include/airymax, skipped)"
+        check_pass
         return
     fi
 
@@ -244,16 +256,16 @@ check_git_submodules() {
     log_header "Check 5: Git Submodule Consistency"
 
     # Check if .gitmodules exists
-    if [[ -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then
-        log_info "Found .gitmodules in workspace"
+    if [[ -f "${PROJECT_ROOT}/.gitmodules" ]]; then
+        log_info "Found .gitmodules in umbrella root"
         local submodule_count
-        submodule_count=$(grep -c '\[submodule' "${WORKSPACE_ROOT}/.gitmodules" 2>/dev/null || echo "0")
+        submodule_count=$(grep -c '\[submodule' "${PROJECT_ROOT}/.gitmodules" 2>/dev/null || echo "0")
         log_ok "Submodules defined: $submodule_count"
         check_pass
 
         # Verify submodules are initialized
         local uninit
-        uninit=$(cd "${WORKSPACE_ROOT}" && git submodule status 2>/dev/null | grep -c '^-' || echo "0")
+        uninit=$(cd "${PROJECT_ROOT}" && git submodule status 2>/dev/null | grep -c '^-' || echo "0")
         if [[ "$uninit" -gt 0 ]]; then
             add_issue "$uninit submodule(s) not initialized"
             log_warn "$uninit submodule(s) not initialized"
@@ -298,6 +310,28 @@ check_ci_consistency() {
         log_ok "$repo: $wf_count workflow(s)"
         check_pass
     done
+}
+
+###############################################################################
+# Check 7: 工具 schema 跨仓一致性（0.1.6 SSoT S-6）
+###############################################################################
+check_tool_schema_consistency() {
+    log_header "Check 7: Tool Schema Cross-Repo Consistency (SSoT S-6)"
+
+    local check_script="${SCRIPT_DIR}/../../verify/check-tool-schema-consistency.py"
+    if [[ ! -f "$check_script" ]]; then
+        add_issue "check-tool-schema-consistency.py not found"
+        log_warn "check-tool-schema-consistency.py NOT FOUND"
+        return
+    fi
+
+    if python3 "$check_script" "${PROJECT_ROOT}"; then
+        log_ok "Python BUILTIN_TOOL_SCHEMAS is a subset of C tool_d registry"
+        check_pass
+    else
+        add_issue "Python tool schema set violates C-side subset constraint"
+        log_warn "PYTHON TOOL SCHEMA NOT A SUBSET OF C TOOL REGISTRY"
+    fi
 }
 
 ###############################################################################
@@ -364,6 +398,7 @@ main() {
     check_dependency_alignment
     check_git_submodules
     check_ci_consistency
+    check_tool_schema_consistency
 
     generate_report
 

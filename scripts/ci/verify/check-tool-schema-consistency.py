@@ -44,8 +44,8 @@ def load_c_tools(service_builtin_c):
 
 
 def main():
-    root = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(
-        os.path.abspath(__file__))
+    root = sys.argv[1] if len(sys.argv) > 1 else os.path.abspath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../../"))
     root = os.path.normpath(root)
 
     base_py = os.path.join(root, "agent-workload/ecosystem/agents/airymax_agents/base.py")
