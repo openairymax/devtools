@@ -278,6 +278,17 @@ if [ -f "$INSTALLER_PS1_SRC" ]; then
 else
     log_warn "未找到 Windows 安装器源: ${INSTALLER_PS1_SRC}（PowerShell 一键安装将不可用）"
 fi
+# 安装器快照同步（SSoT → developbuild 离线归档快照，0.1.6 根治历史漂移）：
+# agentrt/scripts/install.{sh,ps1} 是安装器唯一权威源（SSoT）；发布时必须
+# 同步到 developbuild/agentrt/scripts 快照（离线介质 install-offline.sh 的
+# 自包含依赖），否则两处脚本再次分叉（历史教训：0.1.5 快照残留旧公钥与
+# 旧版本号，导致离线安装与在线安装行为不一致）。
+SNAPSHOT_DIR="${AIRY_DEVELOPBUILD_SNAPSHOT_DIR:-${SCRIPT_DIR}/../../../../developbuild/agentrt/scripts}"
+if [ -d "$SNAPSHOT_DIR" ] && [ -f "$INSTALLER_SRC" ] && [ -f "$INSTALLER_PS1_SRC" ]; then
+    cp -f "$INSTALLER_SRC" "$SNAPSHOT_DIR/install.sh"
+    cp -f "$INSTALLER_PS1_SRC" "$SNAPSHOT_DIR/install.ps1"
+    log_ok "安装器快照已同步: ${SNAPSHOT_DIR}"
+fi
 for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc" "$INSTALLER" "$INSTALLER_PS1"; do
     [ -e "$f" ] || continue
     upload_asset "$f" || UP_FAILED=1
