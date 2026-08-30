@@ -223,11 +223,15 @@ run_pytest() {
 
     cd "$tests_dir"
 
+    # .pyc 缓存重定向到源码区外（Python 3.8+），根治源码区 __pycache__ 污染
+    export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/agentrt-pycache}"
+
     local pytest_args=(
         "-m" "${TEST_CATEGORY:-not slow}"
         "--tb=short"
         "-q"
         "-W" "ignore::DeprecationWarning"
+        "-p" "no:cacheprovider"
     )
 
     # 并行
