@@ -234,106 +234,11 @@ apt-get install -y -qq --no-install-recommends \
   build-essential make perl curl git ca-certificates python3 python3-pip python3-venv \
   libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
   libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
-if ! cmake --version 2>/dev/null | grep -q "3\.29\.6"; then
-  if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
-      tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
-  else
-      curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
-        https://cmake.org/files/v3.29/cmake-3.29.6.tar.gz
-      tar -xzf /tmp/cmake.tar.gz -C /tmp
-  fi
-  (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$(nproc)" --no-qt-gui --no-debugger \
-    -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
-    && make -j"$(nproc)" && make install)
-fi
-if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ]; then
-  if [ -f /deps/cJSON-1.7.18.tar.gz ]; then
-      cp -f /deps/cJSON-1.7.18.tar.gz /tmp/cjson.tar.gz
-  else
-      curl -fsSL -o /tmp/cjson.tar.gz \
-        https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
-  fi
-  tar -xzf /tmp/cjson.tar.gz -C /tmp
-  CJSON_DIR="$(ls -d /tmp/cJSON-* 2>/dev/null | head -1)"
-  cmake -S "$CJSON_DIR" -B /tmp/cjson-build \
-    -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-    -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
-  cmake --build /tmp/cjson-build --parallel
-  cmake --install /tmp/cjson-build
-fi
-# 0.1.6b 系统性修复（SSoT 单一权威）：openssl 唯一权威 = 自编译 3.0.17，
-# 且必须装到 /usr/local/lib。历史 bug：默认 Configure 在 64 位主机把
-# libdir 解析为 lib64，而 CMake FindOpenSSL/pkg-config 默认不搜
-# /usr/local/lib64 → find_package 错解析到系统 1.1.1f（Ubuntu 20.04 的
-# libcrypto.so.1.1 不导出 EVP_DigestSignUpdate@@OPENSSL_3.0.0）→
-# license_sign 链接失败（0.1.6b 容器构建实测）。
-# 自愈逻辑：lib 缺失或 lib64 有残留（历史产物）→ 容器内（root）清理重装。
-if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] || [ -f /usr/local/lib64/libssl.so ]; then
-  rm -rf /usr/local/lib64/libcrypto* /usr/local/lib64/libssl* \
-         /usr/local/lib64/pkgconfig/libcrypto.pc /usr/local/lib64/pkgconfig/libssl.pc \
-         /usr/local/include/openssl /usr/local/ssl
-  if [ -f /deps/openssl-3.0.17.tar.gz ]; then
-      cp -f /deps/openssl-3.0.17.tar.gz /tmp/openssl.tar.gz
-  else
-      curl -fsSL -o /tmp/openssl.tar.gz \
-        https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
-  fi
-  tar -xzf /tmp/openssl.tar.gz -C /tmp
-  OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
-  (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
-    --openssldir=/usr/local/ssl shared --libdir=lib \
-    && make -j"$(nproc)" build_sw && make install_sw)
-fi
-# 0.1.6e 根治修复（社区用户 Ubuntu 24.04 启动失败根因）：apt 的
-# libcurl4-openssl-dev（ubuntu:20.04）预编译链接系统 libssl.so.1.1，而
-# llm_d/think_d/tool_d 直接链接自编译 3.0.17（libssl.so.3）——同一进程
-# 加载两套 OpenSSL ABI；宿主（如 Ubuntu 24.04，仅 libssl.so.3）缺
-# libssl.so.1.1 时 libcurl.so.4 传递依赖即崩。根治：自编译 libcurl 链接
-# /usr/local 的 OpenSSL 3.0.17，统一 libssl.so.3，同时裁剪 ldap/rtmp/
-# ssh2/psl/brotli 等非必需依赖（包体积同步缩小）。
-if [ ! -f /usr/local/lib/libcurl.so ]; then
-  if [ -f /deps/curl-8.5.0.tar.gz ]; then
-      cp -f /deps/curl-8.5.0.tar.gz /tmp/curl.tar.gz
-  else
-      curl -fsSL --retry 3 -o /tmp/curl.tar.gz \
-        https://github.com/curl/curl/releases/download/curl-8_5_0/curl-8.5.0.tar.gz
-  fi
-  tar -xzf /tmp/curl.tar.gz -C /tmp
-  CURL_DIR="$(ls -d /tmp/curl-* 2>/dev/null | head -1)"
-  (cd "$CURL_DIR" && ./configure --prefix=/usr/local \
-      --with-openssl=/usr/local \
-      --without-nghttp2 --without-nghttp3 --without-libpsl --without-libidn2 \
-      --without-brotli --without-zstd --without-librtmp --without-libssh2 \
-      --disable-ldap --disable-ldaps --disable-rtsp --disable-dict \
-      --disable-telnet --disable-tftp --disable-pop3 --disable-imap \
-      --disable-smtp --disable-gopher --disable-manual --disable-debug \
-      --enable-http --enable-https --enable-ftp --enable-file --with-zlib \
-    && make -j"$(nproc)" && make install)
-fi
-# 0.1.6e 同因修复：apt 的 libwebsockets（ubuntu:20.04 4.1.0）链接系统
-# libssl.so.1.1，websocket 组件（gateway_d 等）引入两套 OpenSSL ABI 且
-# 宿主缺 libssl.so.1.1 时崩溃。自编译 libwebsockets 链接 /usr/local
-# OpenSSL 3.0.17（libssl.so.3 统一链路），剥离测试/示例以提速。
-if [ ! -f /usr/local/lib/libwebsockets.so ]; then
-  if [ -f /deps/lws-4.3.3.tar.gz ]; then
-      cp -f /deps/lws-4.3.3.tar.gz /tmp/lws.tar.gz
-  else
-      curl -fsSL --retry 3 -o /tmp/lws.tar.gz \
-        https://github.com/warmcat/libwebsockets/archive/refs/tags/v4.3.3.tar.gz
-  fi
-  tar -xzf /tmp/lws.tar.gz -C /tmp
-  LWS_DIR="$(ls -d /tmp/libwebsockets-* 2>/dev/null | head -1)"
-  cmake -S "$LWS_DIR" -B /tmp/lws-build \
-      -DCMAKE_INSTALL_PREFIX=/usr/local \
-      -DCMAKE_PREFIX_PATH=/usr/local \
-      -DOPENSSL_ROOT_DIR=/usr/local \
-      -DLWS_WITH_SSL=ON -DLWS_WITH_SHARED=ON -DLWS_WITH_STATIC=OFF \
-      -DLWS_WITHOUT_TESTAPPS=ON -DLWS_WITHOUT_TEST_SERVER=ON \
-      -DLWS_WITHOUT_TEST_SERVER_EXTPOLL=ON -DLWS_WITHOUT_TEST_CLIENT=ON \
-      -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF
-  cmake --build /tmp/lws-build --parallel
-  cmake --install /tmp/lws-build
-fi
+# 0.1.6e SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译逻辑收敛到
+# lib-builddeps.sh（单一权威，CI release.yml 各 Linux job 同源调用），
+# 幂等（已就位即跳过），离线 deps 缓存优先。curl 8.5.0 + lws 4.3.3 统一
+# 链接自编译 OpenSSL 3.0.17（libssl.so.3），根治宿主缺 libssl.so.1.1 崩溃。
+bash /src/tools/scripts/ci/release/lib-builddeps.sh
 # 配置漂移自愈：0.1.6b 起 configure 必须携带 -DOPENSSL_ROOT_DIR=/usr/local
 # （FindOpenSSL 唯一解析到自编译 3.0.17）；0.1.6e 起同时携带
 # -DCMAKE_PREFIX_PATH=/usr/local（FindCURL 优先命中自编译 libcurl，否则

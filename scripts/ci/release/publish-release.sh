@@ -74,6 +74,44 @@ done
 log_info "制品清单:"
 for f in "${ARTIFACTS[@]}"; do log_info "  $(basename "$f")"; done
 
+# ─── 阶段 0.5：发布预检（0.1.6f 强化，fail-closed）──────────────────────
+# 准确性门禁：版本号格式 / sha256 校验件一致 / 包大小 sanity / 包内
+# 启动器语法。任一不过即中止，杜绝发布损坏或错配制品。
+case "$VERSION" in
+    v[0-9]*.[0-9]*.[0-9]*[-.+a-zA-Z0-9]*) ;;
+    *) log_fail "版本号格式非法: ${VERSION}（应为 vX.Y.Z 或带后缀，如 v0.1.6f）"; exit 1 ;;
+esac
+PREFAIL=0
+for f in "${ARTIFACTS[@]}"; do
+    if [ ! -f "$f.sha256" ]; then
+        log_fail "缺少校验文件: $(basename "$f").sha256"; PREFAIL=1; continue
+    fi
+    computed="$(sha256sum "$f" 2>/dev/null | awk '{print $1}')"
+    declared="$(awk '{print $1}' "$f.sha256" 2>/dev/null)"
+    if [ -z "$computed" ] || [ "$computed" != "$declared" ]; then
+        log_fail "sha256 不匹配: $(basename "$f")"; PREFAIL=1
+    fi
+    size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
+    if [ -z "$size" ] || [ "$size" -lt 5000000 ]; then
+        log_fail "制品异常小（疑似损坏）: $(basename "$f")（${size:-?} 字节）"; PREFAIL=1
+    fi
+done
+# 包内关键脚本语法预检（防发布坏启动器/安装器）
+for f in "${ARTIFACTS[@]}"; do
+    if command -v tar >/dev/null 2>&1 && tar -tzf "$f" 2>/dev/null | grep -q 'bin/airymaxrt'; then
+        tmpext="$(mktemp -d)"
+        if tar -xzf "$f" -C "$tmpext" --wildcards '*/bin/airymaxrt' 2>/dev/null; then
+            launcher="$(find "$tmpext" -name airymaxrt -type f | head -1)"
+            if [ -n "$launcher" ] && ! bash -n "$launcher" 2>/dev/null; then
+                log_fail "包内 airymaxrt 语法预检失败: $(basename "$f")"; PREFAIL=1
+            fi
+        fi
+        rm -rf "$tmpext"
+    fi
+done
+[ "$PREFAIL" = "0" ] || { log_fail "发布预检未通过（${PREFAIL} 项），中止"; exit 1; }
+log_ok "发布预检通过: ${#ARTIFACTS[@]} 个制品（sha256 一致 + 大小正常 + 启动器语法 OK）"
+
 # ─── 阶段 1：cosign 签名每个制品 ──────────────────────────────────────────
 if [ "$SKIP_SIGN" = "1" ] || [ "$SKIP_COSIGN" = "1" ]; then
     log_warn "跳过 cosign 制品签名（SKIP_SIGN/SKIP_COSIGN）"
@@ -250,12 +288,25 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     print("-H"); print(f"{k}: {v}")' <<<"$upjson")
     if curl -fsS --connect-timeout 20 --max-time 900 -X PUT \
         "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null; then
-        log_ok "已上传: ${b}"
+        # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
+        # 大小必须等于本地大小，防 OBS 截断/静默失败（此前无校验）。
+        local local_size dl
+        local_size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
+        dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
+            "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null || echo 0)"
+        if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
+            log_ok "已上传并校验: ${b}（${dl} 字节）"
+        else
+            log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
+            return 1
+        fi
     else
         log_fail "上传失败: ${b}"
         return 1
     fi
 }
+
+# ─── 阶段 4.5：并行上传所有附件 ────────────────────────────────────────
 
 # 上传制品 + sha256 校验件 + cosign 签名（*.sig）+ manifest + manifest GPG 签名。
 # cosign 签名必须随制品发布，客户端方可校验供应链完整性（防断链）；
@@ -291,12 +342,21 @@ if [ -d "$SNAPSHOT_DIR" ] && [ -f "$INSTALLER_SRC" ] && [ -f "$INSTALLER_PS1_SRC
     cp -f "$INSTALLER_PS1_SRC" "$SNAPSHOT_DIR/install.ps1"
     log_ok "安装器快照已同步: ${SNAPSHOT_DIR}"
 fi
+# 并行上传（0.1.6f 强化）：6 架构 × 3 附件 + manifest/installer 约 24 文件，
+# 串行 PUT 大包（35-45MB）耗时显著；限 3 并发（避免打爆 atomgit API 限流），
+# 任一失败记入失败清单，全部结束后 fail-closed 中止。
+UPLOAD_PAR=3
+UP_FAIL_LOG="$TMP/upfailed.txt"
+rm -f "$UP_FAIL_LOG"
 for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc" "$INSTALLER" "$INSTALLER_PS1"; do
     [ -e "$f" ] || continue
-    upload_asset "$f" || UP_FAILED=1
+    ( upload_asset "$f" || echo "$(basename "$f")" >> "$UP_FAIL_LOG" ) &
+    while [ "$(jobs -rp | wc -l)" -ge "$UPLOAD_PAR" ]; do wait -n 2>/dev/null || break; done
 done
-if [ "$UP_FAILED" != "0" ]; then
-    log_fail "存在上传失败附件，中止发布（修复后重跑可续传，已成功附件自动跳过）"
+wait 2>/dev/null || true
+if [ -s "$UP_FAIL_LOG" ]; then
+    log_fail "存在上传失败附件（$(wc -l < "$UP_FAIL_LOG") 个），中止发布（修复后重跑可续传，已成功附件自动跳过）:"
+    sed 's/^/  /' "$UP_FAIL_LOG" | head -10
     exit 1
 fi
 
