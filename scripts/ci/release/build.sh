@@ -340,14 +340,15 @@ fi
 # 命中 apt 的 /usr/lib/.../libcurl.so.4 → 链接 libssl.so.1.1 崩溃链）。
 # 且配置前 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig：libwebsockets
 # 等走 pkg-config 的依赖必须命中自编译 4.3.3（libssl.so.3），否则 pkg-config
-# 按默认目录顺序命中系统 libwebsockets.pc（4.1.0 → libssl.so.1.1）——
-# v3 实测 CMakeCache 命中未重配时 gateway_d 链接系统 lws 导致崩溃链未根治。
-# 漂移检测同时覆盖 pkg-config 结果：cache 中 libwebsockets 未解析到
-# /usr/local 即重配。
+# 按默认目录顺序命中系统 libwebsockets.pc（4.1.0 → libssl.so.1.1）。
+# 漂移检测同时覆盖 libwebsockets 解析：lws 走 find_package 的 config-mode
+# （cache 变量 libwebsockets_DIR），非 pkg-config（无 pkgcfg_lib_* 条目）；
+# cache 未命中自编译 /usr/local 即重配，否则 gateway 回退系统 apt 版
+# （libssl.so.1.1 崩溃链）。
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 if [ ! -f /build/CMakeCache.txt ] || ! grep -q "OPENSSL_ROOT_DIR:.*=/usr/local" /build/CMakeCache.txt \
    || ! grep -q "CMAKE_PREFIX_PATH:.*=/usr/local" /build/CMakeCache.txt \
-   || ! grep -q "pkgcfg_lib_LIBWEBSOCKETS_websockets:FILEPATH=/usr/local/" /build/CMakeCache.txt; then
+   || ! grep -q "libwebsockets_DIR:PATH=/usr/local/lib/cmake/libwebsockets" /build/CMakeCache.txt; then
   rm -f /build/CMakeCache.txt
   cmake -S /src/agent-workload/agentrt -B /build \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
