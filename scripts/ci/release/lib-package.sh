@@ -141,6 +141,11 @@ pkg_clean_pyc() {
 # 交叉产物运行时库收集：宿主 ldd 无法分析异架构 ELF（riscv64/aarch64），
 # 改用 readelf 解析 NEEDED 并在 sysroot 中定位 .so；系统核心库由目标系统
 # 提供（libc/libm/libgcc_s/ld-linux 等），不入包。
+# 0.1.6c 系统性修复：必须递归展开传递依赖。旧实现只收 bin 的一层直接
+# NEEDED，漏收 libcurl→libidn2/librtmp/libssh/libpsl/libgssapi/libldap/
+# libzstd/libbrotli/libz/libssl.so.1.1…（aarch64/riscv64 包实测缺 40+ 库，
+# 目标机 daemon exec 即失败 "No such file or directory"）。qemu 容器构建
+# 走 ldd 全递归天然完整；交叉收集需等价收敛（BFS 展开至无新依赖）。
 pkg_runtime_libs_cross() {
     local out="$1" sysroot="$2" readelf="$3" b n
     mkdir -p "$out/lib"
@@ -150,25 +155,53 @@ pkg_runtime_libs_cross() {
     local archdir
     archdir="$(ls -d "$sysroot"/usr/lib/*-linux-gnu 2>/dev/null | head -1)"
     [ -n "$archdir" ] || archdir="$sysroot/usr/lib"
+
+    # 依赖队列（BFS）：幂等入队 + 递归展开
+    local queue=() i=0
+    local enqueue
+    enqueue() { # <soname>
+        local s="$1"
+        case " ${queue[*]} " in *" $s "*) ;; *) queue+=("$s") ;; esac
+    }
+    local expand
+    expand() { # <elf 路径>
+        local elf="$1"
+        while read -r s; do
+            enqueue "$s"
+        done < <("$readelf" -d "$elf" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
+            | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|libresolv\.so|ld-linux)')
+    }
+
+    # 入队：全部 bin 的直接 NEEDED
     for b in "$out"/bin/*; do
         [ -f "$b" ] || continue
         file "$b" 2>/dev/null | grep -q 'ELF' || continue
-        while read -r n; do
-            [ -f "$archdir/$n" ] && cp -f "$archdir/$n" "$out/lib/" 2>/dev/null || true
-        done < <("$readelf" -d "$b" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
-            | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|ld-linux)')
+        expand "$b"
     done
+    # BFS 展开：复制队列库，并递归解析其自身 NEEDED（传递依赖）
+    while [ "$i" -lt "${#queue[@]}" ]; do
+        n="${queue[$i]}"; i=$((i + 1))
+        [ -f "$out/lib/$n" ] && continue
+        if [ -f "$archdir/$n" ]; then
+            cp -f "$archdir/$n" "$out/lib/" 2>/dev/null || true
+            expand "$archdir/$n"
+        else
+            echo "warn: sysroot 缺依赖 $n（$archdir）"
+        fi
+    done
+    echo "交叉运行时库收集完成: $(ls "$out/lib" 2>/dev/null | wc -l) 个（含递归传递依赖）"
 }
 
-# 校验交叉产物无未解析依赖（包内 NEEDED 均在 out/lib 或系统核心库）
+# 校验交叉产物无未解析依赖（fail-closed）：bin 与 lib 全部 ELF 的 NEEDED
+# 均在包内 lib/ 或系统核心库，任一缺失返回 1（构建中止，杜绝缺陷包出库）。
 pkg_verify_deps_cross() {
-    local out="$1" readelf="$2" tmp bad=0 n
+    local out="$1" readelf="$2" tmp bad=0 f
     tmp="$(mktemp)"
-    for b in "$out"/bin/*; do
-        [ -f "$b" ] || continue
-        file "$b" 2>/dev/null | grep -q 'ELF' || continue
-        "$readelf" -d "$b" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
-            | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|ld-linux)' \
+    for f in "$out"/bin/* "$out"/lib/*; do
+        [ -f "$f" ] || continue
+        file "$f" 2>/dev/null | grep -q 'ELF' || continue
+        "$readelf" -d "$f" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
+            | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|libresolv\.so|ld-linux)' \
             >> "$tmp"
     done
     while read -r n; do
@@ -184,10 +217,18 @@ pkg_assemble_full() {
     local out="$1" version="$2" platform="$3" root="$4"
     if [ -n "${5:-}" ] && [ -n "${6:-}" ]; then
         pkg_runtime_libs_cross "$out" "$6" "$5"
-        pkg_verify_deps_cross "$out" "$5" || true
+        # fail-closed：交叉产物任一 NEEDED 未解析即中止构建（0.1.6c 缺陷
+        # 根因是验证被 || true 吞掉——缺 40+ 传递依赖的包照样出库）
+        if ! pkg_verify_deps_cross "$out" "$5"; then
+            echo "[FAIL] 交叉产物存在未解析依赖，构建中止"; exit 1
+        fi
     else
         pkg_runtime_libs "$out"
-        pkg_verify_deps "$out" || true
+        # fail-closed 与交叉路径一致：容器收集产物任一未解析依赖同样
+        # 中止构建（杜绝 qemu/ldd 路径静默出缺陷包）
+        if ! pkg_verify_deps "$out"; then
+            echo "[FAIL] 产物存在未解析依赖，构建中止"; exit 1
+        fi
     fi
     pkg_stage_python "$out" "$root"
     pkg_stage_config "$out" "$root"
