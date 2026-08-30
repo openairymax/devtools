@@ -10,7 +10,9 @@
 #   官方制品仓库：https://atomgit.com/openairymax/agentrt（用户指定）
 #   制品 URL:      https://atomgit.com/openairymax/agentrt/releases/download/<tag>/<file>
 #   manifest 固定入口（更新器轮询）：仓库代码树 latest/ 目录，
-#      URL: https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/manifest.<channel>.json
+#      URL: https://atomgit.com/openairymax/agentrt/raw/main/latest/manifest.<channel>.json
+#      （0.1.6b：主域 raw 路径。raw.atomgit.com 子域对非 Markdown 返回
+#      "暂不支持预览"403，部分网络不可达，安装器/更新器一律用主域。）
 #
 # 用法：
 #   ./publish-release.sh v0.1.5 [DIST_DIR]              # stable 发布
