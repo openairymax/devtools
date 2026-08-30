@@ -27,7 +27,7 @@ ARCH="${1:-}"
 case "$ARCH" in
     i686)
         TC="i686-toolchain"; TRIPLE="i686-linux-gnu"; CMAKE_ARCH="i686"
-        MULTIARCH="i386"; PORT_ARCH="i386"; TUI_TARGET="i686-unknown-linux-gnu"
+        MULTIARCH="i386-linux-gnu"; PORT_ARCH="i386"; TUI_TARGET="i686-unknown-linux-gnu"
         TOOL_PKGS="gcc-i686-linux-gnu g++-i686-linux-gnu"
         # i386 属主归档（archive.ubuntu.com）；armhf 属 ports（armhf 为 port 架构）
         ARCH_BASE="http://archive.ubuntu.com/ubuntu"
@@ -111,13 +111,23 @@ while read -r line; do
     FILENAME["$p"]="$f"
 done < /tmp/pkgs-map-${ARCH}.txt
 
+# 并行下载（xargs -P 8）：先落清单再并发拉取，已存在文件跳过（幂等断点续跑）。
+# 顺序下载在慢网络下每包串行等待，61 包可能拖到小时级；并发显著提速。
+: > "/tmp/dl-list-${ARCH}.txt"
 for p in $LIBS; do
     f="${FILENAME[$p]:-}"
     [ -z "$f" ] && { echo "[MISS] $p"; continue; }
     base="$(basename "$f")"
     [ -f "$base" ] && continue
-    curl -fsSL -o "$base" "${ARCH_BASE}/$f" || echo "[FAIL] $p"
+    printf '%s|%s|%s\n' "$p" "$base" "${ARCH_BASE}/$f" >> "/tmp/dl-list-${ARCH}.txt"
 done
+[ -s "/tmp/dl-list-${ARCH}.txt" ] && {
+    xargs -P 8 -I{} bash -c '
+        p="${1%%|*}"; rest="${1#*|}"; base="${rest%%|*}"; url="${rest#*|}"
+        curl -fsSL --connect-timeout 20 --max-time 600 -o "$base" "$url" \
+            && echo "[GET] $base" || echo "[FAIL] $p"
+    ' _ {} < "/tmp/dl-list-${ARCH}.txt"
+}
 ok "依赖库 deb 就位: $(ls *.deb 2>/dev/null | wc -l) 个"
 
 # 解压到 sysroot/（multiarch 布局 usr/lib/<multiarch> 与 usr/include）
