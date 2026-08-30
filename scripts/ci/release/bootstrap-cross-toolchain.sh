@@ -93,7 +93,9 @@ libkrb5-dev libkrb5-3 libgssapi-krb5-2 libk5crypto3 libkrb5support0 libcom-err2 
 libssh2-1-dev libssh2-1t64 libldap2-dev libldap2 libsasl2-2 \
 libpsl-dev libpsl5t64 libidn2-dev libidn2-0 libbrotli-dev libbrotli1 \
 libgcrypt20-dev libgcrypt20 libgpg-error0 libkeyutils-dev libcom-err-dev \
-libsasl2-dev libsasl2-modules-db librtmp1"
+libsasl2-dev libsasl2-modules-db librtmp1 \
+libgmp10 libgnutls30t64 libhogweed6t64 libnettle8t64 libssh-4 libunistring5 libzstd1 \
+libp11-kit0 libtasn1-6 libffi8"
 
 cd "$TC_DIR/dl-libs"
 IDX="/tmp/pkgs-${ARCH}.txt"
@@ -165,6 +167,13 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
+# 第三方 CMake config（cJSON/libwebsockets）内嵌绝对安装前缀 /usr，
+# 交叉 sysroot 下 imported target 引用宿主路径而失效（i686/armhf 实测）。
+# 禁用其 find_package，由 CMakeLists 的 pkg-config / find_library 回退接管
+# （回退路径经 CMAKE_FIND_ROOT_PATH 自动 sysroot 化，与 riscv64 同法）。
+set(CMAKE_DISABLE_FIND_PACKAGE_cJSON TRUE)
+set(CMAKE_DISABLE_FIND_PACKAGE_libwebsockets TRUE)
 
 set(CMAKE_C_FLAGS_INIT "${EXTRA_MARCH} -I\${AIRY_TC_ROOT}/usr/${TRIPLE}/include -I\${AIRY_SYSROOT}/usr/include -I\${AIRY_SYSROOT}/usr/include/${MULTIARCH}")
 set(CMAKE_CXX_FLAGS_INIT "${EXTRA_MARCH} -I\${AIRY_TC_ROOT}/usr/${TRIPLE}/include -I\${AIRY_SYSROOT}/usr/include -I\${AIRY_SYSROOT}/usr/include/${MULTIARCH}")

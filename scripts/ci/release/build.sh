@@ -460,11 +460,15 @@ build_cross() {
     mkdir -p "$build" "$stage"
     # INSTALL_PREFIX 漂移检测（同 build_native：版本 bump 后 CMakeCache
     # 固化旧 stage 路径，install 落错目录导致包内缺二进制/.so）
+    # 同时处理"缓存残留但构建文件缺失"（上次配置失败后残留 CMakeCache
+    # 而无 Makefile，直接 cmake --build 报 "No rule to make target"）。
     if [ -f "$build/CMakeCache.txt" ]; then
-        local cached_prefix
+        local cached_prefix needs_reconf=0
         cached_prefix="$(sed -n 's/^CMAKE_INSTALL_PREFIX:\([A-Za-z]*\)=//p' "$build/CMakeCache.txt" | head -1)"
-        if [ -n "$cached_prefix" ] && [ "$cached_prefix" != "$out" ]; then
-            log_warn "INSTALL_PREFIX 漂移（缓存 ${cached_prefix} → ${out}），重新 cmake 配置"
+        [ -n "$cached_prefix" ] && [ "$cached_prefix" != "$out" ] && needs_reconf=1
+        { [ ! -f "$build/Makefile" ] && [ ! -f "$build/build.ninja" ]; } && needs_reconf=1
+        if [ "$needs_reconf" = "1" ]; then
+            log_warn "CMake 缓存失效（prefix 漂移或构建文件缺失），重新配置"
             cmake -S "$AGENTRT_TREE" -B "$build" \
                 -DCMAKE_TOOLCHAIN_FILE="$toolchain_file" \
                 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
