@@ -310,13 +310,44 @@ if [ ! -f /usr/local/lib/libcurl.so ]; then
       --enable-http --enable-https --enable-ftp --enable-file --with-zlib \
     && make -j"$(nproc)" && make install)
 fi
+# 0.1.6e 同因修复：apt 的 libwebsockets（ubuntu:20.04 4.1.0）链接系统
+# libssl.so.1.1，websocket 组件（gateway_d 等）引入两套 OpenSSL ABI 且
+# 宿主缺 libssl.so.1.1 时崩溃。自编译 libwebsockets 链接 /usr/local
+# OpenSSL 3.0.17（libssl.so.3 统一链路），剥离测试/示例以提速。
+if [ ! -f /usr/local/lib/libwebsockets.so ]; then
+  if [ -f /deps/lws-4.3.3.tar.gz ]; then
+      cp -f /deps/lws-4.3.3.tar.gz /tmp/lws.tar.gz
+  else
+      curl -fsSL --retry 3 -o /tmp/lws.tar.gz \
+        https://github.com/warmcat/libwebsockets/archive/refs/tags/v4.3.3.tar.gz
+  fi
+  tar -xzf /tmp/lws.tar.gz -C /tmp
+  LWS_DIR="$(ls -d /tmp/libwebsockets-* 2>/dev/null | head -1)"
+  cmake -S "$LWS_DIR" -B /tmp/lws-build \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_PREFIX_PATH=/usr/local \
+      -DOPENSSL_ROOT_DIR=/usr/local \
+      -DLWS_WITH_SSL=ON -DLWS_WITH_SHARED=ON -DLWS_WITH_STATIC=OFF \
+      -DLWS_WITHOUT_TESTAPPS=ON -DLWS_WITHOUT_TEST_SERVER=ON \
+      -DLWS_WITHOUT_TEST_SERVER_EXTPOLL=ON -DLWS_WITHOUT_TEST_CLIENT=ON \
+      -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF
+  cmake --build /tmp/lws-build --parallel
+  cmake --install /tmp/lws-build
+fi
 # 配置漂移自愈：0.1.6b 起 configure 必须携带 -DOPENSSL_ROOT_DIR=/usr/local
 # （FindOpenSSL 唯一解析到自编译 3.0.17）；0.1.6e 起同时携带
 # -DCMAKE_PREFIX_PATH=/usr/local（FindCURL 优先命中自编译 libcurl，否则
 # 命中 apt 的 /usr/lib/.../libcurl.so.4 → 链接 libssl.so.1.1 崩溃链）。
-# 旧 CMakeCache 缺该变量 → 重配。
+# 且配置前 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig：libwebsockets
+# 等走 pkg-config 的依赖必须命中自编译 4.3.3（libssl.so.3），否则 pkg-config
+# 按默认目录顺序命中系统 libwebsockets.pc（4.1.0 → libssl.so.1.1）——
+# v3 实测 CMakeCache 命中未重配时 gateway_d 链接系统 lws 导致崩溃链未根治。
+# 漂移检测同时覆盖 pkg-config 结果：cache 中 libwebsockets 未解析到
+# /usr/local 即重配。
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 if [ ! -f /build/CMakeCache.txt ] || ! grep -q "OPENSSL_ROOT_DIR:.*=/usr/local" /build/CMakeCache.txt \
-   || ! grep -q "CMAKE_PREFIX_PATH:.*=/usr/local" /build/CMakeCache.txt; then
+   || ! grep -q "CMAKE_PREFIX_PATH:.*=/usr/local" /build/CMakeCache.txt \
+   || ! grep -q "pkgcfg_lib_LIBWEBSOCKETS_websockets:FILEPATH=/usr/local/" /build/CMakeCache.txt; then
   rm -f /build/CMakeCache.txt
   cmake -S /src/agent-workload/agentrt -B /build \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
