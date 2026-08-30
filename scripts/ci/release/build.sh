@@ -220,8 +220,23 @@ EOF
         $([ -d "$TUI_VENDOR_DIR" ] && echo "-v $TUI_VENDOR_DIR:/tui-vendor:ro -v $TUI_CFG_DIR:/src/agent-workload/sdk/tui/.cargo:ro") \
         -e SKIP_TUI="${SKIP_TUI:-0}" \
         -e ARCH="${qemu_arch}" \
+        -e AIRY_APT_MIRROR="${AIRY_APT_MIRROR:-}" \
         "$image" bash -euxo pipefail -s <<'CONTAINER_EOF'
 export DEBIAN_FRONTEND=noninteractive
+# 0.1.6f 修复：容器 DNS 常返回 IPv6 AAAA，宿主无 IPv6 路由时 apt 走
+# IPv6 连接挂起（2026-08-30 实测 apt-get update 卡死 >7 分钟）。强制
+# apt 只用 IPv4，网络不可达时快速失败而非无限等待。
+echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
+# 0.1.6f 提速：国内网络访问 archive.ubuntu.com 极慢（TCP 可连但吞吐
+# 极低），支持 AIRY_APT_MIRROR 换镜像源（镜像根，脚本自动补 /ubuntu
+# 路径；基础镜像无 ca-certificates，须用 http 协议：本地构建台设
+# AIRY_APT_MIRROR=http://mirrors.aliyun.com；CI 海外 runner 不设、
+# 保持官方源，两者互不影响）。
+if [ -n "${AIRY_APT_MIRROR:-}" ]; then
+  sed -i -e "s|http://archive.ubuntu.com/ubuntu|${AIRY_APT_MIRROR}/ubuntu|g" \
+         -e "s|http://security.ubuntu.com/ubuntu|${AIRY_APT_MIRROR}/ubuntu|g" \
+         /etc/apt/sources.list
+fi
 # 0.1.6b 系统性修复：apt 依赖在容器系统层，docker run 每次新建实例即丢失。
 # 历史 bug：.agentrt-deps-installed 标志固化在持久 /usr/local 卷，导致新容器
 # 实例跳过 apt 安装而 gcc 等已随旧实例销毁（2026-08-30 实测 cmake bootstrap
