@@ -149,11 +149,15 @@ pkg_clean_pyc() {
 pkg_runtime_libs_cross() {
     local out="$1" sysroot="$2" readelf="$3" b n
     mkdir -p "$out/lib"
-    # 自动探测 sysroot 的 multiarch 库目录（riscv64-linux-gnu /
-    # aarch64-linux-gnu / x86_64-linux-gnu…），避免硬编码单架构路径
+    # 自动探测 sysroot 的 multiarch 库目录，避免硬编码单架构路径
     # （0.1.6 实测：arm64 交叉产物 .so 未收集，因路径写死 riscv64）。
+    # 命名两种：*-linux-gnu（i386/aarch64/riscv64）与
+    # arm-linux-gnueabihf（armhf）。glob 无匹配时 ls 返回非零，pipefail
+    # 下命令替换继承该码触发 set -e 中止（armv7l 构建实测 exit 2），
+    # 必须 || true 兜底再回退下一候选。
     local archdir
-    archdir="$(ls -d "$sysroot"/usr/lib/*-linux-gnu 2>/dev/null | head -1)"
+    archdir="$(ls -d "$sysroot"/usr/lib/*-linux-gnu 2>/dev/null | head -1 || true)"
+    [ -n "$archdir" ] || archdir="$(ls -d "$sysroot"/usr/lib/*-gnueabihf 2>/dev/null | head -1 || true)"
     [ -n "$archdir" ] || archdir="$sysroot/usr/lib"
 
     # 依赖队列（BFS）：幂等入队 + 递归展开
