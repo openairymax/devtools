@@ -50,7 +50,7 @@ source "${SCRIPT_DIR}/lib-package.sh"
 AGENTRT_VERSION_FILE="${PROJECT_ROOT}/agent-workload/agentrt/VERSION"
 DEFAULT_VERSION="v$(cat "$AGENTRT_VERSION_FILE" 2>/dev/null | tr -d '[:space:]' || echo 0.1.5)"
 VERSION="${1:-${DEFAULT_VERSION}}"
-PLATFORM="${2:-linux-x86_64}"
+PLATFORM="${2:-linux-x64}"
 # 目录内使用去 v 的版本号（包内顶层目录 agentrt-<num>，与 install.sh 匹配）
 VERSION_NUM="${VERSION#v}"
 SKIP_GATES="${SKIP_GATES:-0}"

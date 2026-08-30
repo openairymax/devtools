@@ -52,10 +52,10 @@ CLEAN=0
 [ "${2:-}" = "--clean" ] && CLEAN=1
 
 case "$ARCH" in
-    x86_64) PLATFORM="linux-x86_64" ;;
-    i686)   PLATFORM="linux-i686" ;;
-    arm64)  PLATFORM="linux-aarch64" ;;
-    armv7l) PLATFORM="linux-armv7l" ;;
+    x86_64) PLATFORM="linux-x64" ;;
+    i686)   PLATFORM="linux-x86" ;;
+    arm64)  PLATFORM="linux-arm64" ;;
+    armv7l) PLATFORM="linux-arm32" ;;
     riscv64) PLATFORM="linux-riscv64" ;;
     riscv32) PLATFORM="linux-riscv32" ;;
     *) echo "[FAIL] 仅支持 x86_64 / i686 / arm64 / armv7l / riscv64 / riscv32"; exit 1 ;;
@@ -284,14 +284,44 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
     --openssldir=/usr/local/ssl shared --libdir=lib \
     && make -j"$(nproc)" build_sw && make install_sw)
 fi
+# 0.1.6e 根治修复（社区用户 Ubuntu 24.04 启动失败根因）：apt 的
+# libcurl4-openssl-dev（ubuntu:20.04）预编译链接系统 libssl.so.1.1，而
+# llm_d/think_d/tool_d 直接链接自编译 3.0.17（libssl.so.3）——同一进程
+# 加载两套 OpenSSL ABI；宿主（如 Ubuntu 24.04，仅 libssl.so.3）缺
+# libssl.so.1.1 时 libcurl.so.4 传递依赖即崩。根治：自编译 libcurl 链接
+# /usr/local 的 OpenSSL 3.0.17，统一 libssl.so.3，同时裁剪 ldap/rtmp/
+# ssh2/psl/brotli 等非必需依赖（包体积同步缩小）。
+if [ ! -f /usr/local/lib/libcurl.so ]; then
+  if [ -f /deps/curl-8.5.0.tar.gz ]; then
+      cp -f /deps/curl-8.5.0.tar.gz /tmp/curl.tar.gz
+  else
+      curl -fsSL --retry 3 -o /tmp/curl.tar.gz \
+        https://github.com/curl/curl/releases/download/curl-8_5_0/curl-8.5.0.tar.gz
+  fi
+  tar -xzf /tmp/curl.tar.gz -C /tmp
+  CURL_DIR="$(ls -d /tmp/curl-* 2>/dev/null | head -1)"
+  (cd "$CURL_DIR" && ./configure --prefix=/usr/local \
+      --with-openssl=/usr/local \
+      --without-nghttp2 --without-nghttp3 --without-libpsl --without-libidn2 \
+      --without-brotli --without-zstd --without-librtmp --without-libssh2 \
+      --disable-ldap --disable-ldaps --disable-rtsp --disable-dict \
+      --disable-telnet --disable-tftp --disable-pop3 --disable-imap \
+      --disable-smtp --disable-gopher --disable-manual --disable-debug \
+      --enable-http --enable-https --enable-ftp --enable-file --with-zlib \
+    && make -j"$(nproc)" && make install)
+fi
 # 配置漂移自愈：0.1.6b 起 configure 必须携带 -DOPENSSL_ROOT_DIR=/usr/local
-# （FindOpenSSL 唯一解析到自编译 3.0.17）；旧 CMakeCache 缺该变量 → 重配。
-if [ ! -f /build/CMakeCache.txt ] || ! grep -q "OPENSSL_ROOT_DIR:.*=/usr/local" /build/CMakeCache.txt; then
+# （FindOpenSSL 唯一解析到自编译 3.0.17）；0.1.6e 起同时携带
+# -DCMAKE_PREFIX_PATH=/usr/local（FindCURL 优先命中自编译 libcurl，否则
+# 命中 apt 的 /usr/lib/.../libcurl.so.4 → 链接 libssl.so.1.1 崩溃链）。
+# 旧 CMakeCache 缺该变量 → 重配。
+if [ ! -f /build/CMakeCache.txt ] || ! grep -q "OPENSSL_ROOT_DIR:.*=/usr/local" /build/CMakeCache.txt \
+   || ! grep -q "CMAKE_PREFIX_PATH:.*=/usr/local" /build/CMakeCache.txt; then
   rm -f /build/CMakeCache.txt
   cmake -S /src/agent-workload/agentrt -B /build \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF \
     -DAIRY_BUILD_ALL=ON -DCMAKE_INSTALL_PREFIX=/pkg/out \
-    -DOPENSSL_ROOT_DIR=/usr/local
+    -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local
 fi
 cmake --build /build -j"$(nproc)"
 cmake --install /build
@@ -309,6 +339,14 @@ cmake --install /build
 # 才能解析全部依赖。
 ldconfig 2>/dev/null || true
 mkdir -p /pkg/out/lib
+# 0.1.6e 根治修复（Ubuntu 24.04 社区崩溃根因）：收集前清空残留动态库，
+# 并以 LD_LIBRARY_PATH 指向 /usr/local/lib，使 ldd 解析到自编译
+# openssl 3.0.17 / curl 8.5.0（libssl.so.3 统一链路），而非系统 apt 库
+# （libcurl 7.68 → libssl.so.1.1 → 宿主缺该库即崩）。此前 RUNPATH
+# （$ORIGIN/../lib=/pkg/out/lib）优先命中上次收集残留的旧库，自编译
+# libcurl 虽已链接却从未被收集。清空后再收集保证 ldd 无旧库可命中。
+rm -f /pkg/out/lib/*.so.* 2>/dev/null || true
+export LD_LIBRARY_PATH=/usr/local/lib
 for b in /pkg/out/bin/*; do
   ldd "$b" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
     case "$n" in
