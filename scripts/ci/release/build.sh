@@ -53,9 +53,12 @@ CLEAN=0
 
 case "$ARCH" in
     x86_64) PLATFORM="linux-x86_64" ;;
+    i686)   PLATFORM="linux-i686" ;;
     arm64)  PLATFORM="linux-aarch64" ;;
+    armv7l) PLATFORM="linux-armv7l" ;;
     riscv64) PLATFORM="linux-riscv64" ;;
-    *) echo "[FAIL] 仅支持 x86_64 / arm64 / riscv64"; exit 1 ;;
+    riscv32) PLATFORM="linux-riscv32" ;;
+    *) echo "[FAIL] 仅支持 x86_64 / i686 / arm64 / armv7l / riscv64 / riscv32"; exit 1 ;;
 esac
 
 # ─── 构建台与产物台（构建台源码区外；产物台=发布工作区 developbuild） ───
@@ -407,6 +410,40 @@ build_cross() {
             tui_target="aarch64-unknown-linux-gnu"
             tui_linker="aarch64-linux-gnu-gcc"
             ;;
+        i686)
+            # 32 位 x86（i686）：交叉工具链 + sysroot 从 Ubuntu noble deb 解压
+            # （免 root），布局同 riscv64-toolchain（root/ 工具链 + sysroot/ 依赖库）。
+            tc="$BUILD_ROOT/i686-toolchain"
+            build="$BUILD_ROOT/i686-cross"
+            toolchain_file="$tc/toolchain-i686.cmake"
+            readelf="$tc/root/usr/bin/i686-linux-gnu-readelf"
+            sysroot="$tc/sysroot"
+            tui_target="i686-unknown-linux-gnu"
+            tui_linker="$tc/root/usr/bin/i686-linux-gnu-gcc"
+            ;;
+        armv7l)
+            # 32 位 ARM（armhf）：交叉工具链 + sysroot 从 Ubuntu noble armhf deb
+            # 解压（树莓派 32 位用户空间正解，2026-08-30 兼容决策）。
+            tc="$BUILD_ROOT/armhf-toolchain"
+            build="$BUILD_ROOT/armhf-cross"
+            toolchain_file="$tc/toolchain-armhf.cmake"
+            readelf="$tc/root/usr/bin/arm-linux-gnueabihf-readelf"
+            sysroot="$tc/sysroot"
+            tui_target="armv7-unknown-linux-gnueabihf"
+            tui_linker="$tc/root/usr/bin/arm-linux-gnueabihf-gcc"
+            ;;
+        riscv32)
+            # 32 位 RISC-V（ilp32d）：glibc 用户态生态极新（2.41+），Ubuntu
+            # noble 无 riscv32 libc，预编译包暂不可行；检测正确后回退源码构建。
+            # 预留工具链路径，未来 riscv32 musl/glibc 工具链可用时直接填充。
+            tc="$BUILD_ROOT/riscv32-toolchain"
+            build="$BUILD_ROOT/riscv32-cross"
+            toolchain_file="$tc/toolchain-riscv32.cmake"
+            readelf="$tc/root/usr/bin/riscv32-linux-gnu-readelf"
+            sysroot="$tc/sysroot"
+            tui_target="riscv32gc-unknown-linux-gnu"
+            tui_linker="$tc/root/usr/bin/riscv32-linux-gnu-gcc"
+            ;;
         *) log_err "build_cross: 不支持的架构 $arch"; return 1 ;;
     esac
     log_info "${arch} 交叉编译（${toolchain_file}）…"
@@ -492,6 +529,32 @@ case "$ARCH" in
             log_warn "交叉工具链缺失或 AIRY_CROSS=0，回退 qemu 模拟"
             build_qemu riscv64
         fi
+        ;;
+    i686)
+        # 32 位 x86：交叉工具链（i686-toolchain）存在则交叉编译；缺失回退 qemu
+        if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/i686-toolchain/toolchain-i686.cmake" ]; then
+            build_cross i686
+        else
+            log_warn "i686 交叉工具链缺失或 AIRY_CROSS=0，回退 qemu 模拟（需 qemu-i386 多架构容器）"
+            build_qemu i686
+        fi
+        ;;
+    armv7l)
+        # 32 位 ARM（armhf，树莓派 32 位用户空间正解）：交叉工具链优先
+        if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/armhf-toolchain/toolchain-armhf.cmake" ]; then
+            build_cross armv7l
+        else
+            log_warn "armhf 交叉工具链缺失或 AIRY_CROSS=0，回退 qemu 模拟（需 qemu-arm 多架构容器）"
+            build_qemu armv7l
+        fi
+        ;;
+    riscv32)
+        # 32 位 RISC-V（ilp32d）：glibc 用户态生态极新（2.41+），Ubuntu noble
+        # 无 riscv32 libc，预编译包暂不可行（build_cross case 已预留工具链
+        # 路径）。检测正确后回退源码构建：AIRY_MODE=source bash install.sh。
+        log_err "riscv32 预编译包暂不可用：glibc riscv32 用户态生态未就绪"
+        log_err "请使用源码构建：AIRY_MODE=source bash install.sh"
+        exit 1
         ;;
 esac
 
