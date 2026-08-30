@@ -105,14 +105,10 @@ if [ -f "${AIRY_HOME}/bin/agentrt-env.sh" ]; then
     # shellcheck disable=SC1090
     . "${AIRY_HOME}/bin/agentrt-env.sh"
 fi
-# 0.1.6c 系统性修复：幂等兜底。老用户（0.1.5a 及更早安装）的 env.sh
-# 无 LD_LIBRARY_PATH 注入行（airymaxrt update 热替换不重新生成 env.sh），
-# 仅 source 不会注入；此处确保 $AIRY_HOME/lib 始终在 LD_LIBRARY_PATH
-# 首位（已含则跳过），与完整启动器 airymaxrt 兜底同源。
-case ":${LD_LIBRARY_PATH:-}:" in
-    *":${AIRY_HOME}/lib:"*) ;;
-    *) export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}" ;;
-esac
+# 注意：LD_LIBRARY_PATH 幂等兜底不在此处——此处 AIRY_HOME 尚未经
+# --home/-H 覆盖（最终值在下方路径体系解析后确定），注入会指向旧
+# 安装 lib（实测复现 sched_d 缺 libssl.so.1.1）。兜底统一在
+# AIRY_HOME 定稿后执行（见下方"运行库路径兜底（0.1.6c）"）。
 
 # LLM 模型配置（SSoT）：llm_d 的唯一模型来源。
 # 不传 --manager 时 llm_d 模型注册表为空（历史 P1-1：total_endpoints=0 →
@@ -240,15 +236,31 @@ mkdir -p "$AIRY_HOME"/bin "$AIRY_HOME"/lib "$AIRY_HOME"/run \
 # 子目录导出（与 daemon airy_paths_init() 的 setenv 一致）
 # 运行时数据全量统一于 $AIRY_HOME/data/agentrt（2026-08-25）：
 # 日志/缓存/临时/持久化工作区均收敛其下，顶层仅保留分发物与易失 run/。
-export AIRY_RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
-export AIRY_LOG_DIR="${AIRY_LOG_DIR:-$AIRY_HOME/data/agentrt/logs}"
-export AIRY_CONFIG_DIR="${AIRY_CONFIG_DIR:-$AIRY_HOME/config}"
-export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
-export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
-export AIRY_DATA_DIR="${AIRY_DATA_DIR:-$AIRY_HOME/data}"
-export AIRY_CACHE_DIR="${AIRY_CACHE_DIR:-$AIRY_HOME/data/agentrt/cache}"
-export AIRY_TMP_DIR="${AIRY_TMP_DIR:-$AIRY_HOME/data/agentrt/tmp}"
-export AIRY_WORKSPACE_DIR="${AIRY_WORKSPACE_DIR:-$AIRY_HOME/data/agentrt/workspaces}"
+# 0.1.6c 系统性修复：AIRY_HOME 为权威运行根，全部 AIRY_* 子目录一律从
+# 最终 AIRY_HOME 强制派生。父环境残留的旧 AIRY_* 值（历史安装 export /
+# 终端残留）会使 --home/-H 新目录失效——daemon 从旧目录启动、健康检查
+# 探测错 socket（实测复现：AIRY_BIN_DIR 残留时 --home 被忽略）。显式
+# -b/-r 覆盖仍有效（main 中经 AGENTRT_BINDIR/RUNTIME_DIR 重新同步）。
+export AIRY_RUNTIME_DIR="$AIRY_HOME/run"
+export AIRY_LOG_DIR="$AIRY_HOME/data/agentrt/logs"
+export AIRY_CONFIG_DIR="$AIRY_HOME/config"
+export AIRY_BIN_DIR="$AIRY_HOME/bin"
+export AIRY_LIB_DIR="$AIRY_HOME/lib"
+export AIRY_DATA_DIR="$AIRY_HOME/data"
+export AIRY_CACHE_DIR="$AIRY_HOME/data/agentrt/cache"
+export AIRY_TMP_DIR="$AIRY_HOME/data/agentrt/tmp"
+export AIRY_WORKSPACE_DIR="$AIRY_HOME/data/agentrt/workspaces"
+
+# ── 运行库路径兜底（0.1.6c 系统性修复，AIRY_HOME 已定稿）───────────────
+# 老用户（0.1.5a 及更早安装）的 env.sh 无 LD_LIBRARY_PATH 注入行（airymaxrt
+# update 热替换不重新生成 env.sh），仅 source 不会注入；此处确保最终
+# $AIRY_HOME/lib 始终在 LD_LIBRARY_PATH 首位（幂等，已含则跳过），与完整
+# 启动器 airymaxrt 兜底同源。必须在此处（而非 env.sh 之后）——--home/-H
+# 覆盖前的注入会指向旧安装 lib（实测复现 sched_d 缺 libssl.so.1.1）。
+case ":${LD_LIBRARY_PATH:-}:" in
+    *":${AIRY_HOME}/lib:"*) ;;
+    *) export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}" ;;
+esac
 
 # 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）。
 # 直接以 AIRY_* 权威子目录为准（空默认值 + 覆盖，等价于旧"强制覆盖"）。
@@ -656,7 +668,9 @@ start_daemon() {
     # 环境变量优先不覆盖。Agent SDK 包导入由脚本开头 AGENT_SDK_OK 检查保证，
     # agent_d 子进程经标准包解析（pip install -e / wheel）定位，无需 PYTHONPATH。
     if [[ "$name" == "agent_d" ]]; then
-        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "$AGENTRT_MODEL_CONFIG" && -f "$AGENTRT_MODEL_CONFIG" ]]; then
+        # AGENTRT_MODEL_CONFIG 可能未定义（干净环境无 model.yaml），
+        # set -u 下必须用 :- 保护（与 llm_d 分支 L636 同一纪律）。
+        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "${AGENTRT_MODEL_CONFIG:-}" && -f "${AGENTRT_MODEL_CONFIG:-}" ]]; then
             local _def_model
             _def_model="$(sed -n 's/^[[:space:]]*model:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$AGENTRT_MODEL_CONFIG" | head -1 | tr -d '[:space:]')"
             [[ -n "$_def_model" ]] && export AIRY_AGENT_MODEL="$_def_model"
