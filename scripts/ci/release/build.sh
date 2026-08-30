@@ -420,6 +420,9 @@ build_cross() {
             sysroot="$tc/sysroot"
             tui_target="i686-unknown-linux-gnu"
             tui_linker="$tc/root/usr/bin/i686-linux-gnu-gcc"
+            # binutils 运行库（libbfd/libopcodes-i386）在工具链 root 内，
+            # 非标准 RUNPATH，必须显式 LD_LIBRARY_PATH（同 riscv64 分支）。
+            export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
             ;;
         armv7l)
             # 32 位 ARM（armhf）：交叉工具链 + sysroot 从 Ubuntu noble armhf deb
@@ -431,6 +434,9 @@ build_cross() {
             sysroot="$tc/sysroot"
             tui_target="armv7-unknown-linux-gnueabihf"
             tui_linker="$tc/root/usr/bin/arm-linux-gnueabihf-gcc"
+            # binutils 运行库（libbfd/libopcodes-armhf）在工具链 root 内，
+            # 非标准 RUNPATH，必须显式 LD_LIBRARY_PATH（同 riscv64 分支）。
+            export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
             ;;
         riscv32)
             # 32 位 RISC-V（ilp32d）：glibc 用户态生态极新（2.41+），Ubuntu

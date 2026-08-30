@@ -138,6 +138,9 @@ done
 ok "sysroot 就位: $TC_DIR/sysroot/usr/lib/$MULTIARCH"
 
 # ─── 3) 生成 toolchain cmake（仿 riscv64-toolchain/toolchain-riscv64.cmake）───
+# armhf 默认 CPU 架构无 FPU（armv5te），须显式 -march=armv7-a（覆盖树莓派 2/3）
+EXTRA_MARCH=""
+[ "$ARCH" = "armv7l" ] && EXTRA_MARCH="-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard"
 cat > "$TC_DIR/toolchain-${CMAKE_ARCH}.cmake" <<EOF
 # ${CMAKE_ARCH} (${TRIPLE}) 交叉编译工具链 — 32 位 ${ARCH} 部署
 # 由 bootstrap-cross-toolchain.sh 生成；布局同 riscv64-toolchain：
@@ -163,8 +166,8 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-set(CMAKE_C_FLAGS_INIT "-I\${AIRY_TC_ROOT}/usr/${TRIPLE}/include -I\${AIRY_SYSROOT}/usr/include -I\${AIRY_SYSROOT}/usr/include/${MULTIARCH}")
-set(CMAKE_CXX_FLAGS_INIT "-I\${AIRY_TC_ROOT}/usr/${TRIPLE}/include -I\${AIRY_SYSROOT}/usr/include -I\${AIRY_SYSROOT}/usr/include/${MULTIARCH}")
+set(CMAKE_C_FLAGS_INIT "${EXTRA_MARCH} -I\${AIRY_TC_ROOT}/usr/${TRIPLE}/include -I\${AIRY_SYSROOT}/usr/include -I\${AIRY_SYSROOT}/usr/include/${MULTIARCH}")
+set(CMAKE_CXX_FLAGS_INIT "${EXTRA_MARCH} -I\${AIRY_TC_ROOT}/usr/${TRIPLE}/include -I\${AIRY_SYSROOT}/usr/include -I\${AIRY_SYSROOT}/usr/include/${MULTIARCH}")
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-L\${AIRY_SYSROOT}/usr/lib/${MULTIARCH} -Wl,--allow-shlib-undefined")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-L\${AIRY_SYSROOT}/usr/lib/${MULTIARCH} -Wl,--allow-shlib-undefined")
 
