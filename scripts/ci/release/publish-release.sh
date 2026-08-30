@@ -183,6 +183,27 @@ for fn in sorted(os.listdir(dist_dir)):
         "size": os.path.getsize(path),
     }
 
+# 0.1.6f 社区反馈（2026-08-30）：旧安装器（≤0.1.6d）以 uname 原始名
+# （linux-x86_64/aarch64/armv7l/i686）查 manifest，而 0.1.6e 起制品改用
+# 数字形式命名（linux-x64/arm64/arm32/x86），旧安装器报"当前平台无可用
+# 制品"且无法自举。系统性修复：manifest 为标准平台键补充旧命名别名
+# （同一 url/sha256/size），一次发布惠及全部存量旧安装器。
+ALIAS = {
+    "linux-x64":    ["linux-x86_64"],
+    "linux-x86":    ["linux-i686"],
+    "linux-arm64":  ["linux-aarch64"],
+    "linux-arm32":  ["linux-armv7l"],
+    "linux-riscv64": ["linux-riscv64"],
+    "macos-x64":    ["macos-x86_64"],
+    "macos-arm64":  ["macos-aarch64"],
+    "win-x64":      ["win-x86_64"],
+    "win-x86":      ["win-i686"],
+    "win-arm64":    ["win-aarch64"],
+}
+for plat in list(artifacts):
+    for alias in ALIAS.get(plat, ()):
+        artifacts.setdefault(alias, artifacts[plat])
+
 manifest = {
     "schema": 1,
     "channel": channel,
@@ -199,7 +220,7 @@ manifest = {
 with open(out, "w", encoding="utf-8") as f:
     json.dump(manifest, f, ensure_ascii=False, indent=2)
     f.write("\n")
-print(f"manifest 已生成: {out}（{len(artifacts)} 平台）")
+print(f"manifest 已生成: {out}（{len(artifacts)} 平台键，含旧命名别名）")
 PYEOF
 fi
 log_ok "manifest: $(basename "$MANIFEST")"
