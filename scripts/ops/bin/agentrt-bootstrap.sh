@@ -104,9 +104,15 @@ AIRY_HOME="$(echo "$AIRY_HOME" | sed 's#/$##')"
 if [ -f "${AIRY_HOME}/bin/agentrt-env.sh" ]; then
     # shellcheck disable=SC1090
     . "${AIRY_HOME}/bin/agentrt-env.sh"
-else
-    export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"
 fi
+# 0.1.6c 系统性修复：幂等兜底。老用户（0.1.5a 及更早安装）的 env.sh
+# 无 LD_LIBRARY_PATH 注入行（airymaxrt update 热替换不重新生成 env.sh），
+# 仅 source 不会注入；此处确保 $AIRY_HOME/lib 始终在 LD_LIBRARY_PATH
+# 首位（已含则跳过），与完整启动器 airymaxrt 兜底同源。
+case ":${LD_LIBRARY_PATH:-}:" in
+    *":${AIRY_HOME}/lib:"*) ;;
+    *) export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}" ;;
+esac
 
 # LLM 模型配置（SSoT）：llm_d 的唯一模型来源。
 # 不传 --manager 时 llm_d 模型注册表为空（历史 P1-1：total_endpoints=0 →
