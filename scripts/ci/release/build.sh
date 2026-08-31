@@ -422,6 +422,11 @@ build_cross() {
             # binutils 运行库（libbfd/libopcodes-i386）在工具链 root 内，
             # 非标准 RUNPATH，必须显式 LD_LIBRARY_PATH（同 riscv64 分支）。
             export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+            # 0.1.7：TUI 交叉编译需 cc-rs 定位交叉 C 编译器（工具链 bin 不在
+            # 宿主 PATH），且 GNU ld 默认 /usr/i686-linux-gnu 路径不存在，
+            # 必须 --sysroot 指向工具链 root 才能找到 libc（2026-08-31 实测）。
+            export PATH="$tc/root/usr/bin:$PATH"
+            export RUSTFLAGS="-C link-arg=-Wl,-rpath,\$ORIGIN/../lib -C link-arg=-Wl,--sysroot=${tc}/root"
             ;;
         armv7l)
             # 32 位 ARM（armhf）：交叉工具链 + sysroot 从 Ubuntu noble armhf deb
@@ -436,6 +441,11 @@ build_cross() {
             # binutils 运行库（libbfd/libopcodes-armhf）在工具链 root 内，
             # 非标准 RUNPATH，必须显式 LD_LIBRARY_PATH（同 riscv64 分支）。
             export LD_LIBRARY_PATH="$tc/root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+            # 0.1.7：同 i686——cc-rs 需交叉 C 编译器在 PATH，GNU ld 默认
+            # /usr/arm-linux-gnueabihf 路径不存在，须 --sysroot 指向工具链
+            # root 定位 libc（2026-08-31 实测 armv7l TUI 曾链接失败）。
+            export PATH="$tc/root/usr/bin:$PATH"
+            export RUSTFLAGS="-C link-arg=-Wl,-rpath,\$ORIGIN/../lib -C link-arg=-Wl,--sysroot=${tc}/root"
             ;;
         riscv32)
             # 32 位 RISC-V（ilp32d）：glibc 用户态生态极新（2.41+），Ubuntu
