@@ -80,7 +80,11 @@ validate_version() {
         exit 1
     fi
 
-    if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?$ ]]; then
+    # 0.1.7 修复：原正则仅接受 - 开头的后缀（如 -beta.1），不兼容
+    # 无连字符的字母后缀版本（CMakeLists 允许 0.1.6a~0.1.6h），
+    # 与 VERSION 文件与发布流程矛盾。统一为：X.Y.Z 可选后接
+    # （-/.+ 开头或直接字母数字）后缀段，与 publish-release.sh 口径一致。
+    if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][a-zA-Z0-9.]+|[a-zA-Z0-9]+)?$ ]]; then
         log_fail "Invalid version format: $VERSION (expected X.Y.Z or X.Y.Z-suffix)"
         exit 1
     fi
