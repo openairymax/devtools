@@ -416,7 +416,7 @@ build_cross() {
             ;;
         armv7l)
             # 32 位 ARM（armhf）：交叉工具链 + sysroot 从 Ubuntu noble armhf deb
-            # 解压（树莓派 32 位用户空间正解，2026-08-30 兼容决策）。
+            # 解压（32 位 ARM 用户空间通用方案，2026-08-30 兼容决策）。
             tc="$BUILD_ROOT/armhf-toolchain"
             build="$BUILD_ROOT/armhf-cross"
             toolchain_file="$tc/toolchain-armhf.cmake"
@@ -540,7 +540,7 @@ case "$ARCH" in
         fi
         ;;
     armv7l)
-        # 32 位 ARM（armhf，树莓派 32 位用户空间正解）：交叉工具链优先
+        # 32 位 ARM（armhf，32 位 ARM 设备通用）：交叉工具链优先
         if [ "${AIRY_CROSS:-1}" = "1" ] && [ -f "$BUILD_ROOT/armhf-toolchain/toolchain-armhf.cmake" ]; then
             build_cross armv7l
         else

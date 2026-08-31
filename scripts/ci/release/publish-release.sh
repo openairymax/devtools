@@ -96,18 +96,29 @@ for f in "${ARTIFACTS[@]}"; do
         log_fail "制品异常小（疑似损坏）: $(basename "$f")（${size:-?} 字节）"; PREFAIL=1
     fi
 done
-# 包内关键脚本语法预检（防发布坏启动器/安装器）
+# 包内关键组件预检（0.1.6h 漏件教训：启动器 bin/airymaxrt 由安装器
+# 生成、包内不含，旧检查 grep 'bin/airymaxrt' 永远不命中形同虚设）。
+# 改为 fail-closed：关键二进制缺任一即中止；包内脚本做语法预检。
+REQUIRED_BIN="airy_cli agentrt-bootstrap.sh gateway_d llm_d think_d sched_d tool_d mem_d agent_d"
 for f in "${ARTIFACTS[@]}"; do
-    if command -v tar >/dev/null 2>&1 && tar -tzf "$f" 2>/dev/null | grep -q 'bin/airymaxrt'; then
-        tmpext="$(mktemp -d)"
-        if tar -xzf "$f" -C "$tmpext" --wildcards '*/bin/airymaxrt' 2>/dev/null; then
-            launcher="$(find "$tmpext" -name airymaxrt -type f | head -1)"
-            if [ -n "$launcher" ] && ! bash -n "$launcher" 2>/dev/null; then
-                log_fail "包内 airymaxrt 语法预检失败: $(basename "$f")"; PREFAIL=1
+    listing="$(tar -tzf "$f" 2>/dev/null || true)"
+    miss=""
+    for b in $REQUIRED_BIN; do
+        case "$listing" in *"bin/$b"*) ;; *) miss="$miss $b" ;; esac
+    done
+    if [ -n "$miss" ]; then
+        log_fail "包内缺少关键组件（漏件）: $(basename "$f"):$miss"; PREFAIL=1
+    fi
+    tmpext="$(mktemp -d)"
+    if echo "$listing" | grep -q 'bin/agentrt-bootstrap.sh'; then
+        if tar -xzf "$f" -C "$tmpext" --wildcards '*/bin/agentrt-bootstrap.sh' 2>/dev/null; then
+            script="$(find "$tmpext" -name 'agentrt-bootstrap.sh' -type f | head -1)"
+            if [ -n "$script" ] && ! bash -n "$script" 2>/dev/null; then
+                log_fail "包内 agentrt-bootstrap.sh 语法预检失败: $(basename "$f")"; PREFAIL=1
             fi
         fi
-        rm -rf "$tmpext"
     fi
+    rm -rf "$tmpext"
 done
 [ "$PREFAIL" = "0" ] || { log_fail "发布预检未通过（${PREFAIL} 项），中止"; exit 1; }
 log_ok "发布预检通过: ${#ARTIFACTS[@]} 个制品（sha256 一致 + 大小正常 + 启动器语法 OK）"

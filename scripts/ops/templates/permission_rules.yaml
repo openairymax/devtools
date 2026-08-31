@@ -12,6 +12,13 @@
 #   - tool   : 工具名（与 tool_d 注册的工具名一致，如 fs_read / shell_run）
 #   - effect : "allow" 或 "deny"（deny 规则优先于同一 (agent, tool) 的 allow）
 #
+# v1.1.1：新增网关外部调用方授权（2026-08-31）。gateway_d 将本地
+# HTTP/WS JSON-RPC 调用方统一视为 "external"（localhost 个人运行时语义）。
+# 0.1.6 P1-4 能力网关对高敏能力（GW_CAP_EXTRA_PERM：agent 控制 / 插件管理 /
+# 记忆删除 / 调度管理 / cupolas 管理）做 ACL 授权检查（fail-closed）。
+# 本段授予本地会话开箱即用的管理能力；生产部署可按最小权限原则删除
+# 不需要的条目（deny 规则优先）。
+#
 # v1.1.0：按标准角色最小权限授予（2026-08-19）。平台内置 11 个标准 agent
 # （analyst/architect/backend/coding/data_engineer/devops/frontend/
 # product_manager/reviewer/security/tester）默认可用，否则任务管线的
@@ -372,6 +379,26 @@ rules:
     effect: "allow"
   - agent: "product_manager_v1"
     tool: "web_fetch"
+    effect: "allow"
+
+  # ─── 网关外部调用方（"external"，localhost 个人运行时默认授权）─────
+  # 对应 gateway_d GW_CAP_EXTRA_PERM 高敏能力清单；未授权则 fail-closed
+  # 拒绝（0x5002 / -32603），CLI/TUI 的任务取消、记忆删除、凭证存储、
+  # 插件管理、调度管理等能力将不可用。本地运行时默认放行。
+  - agent: "external"
+    tool: "cap:agent.control"
+    effect: "allow"
+  - agent: "external"
+    tool: "cap:plugin.admin"
+    effect: "allow"
+  - agent: "external"
+    tool: "cap:mem.admin"
+    effect: "allow"
+  - agent: "external"
+    tool: "cap:sched.admin"
+    effect: "allow"
+  - agent: "external"
+    tool: "cap:cupolas.admin"
     effect: "allow"
 
   # ─── 明确拒绝示例（默认已 fail-closed，无需枚举）────────────────

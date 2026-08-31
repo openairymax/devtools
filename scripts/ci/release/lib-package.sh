@@ -114,13 +114,21 @@ pkg_stage_toolkit() {
 # 不内嵌校验值，防打包时刻快照漂移）
 pkg_make_manifest() {
     local out="$1" version="$2" platform="$3"
+    # 0.1.6h：daemon 数量不再硬编码（原写死 "18" 与 release.yml/实际 bin
+    # 漂移）——从包内 bin/ 实测 *_d 二进制计数，杜绝清单失实。
+    local dcount=0
+    for _b in "$out"/bin/*_d; do
+        [ -e "$_b" ] || continue
+        [ -f "$_b" ] || continue
+        dcount=$((dcount + 1))
+    done
     cat > "$out/manifest.json" <<EOF
 {
   "name": "agentrt",
   "version": "${version}",
   "platform": "${platform}",
   "components": {
-    "daemons": "18 (15 基础 + think_d/cupolas_d/maths_d)",
+    "daemons": "${dcount}",
     "cli": "airy_cli",
     "tui": "agentrt-tui (rust)",
     "atoms": "prebuilt (closed source)",
