@@ -77,10 +77,13 @@ for f in "${ARTIFACTS[@]}"; do log_info "  $(basename "$f")"; done
 # ─── 阶段 0.5：发布预检（0.1.6f 强化，fail-closed）──────────────────────
 # 准确性门禁：版本号格式 / sha256 校验件一致 / 包大小 sanity / 包内
 # 启动器语法。任一不过即中止，杜绝发布损坏或错配制品。
-case "$VERSION" in
-    v[0-9]*.[0-9]*.[0-9]*[-.+a-zA-Z0-9]*) ;;
-    *) log_fail "版本号格式非法: ${VERSION}（应为 vX.Y.Z 或带后缀，如 v0.1.6f）"; exit 1 ;;
-esac
+# 0.1.7 修复：原 glob 模式 `v[0-9]*.[0-9]*.[0-9]*[-.+a-zA-Z0-9]*` 中
+# [0-9]* 为「一位数字+任意串」glob，且末段要求至少一个后缀字符，
+# 纯版本号 v0.1.7（无后缀）被误拒，仅带后缀（如 v0.1.6h）可通过。
+# 改用正则：vX.Y.Z 可选后接 -/.+ 开头的后缀段。
+if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.+][a-zA-Z0-9.]+)?$ ]]; then
+    log_fail "版本号格式非法: ${VERSION}（应为 vX.Y.Z 或带后缀，如 v0.1.6h、v0.1.7-beta.1）"; exit 1
+fi
 PREFAIL=0
 for f in "${ARTIFACTS[@]}"; do
     if [ ! -f "$f.sha256" ]; then
