@@ -304,8 +304,11 @@ EXISTING_ASSETS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_
 upload_asset() {
     local f="$1" b upjson upurl
     b="$(basename "$f")"
-    if grep -qxF "$b" <<<"$EXISTING_ASSETS"; then
-        log_warn "跳过（远端已存在同名附件）: ${b}"
+    # 幂等跳过：同名附件已存在则跳过（重跑续传）。制品内容变更（如版本
+    # 号修复后同 tag 重新发布）时需 AIRY_FORCE_UPLOAD=1 强制覆盖——OBS
+    # 预签名 PUT 按文件名覆盖写入，远端即更新。
+    if [ "${AIRY_FORCE_UPLOAD:-0}" != "1" ] && grep -qxF "$b" <<<"$EXISTING_ASSETS"; then
+        log_warn "跳过（远端已存在同名附件，AIRY_FORCE_UPLOAD=1 可强制覆盖）: ${b}"
         return 0
     fi
     log_info "上传: ${b}…"

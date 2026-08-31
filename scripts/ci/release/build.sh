@@ -212,6 +212,7 @@ EOF
 
     (
     docker run -i --rm --platform "linux/${qemu_arch}" \
+        --dns 223.5.5.5 --dns 119.29.29.29 \
         -v "$UMBRELLA":/src:ro \
         -v "$work/build":/build \
         -v "$pkg_dir":/pkg \
@@ -309,11 +310,18 @@ for b in /pkg/out/bin/*; do
 done
 touch /pkg/out/lib/.collected
 
-# Rust TUI（agentrt-tui，失败降级不阻断；已装则跳过——qemu 下 cargo 全量
-# 重编极慢）。riscv64 链接陷阱（2026-08-29 实测）：GNU ld 2.34 无法合并
-# RISC-V attributes，需将 rust-lld 复制为 /usr/local/bin/ld.lld 并用
-# -fuse-ld=lld 仅换链接器（gcc driver 保留库路径查找）。
-if [ ! -f /pkg/out/bin/agentrt-tui ] && [ "${SKIP_TUI:-0}" != "1" ]; then
+# Rust TUI（agentrt-tui，失败降级不阻断）。0.1.6h 修复：跳过条件从
+# "文件存在"改为"版本标记匹配当前 VERSION"。历史 bug：/pkg 持久挂载，
+# 旧版（如 0.1.6c）构建的 agentrt-tui 残留在 pkg/out/bin/，下次重建
+# 时 [ ! -f ] 为 false 直接跳过 → 旧版 TUI 进包（社区反馈"TUI 系统头
+# 仍是 0.1.6c"）。标记文件放 /pkg 根（不进包），版本不一致强制重编，
+# 一致才跳过（qemu 下 cargo 全量重编极慢的加速保留）。riscv64 链接
+# 陷阱（2026-08-29 实测）：GNU ld 2.34 无法合并 RISC-V attributes，
+# 需将 rust-lld 复制为 /usr/local/bin/ld.lld 并用 -fuse-ld=lld 仅换
+# 链接器（gcc driver 保留库路径查找）。
+TUI_MARK="/pkg/.tui-version"
+TUI_EXPECT="$(cat /src/agent-workload/agentrt/VERSION 2>/dev/null | tr -d '[:space:]')"
+if [ "$(cat "$TUI_MARK" 2>/dev/null)" != "$TUI_EXPECT" ] && [ "${SKIP_TUI:-0}" != "1" ]; then
   export PATH="$HOME/.cargo/bin:$PATH"
   export RUSTUP_DIST_SERVER="https://rsproxy.cn" RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
   command -v cargo >/dev/null 2>&1 || \
@@ -335,6 +343,7 @@ if [ ! -f /pkg/out/bin/agentrt-tui ] && [ "${SKIP_TUI:-0}" != "1" ]; then
     echo "warn: ${ARCH} TUI 构建失败（降级为 C CLI 包装）"
   else
     cp -f /tmp/tui-target/release/agentrt-tui /pkg/out/bin/ 2>/dev/null || true
+    printf '%s' "$TUI_EXPECT" > "$TUI_MARK" 2>/dev/null || true
   fi
 fi
 CONTAINER_EOF
