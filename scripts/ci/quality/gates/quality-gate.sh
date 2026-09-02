@@ -243,6 +243,26 @@ gate_ssot() {
 }
 
 # ============================================================================
+# Gate 8: 头文件重复度检查 (0.1.9 M0 §1.3bis L4, IRON-6 re-export)
+# ============================================================================
+gate_header_duplication() {
+    section "Gate 8: Header Duplication Check (IRON-6 re-export)"
+
+    local hdr_script="${SCRIPT_DIR}/header-duplication-check.sh"
+    if [ -x "$hdr_script" ] || [ -f "$hdr_script" ]; then
+        log_info "Running header duplication check..."
+        if bash "$hdr_script" 2>&1 | tail -20; then
+            check_gate "HeaderDup" 0
+        else
+            check_gate "HeaderDup" 1
+        fi
+    else
+        log_warn "Header duplication script not found: ${hdr_script}"
+        check_gate "HeaderDup" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -284,6 +304,8 @@ main() {
                 echo "  4. Contract Version Check"
                 echo "  5. Cross-Repository Verification"
                 echo "  6. Complexity Check (lizard, CCN thresholds)"
+                echo "  7. SSoT Authority Validation"
+                echo "  8. Header Duplication Check (IRON-6 re-export)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -312,6 +334,7 @@ main() {
         $skip_cross_repo || gate_cross_repo
         $skip_complexity || gate_complexity
         gate_ssot
+        gate_header_duplication
     fi
 
     # 输出结果
