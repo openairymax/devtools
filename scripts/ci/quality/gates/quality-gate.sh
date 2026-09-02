@@ -263,6 +263,33 @@ gate_header_duplication() {
 }
 
 # ============================================================================
+# Gate 9: coreloopthree ABI 冻结检查 (0.1.9 M3 §4.2-3)
+# 退出码: 0=通过 1=违规(阻断) 2=环境错误(告警)
+# ============================================================================
+gate_abi_frozen() {
+    section "Gate 9: ABI Frozen Check (coreloopthree)"
+
+    local abi_script="${SCRIPT_DIR}/abi-frozen-check.sh"
+    if [ -x "$abi_script" ] || [ -f "$abi_script" ]; then
+        log_info "Running ABI frozen check..."
+        if bash "$abi_script" 2>&1 | tail -20; then
+            check_gate "ABI-Frozen" 0
+        else
+            local abi_exit=$?
+            if [ $abi_exit -eq 2 ]; then
+                log_warn "ABI frozen check: environment error, manual review required"
+                check_gate "ABI-Frozen" 2
+            else
+                check_gate "ABI-Frozen" 1
+            fi
+        fi
+    else
+        log_warn "ABI frozen check script not found: ${abi_script}"
+        check_gate "ABI-Frozen" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -306,6 +333,7 @@ main() {
                 echo "  6. Complexity Check (lizard, CCN thresholds)"
                 echo "  7. SSoT Authority Validation"
                 echo "  8. Header Duplication Check (IRON-6 re-export)"
+                echo "  9. ABI Frozen Check (coreloopthree)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -335,6 +363,7 @@ main() {
         $skip_complexity || gate_complexity
         gate_ssot
         gate_header_duplication
+        gate_abi_frozen
     fi
 
     # 输出结果
