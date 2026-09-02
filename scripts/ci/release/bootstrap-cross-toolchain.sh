@@ -43,7 +43,10 @@ case "$ARCH" in
         ;;
 esac
 
-BUILD_ROOT="${AIRY_WORKSPACE:-$HOME/SpharxWorks/works-engineering}/airymaxrt-build"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UMBRELLA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+# 构建台根默认 = 伞仓同级 works-engineering（随源码仓库迁移自适应，不硬编码 $HOME）
+BUILD_ROOT="${AIRY_WORKSPACE:-$(dirname "$UMBRELLA")/works-engineering}/airymaxrt-build"
 TC_DIR="$BUILD_ROOT/$TC"
 mkdir -p "$TC_DIR/dl" "$TC_DIR/dl-libs"
 SUITE="noble"

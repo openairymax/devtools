@@ -26,7 +26,8 @@ AGENTRT_TREE="${PROJECT_ROOT}/agent-workload/agentrt"
 PROTOCOL_TEST="${PROJECT_ROOT}/tools/tests/integration/python/test_protocol_compatibility.py"
 # 铁律 4.7：门禁构建目录必须在源码区外（历史版本曾在伞仓根建 build-release/
 # 与 in-source 构建，残留 CPackConfig/compile_commands/bin 污染源码区）。
-GATE_BUILD="${GATE_BUILD_DIR:-${HOME}/SpharxWorks/works-engineering/airymaxrt-build/release-gate}"
+# 默认 = 伞仓同级 works-engineering（随源码仓库迁移自适应，不硬编码 $HOME）。
+GATE_BUILD="${GATE_BUILD_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/release-gate}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

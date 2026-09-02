@@ -11,7 +11,8 @@
 #            快于 qemu；工具链缺失或 AIRY_CROSS=0 时回退 qemu 模拟）
 #
 # 目录约定（唯一构建台，均位于源码区外）：
-#   ${AIRY_WORKSPACE:-$HOME/SpharxWorks/works-engineering}/airymaxrt-build/
+#   构建台根默认 = 伞仓父目录（源码仓库同级）的 works-engineering：
+#   ${AIRY_WORKSPACE:-$(dirname "$UMBRELLA")/works-engineering}/airymaxrt-build/
 #     native/               x86_64 原生 build（CMakeCache 持久 → 增量编译）
 #     .ccache/              ccache 缓存（跨次构建复用）
 #     tui-target/           cargo 统一 target（杜绝源码树内 target 落盘）
@@ -28,7 +29,7 @@
 # 用法：
 #   build.sh <x86_64|arm64|riscv64> [--clean]
 # 环境变量：
-#   AIRY_WORKSPACE   构建台根（默认 $HOME/SpharxWorks/works-engineering）
+#   AIRY_WORKSPACE   构建台根（默认 = 伞仓同级 works-engineering，随源码仓库迁移自适应）
 #   AIRY_DIST_OUT    产物台（默认 $UMBRELLA/developbuild/agentrt/dist）
 #   AIRY_VERSION     版本覆盖（默认读 agentrt/VERSION，SSoT）
 #   AIRY_ARCH_IMAGE  arm64/riscv64 基础镜像
@@ -62,7 +63,7 @@ case "$ARCH" in
 esac
 
 # ─── 构建台与产物台（构建台源码区外；产物台=发布工作区 developbuild） ───
-AIRY_WORKSPACE="${AIRY_WORKSPACE:-${HOME}/SpharxWorks/works-engineering}"
+AIRY_WORKSPACE="${AIRY_WORKSPACE:-$(dirname "$UMBRELLA")/works-engineering}"
 BUILD_ROOT="${AIRY_WORKSPACE}/airymaxrt-build"
 # 产物台默认 developbuild/agentrt/dist（发布工作区：build.sh 出包 →
 # publish-release.sh 上传 atomgit 的单一落点）；AIRY_DIST_OUT 可覆盖。
