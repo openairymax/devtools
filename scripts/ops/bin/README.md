@@ -6,7 +6,7 @@
 
 `bin/` 目录存放 AgentRT 的运维入口脚本，是部署后日常操作的核心入口，涵盖一键启动、快速建项和运行时验证三类场景：
 
-- **一键启动**：`agentrt-bootstrap.sh` 按 5 层 DAG 顺序拉起全部 18 个 daemon，支持 watchdog 自愈巡检，是唯一启动编排入口（与 `install.sh` 的 `EXPECTED_DAEMONS` 清单一致）
+- **一键启动**：`agentrt-bootstrap.sh` 按 5 层 DAG 顺序拉起全部 15 个 daemon（0.1.9 M4 整编稳态：observe/info→monit_d、plugin→tool_d），支持 watchdog 自愈巡检，是唯一启动编排入口（层清单即编排唯一事实源；install 侧手工 `EXPECTED_DAEMONS` 已于 M4 退役，由 `bin/*_d` 推导）
 - **快速建项**：`quickstart.sh` 5 分钟从示例模板创建可运行的 Agent 项目
 - **运行时验证**：`agentrt-multiagent.py`、`agentrt-e2e.py` 通过 Unix socket 调用真实 daemon，验证多 Agent 协作与端到端 LLM 链路
 
@@ -17,7 +17,7 @@
 ```
 bin/
 ├── README.md               # 本文档
-├── agentrt-bootstrap.sh    # AgentRT 一键启动脚本：5 层 DAG 按序启动 18 个 daemon，支持 watchdog 自愈
+├── agentrt-bootstrap.sh    # AgentRT 一键启动脚本：5 层 DAG 按序启动 15 个 daemon，支持 watchdog 自愈
 ├── quickstart.sh           # 5 分钟快速创建示例 Agent 项目（复制示例 + 生成 config.yaml / main.agent.yaml）
 ├── agentrt-multiagent.py   # 多 Agent 协作闭环验证：sched.schedule_task 选后派发 → 双角色接力（PM → 后端）
 └── agentrt-e2e.py          # 端到端调用验证：agent.spawn → agent.invoke → 真实 LLM
@@ -27,13 +27,13 @@ bin/
 
 ### agentrt-bootstrap.sh — 一键启动（唯一启动编排入口）
 
-按 DAG 层级顺序启动所有 daemon，每层健康检查通过后才进入下一层。共 5 层 18 个 daemon，与 `agentrt/scripts/install.sh` 的 `EXPECTED_DAEMONS` 清单一一对应：
+按 DAG 层级顺序启动所有 daemon，每层健康检查通过后才进入下一层。0.1.9 M4 整编后共 5 层 15 个 daemon（稳态）：
 
 | 层级 | daemon |
 |------|--------|
-| Layer 0 基础设施 | monit_d, observe_d, info_d, notify_d, cupolas_d |
+| Layer 0 基础设施 | monit_d（M4 吸收 observe/info）, notify_d, cupolas_d |
 | Layer 1 核心服务 | sched_d, channel_d, mem_d |
-| Layer 2 Agent 服务 | llm_d, think_d, tool_d, hook_d, plugin_d, agent_d, a2a_d, maths_d |
+| Layer 2 Agent 服务 | llm_d, think_d, tool_d（M4 吸收 plugin）, hook_d, agent_d, a2a_d, maths_d |
 | Layer 3 业务服务 | market_d |
 | Layer 4 网关 | gateway_d |
 
@@ -62,7 +62,7 @@ bin/
 ### 一键启动全部 daemon
 
 ```bash
-# 基本启动（按 DAG 顺序拉起 18 个 daemon）
+# 基本启动（按 DAG 顺序拉起 15 个 daemon）
 bash tools/scripts/ops/bin/agentrt-bootstrap.sh
 
 # 指定安装目录 + 进入 watchdog 自愈巡检
