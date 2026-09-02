@@ -1014,7 +1014,7 @@ main() {
         export AIRY_RUNTIME_DIR="$AGENTRT_RUNTIME_DIR"
     fi
 
-    log_info "AgentRT Bootstrap v0.1.8"
+    log_info "AgentRT Bootstrap v0.1.9"
     log_info "  Bindir:    $AGENTRT_BINDIR"
     log_info "  Runtime:   $AGENTRT_RUNTIME_DIR"
     log_info "  Config:    ${AGENTRT_CONFIG:-<none>}"
