@@ -124,7 +124,7 @@ while IFS= read -r match; do
     line="${rest%%:*}"
     name="${rest#*:}"
     case "$name" in
-        test_*|cmocka_*|DAEMON_DECLARE_*) continue ;;
+        test_*|cmocka_*|bench_*|DAEMON_DECLARE_*) continue ;;
     esac
     if grep -qxF "$name" "$BASELINE"; then
         known_count=$((known_count + 1))
