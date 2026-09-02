@@ -4,8 +4,8 @@
 
 [Unit]
 Description=AgentRT Marketplace Daemon
-After=network.target agentrt-plugin.service
-Requires=agentrt-plugin.service
+After=network.target agentrt-tool.service
+Requires=agentrt-tool.service
 Wants=network-online.target
 
 [Service]

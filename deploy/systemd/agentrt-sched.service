@@ -4,8 +4,8 @@
 
 [Unit]
 Description=AgentRT Scheduler Daemon
-After=network.target agentrt-observe.service
-Requires=agentrt-observe.service
+After=network.target agentrt-monit.service
+Requires=agentrt-monit.service
 Wants=network-online.target
 
 [Service]

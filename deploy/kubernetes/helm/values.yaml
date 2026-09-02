@@ -246,7 +246,8 @@ monit_d:
     runAsUser: 1000
 
 observe_d:
-  enabled: true
+  # 0.1.9 M4: observe_d 并入 monit_d（可观测域吸收），默认禁用；模板保留待剪枝
+  enabled: false
   replicaCount: 1
   image:
     repository: spharx/agentrt-observe
@@ -451,7 +452,8 @@ hook_d:
     runAsUser: 1000
 
 plugin_d:
-  enabled: true
+  # 0.1.9 M4: plugin_d 并入 tool_d（执行域吸收），默认禁用；模板保留待剪枝
+  enabled: false
   replicaCount: 1
   image:
     repository: spharx/agentrt-plugin
@@ -483,7 +485,8 @@ plugin_d:
     runAsUser: 1000
 
 info_d:
-  enabled: true
+  # 0.1.9 M4: info_d 并入 monit_d（可观测域吸收），默认禁用；模板保留待剪枝
+  enabled: false
   replicaCount: 1
   image:
     repository: spharx/agentrt-info

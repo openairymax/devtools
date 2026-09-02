@@ -5,9 +5,9 @@
 #
 # 支持的 daemon:
 #   corekern, coreloopthree, taskflow, memory,
-#   channel_d, monit_d, observe_d,
-#   llm_d, tool_d, market_d, sched_d,
-#   hook_d, plugin_d, info_d, notify_d,
+#   channel_d, monit_d（吸收 info/observe，M4）,
+#   llm_d, tool_d（吸收 plugin，M4）, market_d, sched_d,
+#   hook_d, notify_d,
 #   gateway_d
 
 set -euo pipefail
@@ -48,9 +48,6 @@ case "${SERVICE_NAME}" in
     monit_d)
         BINARY="agentrt-monit_d"
         ;;
-    observe_d)
-        BINARY="agentrt-observe_d"
-        ;;
     llm_d)
         BINARY="agentrt-llm_d"
         # llm_d 以 model.yaml 为模型清单 SSoT，必须显式传入（否则 registry 为空）
@@ -68,12 +65,6 @@ case "${SERVICE_NAME}" in
     hook_d)
         BINARY="agentrt-hook_d"
         ;;
-    plugin_d)
-        BINARY="agentrt-plugin_d"
-        ;;
-    info_d)
-        BINARY="agentrt-info_d"
-        ;;
     notify_d)
         BINARY="agentrt-notify_d"
         ;;
@@ -82,7 +73,7 @@ case "${SERVICE_NAME}" in
         ;;
     *)
         echo "ERROR: Unknown service name: ${SERVICE_NAME}" >&2
-        echo "Supported: corekern, coreloopthree, taskflow, memory, channel_d, monit_d, observe_d, llm_d, tool_d, market_d, sched_d, hook_d, plugin_d, info_d, notify_d, gateway_d" >&2
+        echo "Supported: corekern, coreloopthree, taskflow, memory, channel_d, monit_d, llm_d, tool_d, market_d, sched_d, hook_d, notify_d, gateway_d" >&2
         exit 1
         ;;
 esac

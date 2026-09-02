@@ -1,6 +1,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# docker-compose.test.yml — AgentRT 集成测试环境（16 服务一键启动）
+# docker-compose.test.yml — AgentRT 集成测试环境一键启动
 # P1.17: docker-compose 集成测试环境搭建
+# 0.1.9 M4: observe_d/info_d → monit_d（可观测域吸收）、plugin_d → tool_d（执行域吸收）。
 #
 # 使用方法:
 #   启动全部服务:  docker-compose -f deploy/docker/docker-compose.test.yml up -d
@@ -12,9 +13,9 @@
 #   Layer 0 (基础设施): redis, postgres
 #   Layer 1 (内核原子): corekern
 #   Layer 2 (核心原子): coreloopthree, taskflow, memory
-#   Layer 3 (基础 daemon): channel_d, monit_d, observe_d
-#   Layer 4 (业务 daemon): llm_d, tool_d, market_d, sched_d
-#   Layer 5 (扩展 daemon): hook_d, plugin_d, info_d, notify_d
+#   Layer 3 (基础 daemon): channel_d, monit_d（吸收 info/observe）
+#   Layer 4 (业务 daemon): llm_d, tool_d（吸收 plugin）, market_d, sched_d
+#   Layer 5 (扩展 daemon): hook_d, notify_d
 #   Layer 6 (网关层):    gateway_d
 
 version: '3.8'
@@ -220,29 +221,6 @@ services:
       retries: 5
       start_period: 10s
 
-  observe_d:
-    <<: *common-daemon
-    container_name: agentrt-test-observe
-    hostname: observe-d
-    ports:
-      - "${TEST_OBSERVE_PORT:-19103}:9103"
-    environment:
-      AGENTRT_SERVICE_NAME: observe_d
-      AGENTRT_SERVICE_PORT: "9103"
-      AGENTRT_COREKERN_HOST: corekern
-      AGENTRT_MONIT_HOST: monit-d
-    depends_on:
-      corekern:
-        condition: service_healthy
-      monit_d:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9103/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-
   # ========================================================================
   # Layer 4: 业务 daemon 服务
   # ========================================================================
@@ -375,52 +353,6 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:9301/healthz"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  plugin_d:
-    <<: *common-daemon
-    container_name: agentrt-test-plugin
-    hostname: plugin-d
-    ports:
-      - "${TEST_PLUGIN_PORT:-19302}:9302"
-    environment:
-      AGENTRT_SERVICE_NAME: plugin_d
-      AGENTRT_SERVICE_PORT: "9302"
-      AGENTRT_COREKERN_HOST: corekern
-      AGENTRT_CHANNEL_HOST: channel-d
-    depends_on:
-      corekern:
-        condition: service_healthy
-      channel_d:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9302/healthz"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  info_d:
-    <<: *common-daemon
-    container_name: agentrt-test-info
-    hostname: info-d
-    ports:
-      - "${TEST_INFO_PORT:-19303}:9303"
-    environment:
-      AGENTRT_SERVICE_NAME: info_d
-      AGENTRT_SERVICE_PORT: "9303"
-      AGENTRT_COREKERN_HOST: corekern
-      AGENTRT_CHANNEL_HOST: channel-d
-    depends_on:
-      corekern:
-        condition: service_healthy
-      channel_d:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9303/healthz"]
-      interval: 5s
-      timeout: 3s
       retries: 5
       start_period: 10s
 
