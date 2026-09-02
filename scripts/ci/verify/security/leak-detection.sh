@@ -203,9 +203,9 @@ run_valgrind_tests() {
 # ============================================================================
 DAEMON_NAMES=(
     "corekern" "coreloopthree" "taskflow" "memory"
-    "channel_d" "monit_d" "observe_d"
+    "channel_d" "monit_d"
     "llm_d" "tool_d" "market_d" "sched_d"
-    "hook_d" "plugin_d" "info_d" "notify_d"
+    "hook_d" "notify_d"
     "gateway_d"
 )
 

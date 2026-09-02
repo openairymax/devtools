@@ -37,9 +37,6 @@ data:
           host: {{ include "agentrt.fullname" . }}-monit-d
           port: 9102
           metrics_port: 9902
-        observe:
-          host: {{ include "agentrt.fullname" . }}-observe-d
-          port: 9103
         llm:
           host: {{ include "agentrt.fullname" . }}-llm-d
           port: 9201
@@ -55,12 +52,6 @@ data:
         hook:
           host: {{ include "agentrt.fullname" . }}-hook-d
           port: 9301
-        plugin:
-          host: {{ include "agentrt.fullname" . }}-plugin-d
-          port: 9302
-        info:
-          host: {{ include "agentrt.fullname" . }}-info-d
-          port: 9303
         notify:
           host: {{ include "agentrt.fullname" . }}-notify-d
           port: 9304

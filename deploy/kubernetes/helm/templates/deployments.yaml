@@ -36,11 +36,6 @@ Generated from values.yaml using _helpers.tpl macros
 ---
 {{- end }}
 
-{{- if .Values.observe_d.enabled }}
-{{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "observe-d" "image" .Values.observe_d.image "service" .Values.observe_d.service "replicaCount" .Values.observe_d.replicaCount "resources" .Values.observe_d.resources "livenessProbe" (dict "initialDelaySeconds" 15 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 10 "periodSeconds" 5) "securityContext" .Values.observe_d.securityContext)) }}
----
-{{- end }}
-
 {{/* ===== 业务 daemon ===== */}}
 {{- if .Values.llm_d.enabled }}
 {{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "llm-d" "image" .Values.llm_d.image "service" .Values.llm_d.service "replicaCount" .Values.llm_d.replicaCount "resources" .Values.llm_d.resources "livenessProbe" (dict "initialDelaySeconds" 20 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 15 "periodSeconds" 5) "securityContext" .Values.llm_d.securityContext "env" .Values.llm_d.env "args" .Values.llm_d.args)) }}
@@ -65,16 +60,6 @@ Generated from values.yaml using _helpers.tpl macros
 {{/* ===== 扩展 daemon ===== */}}
 {{- if .Values.hook_d.enabled }}
 {{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "hook-d" "image" .Values.hook_d.image "service" .Values.hook_d.service "replicaCount" .Values.hook_d.replicaCount "resources" .Values.hook_d.resources "livenessProbe" (dict "initialDelaySeconds" 10 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 5 "periodSeconds" 5) "securityContext" .Values.hook_d.securityContext)) }}
----
-{{- end }}
-
-{{- if .Values.plugin_d.enabled }}
-{{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "plugin-d" "image" .Values.plugin_d.image "service" .Values.plugin_d.service "replicaCount" .Values.plugin_d.replicaCount "resources" .Values.plugin_d.resources "livenessProbe" (dict "initialDelaySeconds" 10 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 5 "periodSeconds" 5) "securityContext" .Values.plugin_d.securityContext)) }}
----
-{{- end }}
-
-{{- if .Values.info_d.enabled }}
-{{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "info-d" "image" .Values.info_d.image "service" .Values.info_d.service "replicaCount" .Values.info_d.replicaCount "resources" .Values.info_d.resources "livenessProbe" (dict "initialDelaySeconds" 10 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 5 "periodSeconds" 5) "securityContext" .Values.info_d.securityContext)) }}
 ---
 {{- end }}
 

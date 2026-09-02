@@ -87,9 +87,9 @@ setup_environment() {
     # 启动测试环境
     docker compose -f "${COMPOSE_FILE}" up -d --wait \
         redis postgres corekern coreloopthree taskflow memory \
-        channel_d monit_d observe_d \
+        channel_d monit_d \
         llm_d tool_d market_d sched_d \
-        hook_d plugin_d info_d notify_d \
+        hook_d notify_d \
         gateway_d 2>&1 | tail -5
 
     # 等待所有服务健康
@@ -98,8 +98,8 @@ setup_environment() {
 
     # 快速健康检查
     local unhealthy=0
-    for svc in gateway_d llm_d tool_d market_d sched_d hook_d plugin_d \
-               info_d notify_d channel_d monit_d observe_d \
+    for svc in gateway_d llm_d tool_d market_d sched_d hook_d \
+               notify_d channel_d monit_d \
                corekern coreloopthree taskflow memory; do
         container="agentrt-test-${svc//_/-}"
         if docker inspect --format='{{.State.Health.Status}}' "${container}" 2>/dev/null | grep -q "healthy"; then

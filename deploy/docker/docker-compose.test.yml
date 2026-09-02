@@ -457,8 +457,8 @@ services:
         echo ""
         echo "=== Health Check Results ==="
         for svc in gateway-d:8080 llm-d:9201 tool-d:9202 market-d:9203 \
-                   sched-d:9204 hook-d:9301 plugin-d:9302 info-d:9303 \
-                   notify-d:9304 channel-d:9101 monit-d:9102 observe-d:9103 \
+                   sched-d:9204 hook-d:9301 \
+                   notify-d:9304 channel-d:9101 monit-d:9102 \
                    corekern:9001 coreloopthree:9002 taskflow:9003 memory:9004; do
           host="$${svc%%:*}"
           port="$${svc##*:}"

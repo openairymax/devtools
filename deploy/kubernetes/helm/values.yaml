@@ -245,39 +245,6 @@ monit_d:
     runAsNonRoot: true
     runAsUser: 1000
 
-observe_d:
-  # 0.1.9 M4: observe_d 并入 monit_d（可观测域吸收），默认禁用；模板保留待剪枝
-  enabled: false
-  replicaCount: 1
-  image:
-    repository: spharx/agentrt-observe
-    tag: "0.1.1"
-  service:
-    port: 9103
-    type: ClusterIP
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "512Mi"
-      cpu: "500m"
-  livenessProbe:
-    httpGet:
-      path: /healthz
-      port: 9103
-    initialDelaySeconds: 15
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /healthz
-      port: 9103
-    initialDelaySeconds: 10
-    periodSeconds: 5
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-
 # ===========================================================================
 # 业务 daemon 服务
 # ===========================================================================
@@ -445,72 +412,6 @@ hook_d:
     httpGet:
       path: /healthz
       port: 9301
-    initialDelaySeconds: 5
-    periodSeconds: 5
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-
-plugin_d:
-  # 0.1.9 M4: plugin_d 并入 tool_d（执行域吸收），默认禁用；模板保留待剪枝
-  enabled: false
-  replicaCount: 1
-  image:
-    repository: spharx/agentrt-plugin
-    tag: "0.1.1"
-  service:
-    port: 9302
-    type: ClusterIP
-  resources:
-    requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-  livenessProbe:
-    httpGet:
-      path: /healthz
-      port: 9302
-    initialDelaySeconds: 10
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /healthz
-      port: 9302
-    initialDelaySeconds: 5
-    periodSeconds: 5
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-
-info_d:
-  # 0.1.9 M4: info_d 并入 monit_d（可观测域吸收），默认禁用；模板保留待剪枝
-  enabled: false
-  replicaCount: 1
-  image:
-    repository: spharx/agentrt-info
-    tag: "0.1.1"
-  service:
-    port: 9303
-    type: ClusterIP
-  resources:
-    requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-  livenessProbe:
-    httpGet:
-      path: /healthz
-      port: 9303
-    initialDelaySeconds: 10
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /healthz
-      port: 9303
     initialDelaySeconds: 5
     periodSeconds: 5
   securityContext:

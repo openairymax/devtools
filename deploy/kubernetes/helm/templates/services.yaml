@@ -31,10 +31,6 @@ AgentRT Helm Chart — All Daemon Services (18 services)
 {{- include "agentrt.render.service" (dict "root" $ "name" "monit-d" "service" .Values.monit_d.service) }}
 {{- end }}
 
-{{- if .Values.observe_d.enabled }}
-{{- include "agentrt.render.service" (dict "root" $ "name" "observe-d" "service" .Values.observe_d.service) }}
-{{- end }}
-
 {{- if .Values.llm_d.enabled }}
 {{- include "agentrt.render.service" (dict "root" $ "name" "llm-d" "service" .Values.llm_d.service) }}
 {{- end }}
@@ -53,14 +49,6 @@ AgentRT Helm Chart — All Daemon Services (18 services)
 
 {{- if .Values.hook_d.enabled }}
 {{- include "agentrt.render.service" (dict "root" $ "name" "hook-d" "service" .Values.hook_d.service) }}
-{{- end }}
-
-{{- if .Values.plugin_d.enabled }}
-{{- include "agentrt.render.service" (dict "root" $ "name" "plugin-d" "service" .Values.plugin_d.service) }}
-{{- end }}
-
-{{- if .Values.info_d.enabled }}
-{{- include "agentrt.render.service" (dict "root" $ "name" "info-d" "service" .Values.info_d.service) }}
 {{- end }}
 
 {{- if .Values.notify_d.enabled }}

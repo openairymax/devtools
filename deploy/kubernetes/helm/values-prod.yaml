@@ -131,16 +131,6 @@ hook_d:
       memory: "512Mi"
       cpu: "500m"
 
-plugin_d:
-  replicaCount: 2
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "512Mi"
-      cpu: "500m"
-
 gateway_d:
   replicaCount: 3
   resources:
