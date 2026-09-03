@@ -1,0 +1,29 @@
+# AgentRT systemd unit 文件 — Layer 2: Agent 服务
+# Copyright (C) 2025-2026 SPHARX Ltd.
+# P1.23.2: daemon 启动顺序编排
+
+[Unit]
+Description=AgentRT LLM Daemon
+After=network.target agentrt-sched.service
+Requires=agentrt-sched.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# llm_d 以 model.yaml 为模型清单 SSoT，必须 --manager 显式传入
+# （否则 provider registry 为空，所有模型请求失败）。路径可用
+# systemctl edit 覆盖：ExecStart 追加其他参数。
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/llm_d --manager /etc/agentrt/model.yaml
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=@AGENTRT_RUNTIME_DIR@
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

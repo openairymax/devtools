@@ -1,0 +1,411 @@
+# Doxyfile - AgentRT 全项目 API 文档生成配置
+#
+# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+#
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+#
+# 覆盖模块: atoms / commons / cupolas / daemon / gateway / heapstore
+# 基于 AgentRT 架构设计原则 (E-7: 文档即代码)
+# 参考: manuals/ARCHITECTURAL_PRINCIPLES.md
+
+#---------------------------------------------------------------------------
+# 项目相关配置
+#---------------------------------------------------------------------------
+
+PROJECT_NAME           = "AgentRT"
+
+PROJECT_NUMBER         = "0.1.0"
+
+PROJECT_BRIEF          = "多体控制论智能操作系统 — 微内核架构 · 五大框架 · 多协议网关"
+
+OUTPUT_DIRECTORY       = docs/api
+
+CREATE_SUBDIRS         = YES
+
+OUTPUT_LANGUAGE        = Chinese
+
+ABBREVIATE_BRIEF       = "The $name class" \
+                         "The $name widget" \
+                         "The $name file" \
+                         is \
+                         provides \
+                         specifies \
+                         contains \
+                         represents \
+                         a \
+                         an \
+                         the
+
+ALWAYS_DETAILED_SEC    = YES
+
+FULL_PATH_NAMES        = YES
+
+STRIP_FROM_PATH        = agentrt
+
+STRIP_FROM_INC_PATH    = agentrt
+
+#---------------------------------------------------------------------------
+# 构建相关配置
+#---------------------------------------------------------------------------
+
+EXTRACT_ALL            = YES
+
+EXTRACT_PRIVATE        = NO
+
+EXTRACT_STATIC         = YES
+
+EXTRACT_LOCAL_CLASSES  = YES
+
+EXTRACT_ANON_NSPACES   = NO
+
+HIDE_UNDOC_MEMBERS     = NO
+
+HIDE_UNDOC_CLASSES     = NO
+
+HIDE_FRIEND_COMPOUNDS  = NO
+
+HIDE_IN_BODY_DOCS      = NO
+
+INTERNAL_DOCS          = NO
+
+CASE_SENSE_NAMES       = NO
+
+HIDE_SCOPE_NAMES       = NO
+
+SHOW_INCLUDE_FILES     = YES
+
+SHOW_GROUPED_DOC_INC   = YES
+
+FORCE_INFO_INCLUDES    = YES
+
+GENERATE_SOURCELIST    = YES
+
+SOURCE_BROWSER         = YES
+
+INLINE_SOURCES         = NO
+
+STRIP_CODE_COMMENTS    = YES
+
+REFERENCED_BY_RELATION = YES
+
+REFERENCES_RELATION    = YES
+
+#---------------------------------------------------------------------------
+# 消息相关配置
+#---------------------------------------------------------------------------
+
+WARNINGS               = YES
+
+WARN_IF_UNDOCUMENTED   = YES
+
+WARN_IF_DOC_ERROR      = YES
+
+WARN_NO_PARAMDOC       = YES
+
+WARN_LOGFILE           = docs/api/doxygen_warnings.log
+
+WARN_FORMAT            = "$file:$line: $text"
+
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+
+#---------------------------------------------------------------------------
+# 输入相关配置
+#---------------------------------------------------------------------------
+
+INPUT_ENCODING         = UTF-8
+
+INPUT                  = agentrt/atoms \
+                         agentrt/commons \
+                         agentrt/cupolas/include \
+                         agentrt/cupolas/src \
+                         agentrt/daemons/common/include \
+                         agentrt/daemons/gateway_d \
+                         agentrt/daemons/llm_d/include \
+                         agentrt/daemons/tool_d/include \
+                         agentrt/daemons/sched_d \
+                         agentrt/daemons/monit_d \
+                         agentrt/daemons/market_d \
+                         agentrt/gateway/include \
+                         agentrt/gateway/src \
+                         agentrt/heapstore/include \
+                         agentrt/atoms/memory/include \
+                         agentrt/protocols/standards/mcp/include \
+                         agentrt/protocols/standards/a2a/include \
+                         agentrt/protocols/standards/agntcy/include \
+                         agentrt/protocols/integrations/openai/include \
+                         agentrt/protocols/integrations/claude/include \
+                         agentrt/protocols/integrations/china_eco/include \
+                         agentrt/protocols/integrations/openclaw/include \
+                         agentrt/protocols/integrations/openjiuwen/include \
+                         agentrt/protocols/frameworks/langchain/include \
+                         agentrt/protocols/frameworks/autogen/include \
+                         agentrt/protocols/core \
+                         agentrt/protocols/common \
+                         agentrt/atoms/memoryrovol/include \
+                         docs/api/mainpage.dox
+
+FILE_PATTERNS          = *.c \
+                         *.h \
+                         *.md \
+                         *.dox
+
+RECURSIVE              = YES
+
+EXCLUDE                = agentrt/cupolas/src/mainpage.dox
+
+EXCLUDE_PATTERNS       = */tests/* \
+                         */fuzz/* \
+                         */CMakeFiles/* \
+                         */build/* \
+                         */.git/* \
+                         */node_modules/* \
+                         */target/* \
+                         */dist/* \
+                         */__pycache__/* \
+                         */third_party/* \
+                         */vendor/*
+
+EXAMPLE_PATH           = agentrt/heapstore/examples
+
+EXAMPLE_PATTERNS       = *.c
+
+EXAMPLE_RECURSIVE      = YES
+
+IMAGE_PATH             = docs/api/images
+
+#---------------------------------------------------------------------------
+# 源浏览器相关配置
+#---------------------------------------------------------------------------
+
+INCLUDE_GRAPH          = YES
+
+INCLUDED_BY_GRAPH      = YES
+
+CALL_GRAPH             = YES
+
+CALLER_GRAPH           = YES
+
+GRAPHICAL_HIERARCHY    = YES
+
+DIRECTORY_GRAPH        = YES
+
+DOT_IMAGE_FORMAT       = svg
+
+INTERACTIVE_SVG        = YES
+
+MAX_DOT_GRAPH_DEPTH    = 4
+
+MAX_DOT_GRAPH_NODES    = 200
+
+#---------------------------------------------------------------------------
+# 索引相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_TREEVIEW      = YES
+
+ENUM_VALUES_PER_LINE   = 4
+
+#---------------------------------------------------------------------------
+# HTML 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_HTML          = YES
+
+HTML_OUTPUT            = html
+
+HTML_FILE_EXTENSION    = .html
+
+HTML_COLORSTYLE_HUE    = 220
+
+HTML_COLORSTYLE_SAT    = 100
+
+HTML_COLORSTYLE_GAMMA  = 80
+
+GENERATE_HTMLHELP      = NO
+
+GENERATE_CHI           = NO
+
+BINARY_TOC             = NO
+
+TOC_EXPAND             = YES
+
+DISABLE_INDEX          = NO
+
+GENERATE_TREEVIEW      = YES
+
+HIDE_FORWARD_DECLARATIONS = NO
+
+SEARCHENGINE           = YES
+
+SERVER_BASED_SEARCH    = NO
+
+#---------------------------------------------------------------------------
+# LaTeX 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_LATEX         = NO
+
+#---------------------------------------------------------------------------
+# RTF 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_RTF           = NO
+
+#---------------------------------------------------------------------------
+# Man page 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_MAN           = NO
+
+#---------------------------------------------------------------------------
+# XML 相关配置
+#---------------------------------------------------------------------------
+
+GENERATE_XML           = NO
+
+#---------------------------------------------------------------------------
+# 预处理相关配置
+#---------------------------------------------------------------------------
+
+ENABLE_PREPROCESSING   = YES
+
+MACRO_EXPANSION        = YES
+
+EXPAND_ONLY_PREDEF     = YES
+
+SEARCH_INCLUDES        = YES
+
+INCLUDE_PATH           = agentrt/atoms/corekern/include \
+                         agentrt/atoms/coreloopthree/include \
+                         agentrt/atoms/memoryrovol/include \
+                         agentrt/atoms/memory/include \
+                         agentrt/atoms/syscall/include \
+                         agentrt/atoms/taskflow/include \
+                         agentrt/atoms/frameworks/include \
+                         agentrt/commons/platform/include \
+                         agentrt/commons/utils/include \
+                         agentrt/commons/utils/observability/include \
+                         agentrt/commons/utils/compat/include \
+                         agentrt/commons/utils/config/include \
+                         agentrt/commons/utils/cost/include \
+                         agentrt/commons/utils/error/include \
+                         agentrt/commons/utils/io/include \
+                         agentrt/commons/utils/ipc/include \
+                         agentrt/commons/utils/logging/include \
+                         agentrt/commons/utils/memory/include \
+                         agentrt/commons/utils/string/include \
+                         agentrt/commons/utils/sync/include \
+                         agentrt/commons/utils/token/include \
+                         agentrt/commons/utils/types/include \
+                         agentrt/cupolas/include \
+                         agentrt/daemons/common/include \
+                         agentrt/daemons/llm_d/include \
+                         agentrt/daemons/tool_d/include \
+                         agentrt/gateway/include \
+                         agentrt/heapstore/include \
+                         agentrt/protocols/standards/mcp/include \
+                         agentrt/protocols/standards/a2a/include \
+                         agentrt/protocols/standards/agntcy/include \
+                         agentrt/protocols/integrations/openai/include \
+                         agentrt/protocols/integrations/claude/include \
+                         agentrt/protocols/integrations/china_eco/include \
+                         agentrt/protocols/integrations/openclaw/include \
+                         agentrt/protocols/integrations/openjiuwen/include \
+                         agentrt/protocols/frameworks/langchain/include \
+                         agentrt/protocols/frameworks/autogen/include \
+                         agentrt/protocols/core \
+                         agentrt/protocols/common
+
+PREDEFINED             = __cplusplus \
+                         AGENTRT_API= \
+                         AGENTRT_EXPORT= \
+                         CUPOLAS_API= \
+                         AGENTRT_HAS_CURL \
+                         AGENTRT_PLATFORM_WINDOWS= \
+                         AGENTRT_PLATFORM_LINUX= \
+                         AGENTRT_PLATFORM_MACOS= \
+                         __attribute__\(x\)= \
+                         __declspec\(x\)=
+
+EXPAND_AS_DEFINED      =
+
+SKIP_FUNCTION_MACROS   = YES
+
+#---------------------------------------------------------------------------
+# Dot 相关配置
+#---------------------------------------------------------------------------
+
+CLASS_DIAGRAMS         = YES
+
+COLLABORATION_GRAPH    = YES
+
+GROUP_GRAPHS           = YES
+
+UML_LOOK               = YES
+
+TEMPLATE_RELATIONS     = YES
+
+INCLUDE_GRAPH          = YES
+
+INCLUDED_BY_GRAPH      = YES
+
+CALL_GRAPH             = YES
+
+CALLER_GRAPH           = YES
+
+GRAPHICAL_HIERARCHY    = YES
+
+DIRECTORY_GRAPH        = YES
+
+DOT_IMAGE_FORMAT       = svg
+
+INTERACTIVE_SVG        = YES
+
+DOT_PATH               =
+
+DOTFILE_NAMES          = dot
+
+MAX_DOT_GRAPH_DEPTH    = 4
+
+MAX_DOT_GRAPH_NODES    = 200
+
+DOT_CLEANUP            = YES
+
+#---------------------------------------------------------------------------
+# 特殊配置
+#---------------------------------------------------------------------------
+
+ALGORITHMS             = YES
+
+INLINE_INHERITED_MEMB  = YES
+
+SORT_MEMBER_DOCS       = YES
+
+SORT_BRIEF_DOCS        = NO
+
+SORT_MEMBERS_CTORS_1ST = NO
+
+SORT_GROUP_NAMES       = YES
+
+TAB_SIZE               = 4
+
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+SUBGROUPING            = YES
+
+TYPEDEF_HIDES_STRUCT   = YES
+
+SYMBOL_CACHE_SIZE      = 0
+
+#---------------------------------------------------------------------------
+# 日志与调试
+#---------------------------------------------------------------------------
+
+TIMESTAMP              = YES
+
+VERBOSE                = NO
+
+#---------------------------------------------------------------------------
+# 配置文件结束
+#---------------------------------------------------------------------------

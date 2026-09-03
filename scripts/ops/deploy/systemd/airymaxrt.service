@@ -1,0 +1,41 @@
+# AirymaxRT daemon fleet — systemd user unit
+#
+# 安装（用户级，无需 root）：
+#   mkdir -p ~/.config/systemd/user
+#   cp airymaxrt.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now airymaxrt.service
+#   loginctl enable-linger "$USER"   # 无登录会话也常驻（生产）
+#
+# 说明：
+#   - 以 agentrt-bootstrap.sh --watchdog 作为前台监督进程（Type=simple），
+#     watchdog 巡检实现崩溃自愈（60s/3 次重启频率限制）。
+#   - KillMode=control-group：systemctl stop 时向 cgroup 内全部 daemon
+#     并行发送 SIGTERM，daemon 按自身 10s 优雅停止窗口清理；TimeoutStopSec
+#     覆盖窗口 + 余量，超时由 systemd 强制 SIGKILL 兜底。
+#   - Restart=on-failure：监督进程异常退出时自动重启整舰队。
+#   - 环境经 install.env（AIRY_HOME 等）注入，与 platform.h 路径体系一致。
+#
+# SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+
+[Unit]
+Description=AirymaxRT agent runtime daemon fleet (control plane)
+Documentation=file:%h/.airymaxrt/README_zh.md
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.airymaxrt/config/install.env
+ExecStart=%h/.airymaxrt/bin/agentrt-bootstrap.sh --watchdog --watchdog-interval 10
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillMode=control-group
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+
+[Install]
+WantedBy=default.target

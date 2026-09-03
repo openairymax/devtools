@@ -1,0 +1,91 @@
+# AgentRT clangd configuration
+# SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+#
+# This file uses RELATIVE paths and is safe to commit.
+# Each developer must build the project first to generate compile_commands.json:
+#   mkdir -p ../AgentRT-build && cd ../AgentRT-build
+#   cmake ../AgentRT -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+#
+# If compile_commands.json exists, clangd will use it for accurate analysis.
+# If not, the fallback CompileFlags below provide basic single-file analysis.
+
+CompileFlags:
+  CompilationDatabase: ../AgentRT-build
+  Add:
+    - -std=c11
+    - -D_GNU_SOURCE
+    - -D_POSIX_C_SOURCE=200809L
+    - -Iagentrt/atoms/corekern/include
+    - -Iagentrt/atoms/coreloopthree/include
+    - -Iagentrt/atoms/memoryrovol/include
+    - -Iagentrt/atoms/syscall/include
+    - -Iagentrt/atoms/threelevelmemory/include
+    - -Iagentrt/atoms/memmap/include
+    - -Iagentrt/atoms/memorypool/include
+    - -Iagentrt/atoms/memorycompact/include
+    - -Iagentrt/atoms/taskflow/include
+    - -Iagentrt/atoms/taskflow/src
+    - -Iagentrt/commons/utils/memory/include
+    - -Iagentrt/commons/utils/string/include
+    - -Iagentrt/commons/utils/token/include
+    - -Iagentrt/commons/utils/network/include
+    - -Iagentrt/commons/utils/security/include
+    - -Iagentrt/commons/utils/resource/include
+    - -Iagentrt/commons/utils/uuid/include
+    - -Iagentrt/commons/utils/strategy/include
+    - -Iagentrt/commons/utils/config_unified/include
+    - -Iagentrt/commons/utils/error
+    - -Iagentrt/commons/utils/types/include
+    - -Iagentrt/commons/utils/compat/include
+    - -Iagentrt/commons/utils/platform/include
+    - -Iagentrt/commons/utils/io/include
+    - -Iagentrt/commons/utils/logging/include
+    - -Iagentrt/commons/utils/sync/include
+    - -Iagentrt/commons/utils/observability/include
+    - -Iagentrt/cupolas/include
+    - -Iagentrt/cupolas/src
+    - -Iagentrt/cupolas/src/security
+    - -Iagentrt/cupolas/src/sanitizer
+    - -Iagentrt/cupolas/src/guards
+    - -Iagentrt/cupolas/src/utils
+    - -Iagentrt/cupolas/src/workbench
+    - -Iagentrt/cupolas/src/audit
+    - -Iagentrt/daemons/common/include
+    - -Iagentrt/daemons/common/src
+    - -Iagentrt/daemons/common/types/include
+    - -Iagentrt/daemons/common/protocol/include
+    - -Iagentrt/daemons/common/utils/include
+    - -Iagentrt/daemons/common/config/include
+    - -Iagentrt/heapstore/include
+    - -Iagentrt/heapstore/src
+    - -Iagentrt/gateway/include
+    - -Iagentrt/gateway/src
+    - -Iagentrt/manager/include
+    - -Iagentrt/manager/src
+    - -Iagentrt/protocols/common/include
+    - -Iagentrt/protocols/common/src
+    - -Iagentrt/protocols/core/router/include
+    - -Iagentrt/protocols/core/router/src
+    - -Iagentrt/protocols/core/transformers/include
+    - -Iagentrt/protocols/core/transformers/src
+  Remove:
+    - -Wno-*
+    - -Werror
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Yes
+  ClangTidy:
+    Add: [bugprone-*, performance-*, readability-*]
+    Remove:
+      - readability-magic-numbers
+      - readability-identifier-length
+      - bugprone-easily-swappable-parameters
+      - readability-function-cognitive-complexity
+
+Hover:
+  ShowAKA: Yes
+
+Index:
+  StandardLibrary: Yes
