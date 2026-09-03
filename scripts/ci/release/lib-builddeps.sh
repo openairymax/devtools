@@ -37,16 +37,23 @@ trap 'echo "::error::[builddeps] FAILED rc=$? cmd: ${BASH_COMMAND:-?}" >&2' ERR
 JOBS="${AIRY_JOBS:-$(nproc 2>/dev/null || echo 2)}"
 export JOBS
 
-# ── cmake 3.29.6（20.04 自带 3.16 不满足最低要求）────────────────────
-# 快路径优先级：① pip wheel（PyPI 提供 amd64/aarch64/i686 等）；② Kitware
-# 官方二进制 tarball（linux-x86_64/aarch64/riscv64，免 qemu 源码编译——
-# riscv64 源码 bootstrap 在 qemu 下约 1 小时，二进制解压即用）；③ 源码
-# 自编译兜底（armv7l 等无 wheel/无二进制场景）。
-if ! cmake --version 2>/dev/null | grep -q "3\.29\.6"; then
-    if command -v pip3 >/dev/null 2>&1 && \
-       pip3 install --no-cache-dir "cmake==3.29.6" >/dev/null 2>&1; then
+# ── cmake ≥3.20（20.04 自带 3.16 不满足最低要求）────────────────────
+# 快路径优先级：
+#   ① pip wheel：amd64/aarch64/i686 有 3.29.6 wheel；armv7l 需 cmake≥3.31
+#      （manylinux_2_31_armv7l），且 focal pip 20.3 不认识 2_31 tag——
+#      先升级 pip 再装 3.29.6，失败则回退 3.31.6。
+#   ② Kitware 官方二进制 tarball（linux-x86_64/aarch64/riscv64，免 qemu
+#      源码编译：riscv64 源码 bootstrap 在 qemu 下约 1 小时）。
+#   ③ 源码自编译兜底（最后手段，qemu 32 位下慢且脆弱）。
+if ! cmake --version 2>/dev/null | grep -qE "3\.(29\.6|31\.6)"; then
+    if command -v pip3 >/dev/null 2>&1; then
+        pip3 install -q -U pip >/dev/null 2>&1 || true
+        pip3 install --no-cache-dir "cmake==3.29.6" >/dev/null 2>&1 || \
+        pip3 install --no-cache-dir "cmake==3.31.6" >/dev/null 2>&1 || true
         hash -r
-        echo "[builddeps] cmake 3.29.6 已由 pip wheel 安装: $(cmake --version | head -1)"
+    fi
+    if cmake --version 2>/dev/null | grep -qE "3\.(29\.6|31\.6)"; then
+        echo "[builddeps] cmake 已由 pip wheel 安装: $(cmake --version | head -1)"
     else
         CM_PLAT=""
         case "$(uname -m)" in
