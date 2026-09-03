@@ -27,8 +27,9 @@
 set -euo pipefail
 
 # 内层失败自报（容器外层 ERR trap 只能看到本脚本整体退出码；此 trap 把
-# 具体失败命令打到 stderr，随容器 tee 落盘并进 ::error:: tail）。
-trap 'echo "[builddeps] FAILED rc=$? cmd: ${BASH_COMMAND:-?}" >&2' ERR
+# 具体失败命令以 ::error:: 上报，随合并 stdout/stderr 被 GH 解析为
+# annotation，匿名 API 可读）。
+trap 'echo "::error::[builddeps] FAILED rc=$? cmd: ${BASH_COMMAND:-?}" >&2' ERR
 
 # 并行度可覆盖：32 位容器（i686/armv7l）下 -j$(nproc) 大并行可能撞上
 # 32 位用户态地址空间/资源限制导致 make 失败（rc=2），回退小并行。
