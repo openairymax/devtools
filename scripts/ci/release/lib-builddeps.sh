@@ -108,9 +108,20 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
     fi
     tar -xzf /tmp/openssl.tar.gz -C /tmp
     OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
-    (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
-        --openssldir=/usr/local/ssl shared --libdir=lib \
-        && make -j"$JOBS" build_sw && make install_sw)
+    # i686 原生容器陷阱（v0.1.9 run #8 实证）：./config 检测到 i386/i686 会
+    # 选 linux-x86 目标并强制 -m32，而 Debian i386 镜像无 multilib 头文件
+    # 搜索路径 → "bits/libc-header-start.h: No such file or directory"。
+    # linux-generic32 走原生 32 位编译、不加 -m32。
+    case "$(uname -m)" in
+        i386|i486|i586|i686)
+            (cd "$OPENSSL_DIR" && perl Configure linux-generic32 \
+                --prefix=/usr/local --openssldir=/usr/local/ssl shared --libdir=lib \
+                && make -j"$JOBS" build_sw && make install_sw) ;;
+        *)
+            (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
+                --openssldir=/usr/local/ssl shared --libdir=lib \
+                && make -j"$JOBS" build_sw && make install_sw) ;;
+    esac
     ldconfig 2>/dev/null || true
 else
     echo "[builddeps] OpenSSL 已就位（跳过）"
