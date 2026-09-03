@@ -26,6 +26,12 @@
 # ============================================================================
 set -euo pipefail
 
+# 并行度可覆盖：32 位容器（i686/armv7l）下 -j$(nproc) 大并行可能撞上
+# 32 位用户态地址空间/资源限制导致 make 失败（rc=2），回退小并行。
+# 调用方经 AIRY_JOBS 传入（如 release.yml qemu 矩阵 -e AIRY_JOBS=2）。
+JOBS="${AIRY_JOBS:-$(nproc 2>/dev/null || echo 2)}"
+export JOBS
+
 # ── cmake 3.29.6（20.04 自带 3.16 不满足最低要求）────────────────────
 # 快路径优先：pip wheel（PyPI 提供 amd64/aarch64/i686/musl 等）；riscv64/
 # armv7l 无 wheel 时回退源码自编译（qemu 下较慢但完整）。
@@ -63,7 +69,7 @@ if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ];
     cmake -S "$CJSON_DIR" -B /tmp/cjson-build \
         -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
-    cmake --build /tmp/cjson-build --parallel
+    cmake --build /tmp/cjson-build --parallel "$JOBS"
     cmake --install /tmp/cjson-build
 fi
 
@@ -88,7 +94,7 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
     OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
     (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
         --openssldir=/usr/local/ssl shared --libdir=lib \
-        && make -j"$(nproc)" build_sw && make install_sw)
+        && make -j"$JOBS" build_sw && make install_sw)
     ldconfig 2>/dev/null || true
 else
     echo "[builddeps] OpenSSL 已就位（跳过）"
@@ -113,7 +119,7 @@ if [ ! -f /usr/local/lib/libcurl.so ]; then
         --disable-telnet --disable-tftp --disable-pop3 --disable-imap \
         --disable-smtp --disable-gopher --disable-manual --disable-debug \
         --enable-http --enable-https --enable-ftp --enable-file --with-zlib \
-        && make -j"$(nproc)" && make install)
+        && make -j"$JOBS" && make install)
     ldconfig 2>/dev/null || true
 else
     echo "[builddeps] libcurl 已就位（跳过）"
@@ -138,7 +144,7 @@ if [ ! -f /usr/local/lib/libwebsockets.so ]; then
         -DLWS_WITHOUT_TESTAPPS=ON -DLWS_WITHOUT_TEST_SERVER=ON \
         -DLWS_WITHOUT_TEST_SERVER_EXTPOLL=ON -DLWS_WITHOUT_TEST_CLIENT=ON \
         -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF
-    cmake --build /tmp/lws-build --parallel
+    cmake --build /tmp/lws-build --parallel "$JOBS"
     cmake --install /tmp/lws-build
     ldconfig 2>/dev/null || true
 else
