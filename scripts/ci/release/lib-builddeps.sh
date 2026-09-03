@@ -27,18 +27,26 @@
 set -euo pipefail
 
 # ── cmake 3.29.6（20.04 自带 3.16 不满足最低要求）────────────────────
+# 快路径优先：pip wheel（PyPI 提供 amd64/aarch64/i686/musl 等）；riscv64/
+# armv7l 无 wheel 时回退源码自编译（qemu 下较慢但完整）。
 if ! cmake --version 2>/dev/null | grep -q "3\.29\.6"; then
-    echo "[builddeps] 自编译 cmake 3.29.6 …"
-    if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
-        tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
+    if command -v pip3 >/dev/null 2>&1 && \
+       pip3 install --no-cache-dir "cmake==3.29.6" >/dev/null 2>&1; then
+        hash -r
+        echo "[builddeps] cmake 3.29.6 已由 pip wheel 安装: $(cmake --version | head -1)"
     else
-        curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
-            https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6.tar.gz
-        tar -xzf /tmp/cmake.tar.gz -C /tmp
+        echo "[builddeps] pip 无可用 wheel，自编译 cmake 3.29.6 …"
+        if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
+            tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
+        else
+            curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
+                https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6.tar.gz
+            tar -xzf /tmp/cmake.tar.gz -C /tmp
+        fi
+        (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$(nproc)" --no-qt-gui --no-debugger \
+            -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
+            && make -j"$(nproc)" && make install)
     fi
-    (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$(nproc)" --no-qt-gui --no-debugger \
-        -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
-        && make -j"$(nproc)" && make install)
 fi
 
 # ── cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue）─────────────
