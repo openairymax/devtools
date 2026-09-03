@@ -26,6 +26,10 @@
 # ============================================================================
 set -euo pipefail
 
+# 内层失败自报（容器外层 ERR trap 只能看到本脚本整体退出码；此 trap 把
+# 具体失败命令打到 stderr，随容器 tee 落盘并进 ::error:: tail）。
+trap 'echo "[builddeps] FAILED rc=$? cmd: ${BASH_COMMAND:-?}" >&2' ERR
+
 # 并行度可覆盖：32 位容器（i686/armv7l）下 -j$(nproc) 大并行可能撞上
 # 32 位用户态地址空间/资源限制导致 make 失败（rc=2），回退小并行。
 # 调用方经 AIRY_JOBS 传入（如 release.yml qemu 矩阵 -e AIRY_JOBS=2）。
@@ -108,12 +112,14 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
     fi
     tar -xzf /tmp/openssl.tar.gz -C /tmp
     OPENSSL_DIR="$(ls -d /tmp/openssl-* 2>/dev/null | head -1)"
-    # i686 原生容器陷阱（v0.1.9 run #8 实证）：./config 检测到 i386/i686 会
-    # 选 linux-x86 目标并强制 -m32，而 Debian i386 镜像无 multilib 头文件
-    # 搜索路径 → "bits/libc-header-start.h: No such file or directory"。
-    # linux-generic32 走原生 32 位编译、不加 -m32。
-    case "$(uname -m)" in
-        i386|i486|i586|i686)
+    # i686 原生容器陷阱（v0.1.9 run #8/#9 实证）：OpenSSL ./config 检测到
+    # 32 位 x86 会选 linux-x86 目标并强制 -m32，而 Debian i386 镜像无
+    # multilib 头文件搜索路径 → "bits/libc-header-start.h: No such file"。
+    # 注意 uname -m 在 32 位容器里返回宿主内核架构（x86_64），必须用
+    # gcc -dumpmachine 判定真实工具链；linux-generic32 走原生 32 位编译、
+    # 不加 -m32。
+    case "$(gcc -dumpmachine 2>/dev/null)" in
+        i[3-6]86-*)
             (cd "$OPENSSL_DIR" && perl Configure linux-generic32 \
                 --prefix=/usr/local --openssldir=/usr/local/ssl shared --libdir=lib \
                 && make -j"$JOBS" build_sw && make install_sw) ;;
