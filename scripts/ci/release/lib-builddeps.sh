@@ -33,25 +33,41 @@ JOBS="${AIRY_JOBS:-$(nproc 2>/dev/null || echo 2)}"
 export JOBS
 
 # ── cmake 3.29.6（20.04 自带 3.16 不满足最低要求）────────────────────
-# 快路径优先：pip wheel（PyPI 提供 amd64/aarch64/i686/musl 等）；riscv64/
-# armv7l 无 wheel 时回退源码自编译（qemu 下较慢但完整）。
+# 快路径优先级：① pip wheel（PyPI 提供 amd64/aarch64/i686 等）；② Kitware
+# 官方二进制 tarball（linux-x86_64/aarch64/riscv64，免 qemu 源码编译——
+# riscv64 源码 bootstrap 在 qemu 下约 1 小时，二进制解压即用）；③ 源码
+# 自编译兜底（armv7l 等无 wheel/无二进制场景）。
 if ! cmake --version 2>/dev/null | grep -q "3\.29\.6"; then
     if command -v pip3 >/dev/null 2>&1 && \
        pip3 install --no-cache-dir "cmake==3.29.6" >/dev/null 2>&1; then
         hash -r
         echo "[builddeps] cmake 3.29.6 已由 pip wheel 安装: $(cmake --version | head -1)"
     else
-        echo "[builddeps] pip 无可用 wheel，自编译 cmake 3.29.6 …"
-        if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
-            tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
+        CM_PLAT=""
+        case "$(uname -m)" in
+            x86_64)  CM_PLAT=linux-x86_64 ;;
+            aarch64) CM_PLAT=linux-aarch64 ;;
+            riscv64) CM_PLAT=linux-riscv64 ;;
+        esac
+        if [ -n "$CM_PLAT" ] && \
+           curl -fsSL --retry 2 -o /tmp/cmake-bin.tar.gz \
+               "https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6-${CM_PLAT}.tar.gz" \
+           && tar -xzf /tmp/cmake-bin.tar.gz -C /usr/local --strip-components=1; then
+            hash -r
+            echo "[builddeps] cmake 3.29.6 由 Kitware 官方二进制就位: $(cmake --version | head -1)"
         else
-            curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
-                https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6.tar.gz
-            tar -xzf /tmp/cmake.tar.gz -C /tmp
+            echo "[builddeps] pip/官方二进制均不可用，自编译 cmake 3.29.6 …"
+            if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
+                tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
+            else
+                curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
+                    https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6.tar.gz
+                tar -xzf /tmp/cmake.tar.gz -C /tmp
+            fi
+            (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$JOBS" --no-qt-gui --no-debugger \
+                -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
+                && make -j"$JOBS" && make install)
         fi
-        (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$(nproc)" --no-qt-gui --no-debugger \
-            -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
-            && make -j"$(nproc)" && make install)
     fi
 fi
 
