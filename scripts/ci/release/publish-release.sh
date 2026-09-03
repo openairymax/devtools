@@ -96,7 +96,9 @@ for f in "${ARTIFACTS[@]}"; do
         log_fail "sha256 不匹配: $(basename "$f")"; PREFAIL=1
     fi
     size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
-    if [ -z "$size" ] || [ "$size" -lt 5000000 ]; then
+    # 下限 1MB（原 5MB 会误伤小而完整的包，如 macOS-arm64 ~4.6MB）；
+    # 仍能拦截 qemu 静默空包（~3KB）等损坏制品。
+    if [ -z "$size" ] || [ "$size" -lt 1000000 ]; then
         log_fail "制品异常小（疑似损坏）: $(basename "$f")（${size:-?} 字节）"; PREFAIL=1
     fi
 done
