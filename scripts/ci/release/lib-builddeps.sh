@@ -42,17 +42,23 @@ export JOBS
 #   ① pip wheel：amd64/aarch64/i686 有 3.29.6 wheel；armv7l 需 cmake≥3.31
 #      （manylinux_2_31_armv7l），且 focal pip 20.3 不认识 2_31 tag——
 #      先升级 pip 再装 3.29.6，失败则回退 3.31.6。
-#   ② Kitware 官方二进制 tarball（linux-x86_64/aarch64/riscv64，免 qemu
-#      源码编译：riscv64 源码 bootstrap 在 qemu 下约 1 小时）。
-#   ③ 源码自编译兜底（最后手段，qemu 32 位下慢且脆弱）。
-if ! cmake --version 2>/dev/null | grep -qE "3\.(29\.6|31\.6)"; then
+#   ② Kitware 官方二进制 tarball（linux-x86_64/aarch64/riscv64）。
+#   ③ Kitware APT（ubuntu armhf/riscv64 等无官方 tarball 场景）。
+#   ④ 源码自编译兜底（最后手段，qemu 32 位下慢且脆弱）。
+cmake_ge320() {
+    command -v cmake >/dev/null 2>&1 || return 1
+    local ver
+    ver="$(cmake --version | head -1 | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
+    [ -n "$ver" ] && [ "$(printf '%s\n3.20.0' "$ver" | sort -V | head -1)" = "3.20.0" ]
+}
+if ! cmake_ge320; then
     if command -v pip3 >/dev/null 2>&1; then
         pip3 install -q -U pip >/dev/null 2>&1 || true
         pip3 install --no-cache-dir "cmake==3.29.6" >/dev/null 2>&1 || \
         pip3 install --no-cache-dir "cmake==3.31.6" >/dev/null 2>&1 || true
         hash -r
     fi
-    if cmake --version 2>/dev/null | grep -qE "3\.(29\.6|31\.6)"; then
+    if cmake_ge320; then
         echo "[builddeps] cmake 已由 pip wheel 安装: $(cmake --version | head -1)"
     else
         CM_PLAT=""
@@ -67,8 +73,13 @@ if ! cmake --version 2>/dev/null | grep -qE "3\.(29\.6|31\.6)"; then
            && tar -xzf /tmp/cmake-bin.tar.gz -C /usr/local --strip-components=1; then
             hash -r
             echo "[builddeps] cmake 3.29.6 由 Kitware 官方二进制就位: $(cmake --version | head -1)"
+        elif [ -f /etc/os-release ] && grep -q '^ID=ubuntu' /etc/os-release && \
+             curl -fsSL --retry 2 https://apt.kitware.com/keys/kitware-archive-latest.asc | apt-key add - >/dev/null 2>&1 && \
+             printf 'deb https://apt.kitware.com/ubuntu/ focal main\n' > /etc/apt/sources.list.d/kitware.list && \
+             apt-get update -qq && apt-get install -y -qq --no-install-recommends cmake; then
+            echo "[builddeps] cmake 由 Kitware APT 安装: $(cmake --version | head -1)"
         else
-            echo "[builddeps] pip/官方二进制均不可用，自编译 cmake 3.29.6 …"
+            echo "[builddeps] pip/二进制/APT 均不可用，自编译 cmake 3.29.6 …"
             if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
                 tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
             else
@@ -82,6 +93,7 @@ if ! cmake --version 2>/dev/null | grep -qE "3\.(29\.6|31\.6)"; then
         fi
     fi
 fi
+unset -f cmake_ge320 2>/dev/null || true
 
 # ── cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue）─────────────
 if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ]; then
