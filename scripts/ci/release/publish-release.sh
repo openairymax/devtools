@@ -327,7 +327,11 @@ upload_asset() {
     mapfile -t uphdr < <(python3 -c 'import json,sys
 for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     print("-H"); print(f"{k}: {v}")' <<<"$upjson")
-    if curl -fsS --connect-timeout 20 --max-time 900 -X PUT \
+    # PUT 超时 3600s（0.2.0 加固，v0.1.9 R16 实证）：GitHub 美东 runner →
+    # atomgit/OBS 上传 ~20MB 需 ~15min，原 --max-time 900 恰在临界掐断大包
+    # （arm64/x64 两包同时在 900s 处失败）。上传在本地（大陆 → OBS）通常
+    # 数秒级，3600s 为远端/弱网环境留足余量。
+    if curl -fsS --connect-timeout 20 --max-time 3600 -X PUT \
         "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null; then
         # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
         # 大小必须等于本地大小，防 OBS 截断/静默失败（此前无校验）。
