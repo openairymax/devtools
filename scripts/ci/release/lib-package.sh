@@ -24,6 +24,14 @@ pkg_setup_version() {
     echo "[INFO] 版本 SSoT: ${AIRY_VERSION}（VERSION_NUM=${VERSION_NUM}）"
 }
 
+# ELF 魔数判定（coreutils head/od，零外部依赖）：不使用 file(1)——工具链
+# 镜像（.github/docker/qemu-toolchain/ubuntu.Dockerfile）与 ubuntu:20.04
+# 基础镜像均无 file，0.1.11-rc.2 实证：file 缺失使下方收集/校验的 ELF 守卫
+# 整体空转（所有二进制被静默跳过），包内 0 个运行时 .so 仍假阳性通过。
+pkg_is_elf() {
+    head -c4 "$1" 2>/dev/null | od -An -tx1 | grep -q '7f 45 4c 46'
+}
+
 # 运行时 .so 自包含：遍历 bin/ 全部 ELF 收集依赖并集（各 daemon 依赖库不同，
 # 仅以单一参考二进制收集会漏包）；系统核心库豁免。调用后可用
 # pkg_verify_deps <out> 校验无未解析依赖。
@@ -42,7 +50,7 @@ pkg_runtime_libs() {
         [ -f "$b" ] || continue
         # 仅处理 ELF 二进制：脚本（bootstrap 等）ldd 返回非零，pipefail 下
         # 会误触发 set -e 中止（增量复用 out 目录时必现）
-        file "$b" 2>/dev/null | grep -q 'ELF' || continue
+        pkg_is_elf "$b" || continue
         ldd "$b" 2>/dev/null | awk '{print $1, $3}' | while read -r n p; do
             case "$n" in
                 linux-vdso*|ld-linux*|libc.so.*|libm.so.*|libgcc_s.so.*|libpthread.so.*|librt.so.*|libdl.so.*) continue ;;
@@ -64,7 +72,7 @@ pkg_verify_deps() {
     fi
     for b in "$out"/bin/*; do
         [ -f "$b" ] || continue
-        file "$b" 2>/dev/null | grep -q 'ELF' || continue
+        pkg_is_elf "$b" || continue
         if LD_LIBRARY_PATH="${_ldpath:+$_ldpath:}${LD_LIBRARY_PATH:-}" ldd "$b" 2>/dev/null | grep -q "not found"; then
             echo "warn: $(basename "$b") 存在未解析依赖:"
             LD_LIBRARY_PATH="${_ldpath:+$_ldpath:}${LD_LIBRARY_PATH:-}" ldd "$b" 2>/dev/null | grep "not found"
@@ -187,7 +195,7 @@ pkg_runtime_libs_cross() {
     # 入队：全部 bin 的直接 NEEDED
     for b in "$out"/bin/*; do
         [ -f "$b" ] || continue
-        file "$b" 2>/dev/null | grep -q 'ELF' || continue
+        pkg_is_elf "$b" || continue
         expand "$b"
     done
     # BFS 展开：复制队列库，并递归解析其自身 NEEDED（传递依赖）
@@ -211,7 +219,7 @@ pkg_verify_deps_cross() {
     tmp="$(mktemp)"
     for f in "$out"/bin/* "$out"/lib/*; do
         [ -f "$f" ] || continue
-        file "$f" 2>/dev/null | grep -q 'ELF' || continue
+        pkg_is_elf "$f" || continue
         "$readelf" -d "$f" 2>/dev/null | awk '/NEEDED/ {print $5}' | tr -d '[]' \
             | grep -vE '^(libc\.so|libm\.so|libgcc_s\.so|libpthread\.so|librt\.so|libdl\.so|libresolv\.so|ld-linux)' \
             >> "$tmp"
