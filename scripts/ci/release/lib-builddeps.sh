@@ -151,6 +151,18 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
             (cd "$OPENSSL_DIR" && perl Configure linux-generic32 \
                 --prefix=/usr/local --openssldir=/usr/local/ssl shared --libdir=lib \
                 && make -j"$JOBS" build_sw && make install_sw) ;;
+        arm-*)
+            # armhf 32 位（原生 AArch32 compat 或 qemu-armv7）：必须显式
+            # linux-armv4。./config 内部信 uname -m，而 AArch32 compat 下
+            # uname 返回宿主 aarch64（内核报告硬件架构；0.1.12 build-
+            # toolchain-images run #11 实证：openssl 据此选 linux-aarch64
+            # 目标并启用 AArch64 汇编，armv7 汇编器报 bad instruction
+            # `ldp x21,x22,[sp,#48]'）。编译器 -dumpmachine（arm-*-gnuea-
+            # bihf）才是事实标准。linux-armv4 与 qemu 路径下 ./config 所
+            # 选目标一致，无行为漂移。
+            (cd "$OPENSSL_DIR" && perl Configure linux-armv4 \
+                --prefix=/usr/local --openssldir=/usr/local/ssl shared --libdir=lib \
+                && make -j"$JOBS" build_sw && make install_sw) ;;
         *)
             (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
                 --openssldir=/usr/local/ssl shared --libdir=lib \
