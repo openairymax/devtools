@@ -200,22 +200,26 @@ for fn in sorted(os.listdir(dist_dir)):
         "size": os.path.getsize(path),
     }
 
-# 0.1.6f 社区反馈（2026-08-30）：旧安装器（≤0.1.6d）以 uname 原始名
-# （linux-x86_64/aarch64/armv7l/i686）查 manifest，而 0.1.6e 起制品改用
-# 数字形式命名（linux-x64/arm64/arm32/x86），旧安装器报"当前平台无可用
-# 制品"且无法自举。系统性修复：manifest 为标准平台键补充旧命名别名
-# （同一 url/sha256/size），一次发布惠及全部存量旧安装器。
+# 平台命名规范（0.1.10 起，用户定案）：OS-架构族-位宽（linux-x86-64 /
+# macos-arm-64 / windows-x86-64 …），弃用 i686/armv7l/x64/arm64 行话。
+# manifest 主键即文件名平台段；此处为存量客户端补两代旧命名别名（同一
+# url/sha256/size），一次发布惠及全部旧安装器/更新器：
+#   gen2（0.1.6e~0.1.10）：linux-x64/x86/arm64/arm32、macos-x64/arm64、
+#     windows-x64/win-x64 …（win- 前缀仅历史存在，未曾实际发布）
+#   gen1（≤0.1.6d）：uname 原始名 linux-x86_64/i686/aarch64/armv7l …
+# 与 install.sh / airymaxrt plat_legacy_name 同口径（SSoT）。
 ALIAS = {
-    "linux-x64":    ["linux-x86_64"],
-    "linux-x86":    ["linux-i686"],
-    "linux-arm64":  ["linux-aarch64"],
-    "linux-arm32":  ["linux-armv7l"],
-    "linux-riscv64": ["linux-riscv64"],
-    "macos-x64":    ["macos-x86_64"],
-    "macos-arm64":  ["macos-aarch64"],
-    "win-x64":      ["win-x86_64"],
-    "win-x86":      ["win-i686"],
-    "win-arm64":    ["win-aarch64"],
+    "linux-x86-64":   ["linux-x64", "linux-x86_64"],
+    "linux-x86-32":   ["linux-x86", "linux-i686"],
+    "linux-arm-64":   ["linux-arm64", "linux-aarch64"],
+    "linux-arm-32":   ["linux-arm32", "linux-armv7l"],
+    "linux-riscv-64": ["linux-riscv64"],
+    "linux-riscv-32": ["linux-riscv32"],
+    "macos-x86-64":   ["macos-x64", "macos-x86_64"],
+    "macos-arm-64":   ["macos-arm64", "macos-aarch64"],
+    "windows-x86-64": ["windows-x64", "windows-x86_64", "win-x64", "win-x86_64"],
+    "windows-x86-32": ["windows-x86", "windows-i686", "win-x86", "win-i686"],
+    "windows-arm-64": ["windows-arm64", "windows-aarch64", "win-arm64", "win-aarch64"],
 }
 for plat in list(artifacts):
     for alias in ALIAS.get(plat, ()):

@@ -53,13 +53,15 @@ CLEAN=0
 [ "${2:-}" = "--clean" ] && CLEAN=1
 
 case "$ARCH" in
-    x86_64) PLATFORM="linux-x64" ;;
-    i686)   PLATFORM="linux-x86" ;;
-    arm64)  PLATFORM="linux-arm64" ;;
-    armv7l) PLATFORM="linux-arm32" ;;
-    riscv64) PLATFORM="linux-riscv64" ;;
-    riscv32) PLATFORM="linux-riscv32" ;;
-    *) echo "[FAIL] 仅支持 x86_64 / i686 / arm64 / armv7l / riscv64 / riscv32"; exit 1 ;;
+    # 平台命名规范（0.1.10 起）：OS-架构族-位宽。入参兼容技术架构名
+    # （x86_64/arm64/riscv64…，编译目标）→ 产物平台键（linux-x86-64 等）。
+    x86_64) PLATFORM="linux-x86-64" ;;
+    i686)   PLATFORM="linux-x86-32" ;;
+    arm64)  PLATFORM="linux-arm-64" ;;
+    armv7l) PLATFORM="linux-arm-32" ;;
+    riscv64) PLATFORM="linux-riscv-64" ;;
+    riscv32) PLATFORM="linux-riscv-32" ;;
+    *) echo "[FAIL] 仅支持 x86_64 / i686 / arm64 / armv7l / riscv64 / riscv32（→ 产物平台 linux-x86-64 / linux-x86-32 / linux-arm-64 / linux-arm-32 / linux-riscv-64 / linux-riscv-32）"; exit 1 ;;
 esac
 
 # ─── 构建台与产物台（构建台源码区外；产物台=发布工作区 developbuild） ───
