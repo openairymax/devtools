@@ -83,11 +83,19 @@ if ! cmake_ge320; then
             if [ -f /deps/cmake-v3.29.6.tar.gz ]; then
                 tar -xzf /deps/cmake-v3.29.6.tar.gz -C /tmp
             else
-                curl -fsSL --retry 3 -o /tmp/cmake.tar.gz \
+                curl -fsSL --retry 3 --retry-delay 5 -o /tmp/cmake.tar.gz \
                     https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6.tar.gz
                 tar -xzf /tmp/cmake.tar.gz -C /tmp
             fi
-            (cd /tmp/cmake-v3.29.6 && ./bootstrap --parallel="$JOBS" --no-qt-gui --no-debugger \
+            # Kitware 源码包顶层目录为 cmake-3.29.6（无 v 前缀；/deps 缓存
+            # 文件名带 v 仅为命名习惯）。目录名错配曾致 armv7 构建在下载
+            # 解包均成功后 cd 失败（0.1.11 arm32 镜像 run 33973729963 实
+            # 证）。此处 fail-fast：目录缺失立即报错，不留到 bootstrap。
+            [ -d /tmp/cmake-3.29.6 ] || {
+                echo "::error::[builddeps] /tmp/cmake-3.29.6 不存在（下载/解包失败）" >&2
+                exit 1
+            }
+            (cd /tmp/cmake-3.29.6 && ./bootstrap --parallel="$JOBS" --no-qt-gui --no-debugger \
                 -- -DBUILD_TESTING=OFF -DBUILD_CursesDialog:BOOL=OFF \
                 && make -j"$JOBS" && make install)
         fi
