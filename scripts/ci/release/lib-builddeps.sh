@@ -189,9 +189,15 @@ if [ ! -f /usr/local/lib/libwebsockets.so ]; then
     fi
     tar -xzf /tmp/lws.tar.gz -C /tmp
     LWS_DIR="$(ls -d /tmp/libwebsockets-* 2>/dev/null | head -1)"
+    # CMAKE_POLICY_VERSION_MINIMUM=3.5：lws 4.3.3 的 CMakeLists 声明
+    # cmake_minimum_required < 3.5，而新版 CMake（≥3.27，pip/Kitware 供给
+    # 的 3.29/3.31）已移除 <3.5 兼容并直接报错——arm-32 腿因 cmake 供给
+    # 到位到新版而失败（x86-64 回退 apt 3.16 未触发，2026-09-05 run 实证）。
+    # cJSON 已同款处理，此处为 SSoT 补齐。
     cmake -S "$LWS_DIR" -B /tmp/lws-build \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DCMAKE_PREFIX_PATH=/usr/local \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DOPENSSL_ROOT_DIR=/usr/local \
         -DLWS_WITH_SSL=ON -DLWS_WITH_SHARED=ON -DLWS_WITH_STATIC=OFF \
         -DLWS_WITHOUT_TESTAPPS=ON -DLWS_WITHOUT_TEST_SERVER=ON \
