@@ -306,20 +306,47 @@ log_ok "Release 就绪: ${VERSION}（${ATOMGIT_REPO}）"
 # {url, headers}，再 PUT 文件体到预签名 URL。
 # 同名附件已存在则跳过（重跑幂等续传）；任一失败累计后 fail-closed，
 # 绝不假报成功——自更新链依赖附件与 manifest 一致。
+# 0.1.10 修复发布实证（2026-09-05）：同名附件"覆盖"上传不可靠——atomgit
+# upload_url 每次签发全新 OBS key，PUT 到新对象后 release 附件记录未切绑，
+# 下载仍返回旧文件（tar.gz 新旧大小差即暴露，sha256/sig 恒长假绿）。因此
+# AIRY_FORCE_UPLOAD=1 的正确语义 = 先 DELETE 同名附件（全新 key 绑定）再 PUT。
 UP_FAILED=0
+# 拉取现有附件 {name<TAB>id}（attach 有数字 id，source 源码包无 id）
 EXISTING_ASSETS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
     "${API}/tags/${VERSION}" 2>/dev/null \
-    | python3 -c "import sys,json;print('\n'.join(a.get('name','') for a in (json.load(sys.stdin).get('assets') or [])))" 2>/dev/null || true)"
+    | python3 -c "import sys,json;print('\n'.join(f\"{a.get('name','')}\t{a.get('id') or ''}\" for a in (json.load(sys.stdin).get('assets') or [])))" 2>/dev/null || true)"
+
+# 删除远端同名附件（AIRY_FORCE_UPLOAD=1 先删后传；DELETE 失败仅告警不阻断，
+# PUT 本身带幂等，残留旧附件会再暴露于上传后校验并 fail-closed）。
+delete_existing_asset() {
+    local b="$1" aid
+    aid="$(awk -F '\t' -v n="$b" '$1==n{print $2;exit}' <<<"$EXISTING_ASSETS")"
+    [ -n "$aid" ] || return 0
+    if curl -fsS --connect-timeout 20 -X DELETE -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        "${API}/${VERSION}/attach_files/${aid}" >/dev/null 2>&1; then
+        log_ok "已删除远端同名附件（先删后传）: ${b} (asset ${aid})"
+    else
+        log_warn "远端附件删除失败（upload_url 将签发新 key，残留风险由校验兜底）: ${b}"
+    fi
+}
+
+# 远端是否已存在同名附件（精确匹配，防文件名含 . 触发的正则误判）
+asset_exists() {
+    awk -F '\t' -v n="$1" '$1==n{found=1} END{exit !found}' <<<"$EXISTING_ASSETS"
+}
 
 upload_asset() {
     local f="$1" b upjson upurl
     b="$(basename "$f")"
-    # 幂等跳过：同名附件已存在则跳过（重跑续传）。制品内容变更（如版本
-    # 号修复后同 tag 重新发布）时需 AIRY_FORCE_UPLOAD=1 强制覆盖——OBS
-    # 预签名 PUT 按文件名覆盖写入，远端即更新。
-    if [ "${AIRY_FORCE_UPLOAD:-0}" != "1" ] && grep -qxF "$b" <<<"$EXISTING_ASSETS"; then
-        log_warn "跳过（远端已存在同名附件，AIRY_FORCE_UPLOAD=1 可强制覆盖）: ${b}"
-        return 0
+    # 幂等跳过：同名附件已存在且未强制 → 跳过（重跑续传）。同版本修复重发
+    # 必须 AIRY_FORCE_UPLOAD=1：先删后传（delete_existing_asset），否则 OBS
+    # 覆盖不生效、下载仍是旧文件（0.1.10 同 tag 重发实证）。
+    if asset_exists "$b"; then
+        if [ "${AIRY_FORCE_UPLOAD:-0}" != "1" ]; then
+            log_warn "跳过（远端已存在同名附件，AIRY_FORCE_UPLOAD=1 可先删后传）: ${b}"
+            return 0
+        fi
+        delete_existing_asset "$b"
     fi
     log_info "上传: ${b}…"
     upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
@@ -338,13 +365,40 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     if curl -fsS --connect-timeout 20 --max-time 3600 -X PUT \
         "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null; then
         # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
-        # 大小必须等于本地大小，防 OBS 截断/静默失败（此前无校验）。
+        # 大小必须等于本地大小，防 OBS 截断/静默失败。0.1.10 实证补强：
+        # 仅比大小会漏 sha256/sig/manifest 等恒长小文件的覆盖失败（新旧
+        # 内容等长），故对非 tar.gz 附件追加 sha256 内容比对（大包受
+        # --max-time 300 下载约束，维持大小校验 + 文件名可判别覆盖与否）。
         local local_size dl
         local_size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
         dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
             "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null || echo 0)"
         if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
-            log_ok "已上传并校验: ${b}（${dl} 字节）"
+            case "$b" in
+              *.tar.gz|*.zip)
+                log_ok "已上传并校验: ${b}（${dl} 字节）" ;;
+              *)
+                # 恒长小文件（sha256/sig/asc/install.*/manifest）做 sha256 内容
+                # 比对，杜绝"等长旧文件假绿"（0.1.10 同 tag 覆盖未生效实证）。
+                # 下载走临时文件（set -euo pipefail 下 curl|sha256sum 管道
+                # 失败会直接中止脚本而非走失败分支，临时文件 + if 可兜底）。
+                local local_sha dl_sha dlf
+                local_sha="$(sha256sum "$f" | awk '{print $1}')"
+                dlf="$(mktemp)"
+                dl_sha=""
+                if curl -fsSL --connect-timeout 20 --max-time 120 \
+                    "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" \
+                    -o "$dlf" 2>/dev/null; then
+                    dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
+                fi
+                rm -f "$dlf"
+                if [ "$dl_sha" = "$local_sha" ]; then
+                    log_ok "已上传并校验: ${b}（sha256 一致）"
+                else
+                    log_fail "上传完整性校验失败: ${b}（sha256 不一致，疑似覆盖未生效）"
+                    return 1
+                fi ;;
+            esac
         else
             log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
             return 1
