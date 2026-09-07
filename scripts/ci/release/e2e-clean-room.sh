@@ -29,16 +29,23 @@
 #           文本），断言 gateway online、无任何 offline、汇总行 N==M 且 M>0。
 #   阶段 5  收尾：stop daemon 群（失败仅告警，容器 --rm 兜底回收），打印
 #           PASS 证据（glibc 基线 / N=M / gateway 端口）。
+#   阶段 U  （U9，可选，第三参 prev tarball 存在时执行）：**旧版升级路径**——
+#           旧版离线安装（--from-file）→ 写用户配置 marker → airymaxrt
+#           update --file 新版（python-free 离线路径）→ 断言版本升级 + 用户
+#           配置保留（config 兼容性）→ update --rollback → 断言版本回退 +
+#           配置仍在（D8：回滚回收运行中 daemon）。同版（prev==new）跳过。
 #
-# 用法（容器内执行）：e2e-clean-room.sh <install.sh> <tarball>
+# 用法（容器内执行）：e2e-clean-room.sh <install.sh> <tarball> [prev_tarball]
+#   prev_tarball 存在（含相邻 .sha256）时执行阶段 U（U9 升级路径出证）。
 # 本地复现（需 docker.io 可达或已配镜像加速）：
 #   docker run --rm -v "$PWD:/w:ro" ubuntu:20.04 \
 #     bash /w/_tools/scripts/ci/release/e2e-clean-room.sh \
 #       /w/dist/install.sh /w/dist/agentrt-<ver>-linux-x86-64.tar.gz
 set -euo pipefail
 
-INSTALLER="${1:?usage: e2e-clean-room.sh <install.sh> <tarball>}"
-TARBALL="${2:?usage: e2e-clean-room.sh <install.sh> <tarball>}"
+INSTALLER="${1:?usage: e2e-clean-room.sh <install.sh> <tarball> [prev_tarball]}"
+TARBALL="${2:?usage: e2e-clean-room.sh <install.sh> <tarball> [prev_tarball]}"
+PREV="${3:-}"
 AH="$HOME/.airymaxrt"
 
 fail() { echo "::error::$*" >&2; exit 1; }
@@ -58,6 +65,49 @@ if [ -n "$DIRTY" ]; then
     fail "容器非洁净（存在开发工具链:$DIRTY），等价干净机判定失效"
 fi
 info "洁净通过：无开发工具链"
+
+# ─── 阶段 U（U9 升级路径，可选）：旧版→新版 配置兼容 + 回滚 ──────────────
+if [ -n "$PREV" ] && [ -f "$PREV" ]; then
+    info "阶段 U（U9）升级路径: $(basename "$PREV") -> $(basename "$TARBALL")"
+    v_of() { local n; n="${1#agentrt-}"; echo "${n%-linux-x86-64.tar.gz}"; }
+    norm() { echo "${1#v}"; }
+    PREV_VER="$(v_of "$(basename "$PREV")")"
+    NEW_VER="$(v_of "$(basename "$TARBALL")")"
+    if [ "$(norm "$PREV_VER")" = "$(norm "$NEW_VER")" ]; then
+        info "U9 跳过：prev($PREV_VER) == new($NEW_VER)（稳定版同版重发，无升级路径语义）"
+    else
+        PREV_SHA="$PREV.sha256"
+        [ -f "$PREV_SHA" ] || fail "U9: 缺 prev sha256 校验件: $PREV_SHA"
+        [ -f "$TARBALL.sha256" ] || fail "U9: 缺 new sha256 校验件: $TARBALL.sha256"
+        # U9a：安装旧版 + 写入用户侧配置（config 兼容性判据）
+        bash "$INSTALLER" --from-file "$PREV" || fail "U9: 旧版离线安装失败"
+        CUR="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | tr -d '"')"
+        [ -n "$CUR" ] || fail "U9: 旧版安装后 install.env 无 AIRY_VERSION"
+        echo "u9-user-marker: $(date +%s)" > "$AH/config/user-marker.cfg"
+        info "U9a: 旧版 $CUR 已装，用户配置 marker 已写"
+        # U9b：离线升级到新版（update --file，python-free 路径；同 tag 重发
+        # sha 门禁不适用——跨版本直接比对 install.env AIRY_VERSION）
+        NEW_SHAV="$(awk '{print $1}' "$TARBALL.sha256")"
+        "$AH/bin/airymaxrt" update --file "$TARBALL" --sha256 "$NEW_SHAV" \
+            || fail "U9: airymaxrt update --file 升级失败"
+        CUR="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | tr -d '"')"
+        [ "$(norm "$CUR")" = "$(norm "$NEW_VER")" ] \
+            || fail "U9: 升级版本断言失败（期望 $NEW_VER，实得 $CUR）"
+        [ -f "$AH/config/user-marker.cfg" ] || fail "U9: 升级后用户配置丢失（config 兼容性失败）"
+        info "U9b: 升级至 $CUR，用户配置保留"
+        # U9c：回滚（apply_package 备份恢复；D8 回滚回收运行中 daemon）
+        "$AH/bin/airymaxrt" update --rollback || fail "U9: update --rollback 失败"
+        CUR="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | tr -d '"')"
+        [ "$(norm "$CUR")" = "$(norm "$PREV_VER")" ] \
+            || fail "U9: 回滚版本断言失败（期望 $PREV_VER，实得 $CUR）"
+        [ -f "$AH/config/user-marker.cfg" ] || fail "U9: 回滚后用户配置丢失"
+        info "U9c: 回滚至 $CUR，用户配置保留"
+        # 预重置至新版（后续 Phase 1 以新制品做标准离线安装冒烟；失败仅告警，
+        # Phase 1 将再次完整安装——set -e 下这里用显式 if 防误中止）
+        bash "$INSTALLER" --from-file "$TARBALL" >/dev/null 2>&1 \
+            || info "U9: 预重置至新版失败（Phase 1 将重新安装）"
+    fi
+fi
 
 # ─── 阶段 1：离线安装（--from-file 零网络） ───────────────────────────────
 info "阶段 1 离线安装: $(basename "$TARBALL")"
