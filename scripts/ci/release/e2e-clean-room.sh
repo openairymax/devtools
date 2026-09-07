@@ -158,7 +158,10 @@ bash "$AH/bin/agentrt-bootstrap.sh" -s -t 180 \
 
 # ─── 阶段 3：gateway TCP 探测 ─────────────────────────────────────────────
 info "阶段 3 gateway TCP 探测"
-GWP="$(sed -n '1s/[^0-9]//gp' "$AH/run/gateway.port" 2>/dev/null | head -1)"
+GWP=""
+if [ -s "$AH/run/gateway.port" ]; then
+    GWP="$(sed -n '1s/[^0-9]//gp' "$AH/run/gateway.port" | head -1)"
+fi
 GWP="${GWP:-8080}"
 if (exec 3<>"/dev/tcp/127.0.0.1/$GWP") 2>/dev/null; then
     info "gateway online（127.0.0.1:$GWP）"
