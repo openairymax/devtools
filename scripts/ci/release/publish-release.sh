@@ -51,6 +51,11 @@ run() {
     if [ "$DRY_RUN" = "1" ]; then log_info "DRY-RUN: $*"; else "$@"; fi
 }
 
+# URL 内嵌凭据脱敏（对齐 sync-mirror.sh redact 语义）：git 等工具失败时
+# 会把带 token 的 URL 原样回显到 stderr，本地 fallback 发布无 Actions mask
+# 兜底，必须显式过滤（0.1.13 流水线体检：审计发现的 LOW 加固项）。
+redact() { sed -E 's#(https?://)[^/@]*:[^/@]*@#\1***:***@#g'; }
+
 [ -n "$VERSION" ] || { echo "用法: $0 <版本号> [DIST_DIR]"; exit 1; }
 
 # ─── 通道判定 ──────────────────────────────────────────────────────────────
@@ -508,7 +513,16 @@ fi
 if [ "${SKIP_LATEST:-0}" != "1" ]; then
     log_info "更新 latest/ 固定入口…"
     LATEST_DIR="$TMP/agentrt-latest"
-    run git clone --depth 1 "https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/${ATOMGIT_REPO}.git" "$LATEST_DIR"
+    # URL 内嵌 PAT 的 clone 失败时 git 会把带 token 的 URL 回显到 stderr，
+    # 脱敏后输出（DRY-RUN 的 run() 同样会打印参数，须自行过滤）。
+    LATEST_URL="https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/${ATOMGIT_REPO}.git"
+    if [ "$DRY_RUN" = "1" ]; then
+        log_info "DRY-RUN: git clone --depth 1 $(printf '%s' "$LATEST_URL" | redact) $LATEST_DIR"
+    elif ! clone_out="$(git clone --depth 1 "$LATEST_URL" "$LATEST_DIR" 2>&1)"; then
+        printf '%s\n' "$clone_out" | redact >&2
+        log_fail "latest/ 仓 clone 失败（输出已脱敏）"
+        exit 1
+    fi
     if [ "$DRY_RUN" != "1" ]; then
         mkdir -p "$LATEST_DIR/latest/keys"
         cp -f "$MANIFEST" "$MANIFEST.asc" "$LATEST_DIR/latest/" 2>/dev/null || true
