@@ -34,18 +34,29 @@
 #           update --file 新版（python-free 离线路径）→ 断言版本升级 + 用户
 #           配置保留（config 兼容性）→ update --rollback → 断言版本回退 +
 #           配置仍在（D8：回滚回收运行中 daemon）。同版（prev==new）跳过。
+#           离线自举：二进制安装的 bin/airymaxrt 为 thin 包装（仅前端入口），
+#           管理命令经 airymaxrt-full 委托（联网时从 agentrt 仓 latest/
+#           airymaxrt 拉取）。thin 对 update 命令强制重拉 full（每次刷新，
+#           不复用缓存）；clean 容器无 curl/python 不可联网。第四参传入 full
+#           启动器（agentrt 仓 latest/airymaxrt，完整 CLI SSoT），U9 前置
+#           seed 到 bin/airymaxrt-full 后**直接 exec full**——其内容与 thin
+#           联网会拉取的对象同源同版本，仅跳过网络重拉一步，update --file /
+#           --rollback 业务路径全程离线执行，与真实用户在线更新行为一致。
 #
 # 用法（容器内执行）：e2e-clean-room.sh <install.sh> <tarball> [prev_tarball]
-#   prev_tarball 存在（含相邻 .sha256）时执行阶段 U（U9 升级路径出证）。
+#                     [airymaxrt_full]
+#   prev_tarball 存在（含相邻 .sha256）时执行阶段 U（U9 升级路径出证）；
+#   此时须提供 airymaxrt_full（agentrt 仓 latest/airymaxrt）。
 # 本地复现（需 docker.io 可达或已配镜像加速）：
 #   docker run --rm -v "$PWD:/w:ro" ubuntu:20.04 \
 #     bash /w/_tools/scripts/ci/release/e2e-clean-room.sh \
 #       /w/dist/install.sh /w/dist/agentrt-<ver>-linux-x86-64.tar.gz
 set -euo pipefail
 
-INSTALLER="${1:?usage: e2e-clean-room.sh <install.sh> <tarball> [prev_tarball]}"
-TARBALL="${2:?usage: e2e-clean-room.sh <install.sh> <tarball> [prev_tarball]}"
+INSTALLER="${1:?usage: e2e-clean-room.sh <install.sh> <tarball> [prev_tarball] [airymaxrt_full]}"
+TARBALL="${2:?usage: e2e-clean-room.sh <install.sh> <tarball> [prev_tarball] [airymaxrt_full]}"
 PREV="${3:-}"
+FULL="${4:-}"
 AH="$HOME/.airymaxrt"
 
 fail() { echo "::error::$*" >&2; exit 1; }
@@ -76,6 +87,7 @@ if [ -n "$PREV" ] && [ -f "$PREV" ]; then
     if [ "$(norm "$PREV_VER")" = "$(norm "$NEW_VER")" ]; then
         info "U9 跳过：prev($PREV_VER) == new($NEW_VER)（稳定版同版重发，无升级路径语义）"
     else
+        [ -n "$FULL" ] && [ -f "$FULL" ] || fail "U9: 缺 airymaxrt full 启动器（第四参，agentrt 仓 latest/airymaxrt）"
         PREV_SHA="$PREV.sha256"
         [ -f "$PREV_SHA" ] || fail "U9: 缺 prev sha256 校验件: $PREV_SHA"
         [ -f "$TARBALL.sha256" ] || fail "U9: 缺 new sha256 校验件: $TARBALL.sha256"
@@ -85,23 +97,35 @@ if [ -n "$PREV" ] && [ -f "$PREV" ]; then
         [ -n "$CUR" ] || fail "U9: 旧版安装后 install.env 无 AIRY_VERSION"
         echo "u9-user-marker: $(date +%s)" > "$AH/config/user-marker.cfg"
         info "U9a: 旧版 $CUR 已装，用户配置 marker 已写"
-        # U9b：离线升级到新版（update --file，python-free 路径；同 tag 重发
-        # sha 门禁不适用——跨版本直接比对 install.env AIRY_VERSION）
+        # U9b：离线自举 full 启动器并**直接 exec**（thin 对 update 强制重拉
+        # full 且不复用缓存，离线不可达；seeded full 即 thin 联网拉取的同源
+        # 对象，见头注释）。ensure_full 幂等：apply_package 保留 bin/
+        # airymaxrt-full（不删），双入口安全兜底。
+        _FULL="$AH/bin/airymaxrt-full"
+        ensure_full() {
+            [ -s "$_FULL" ] || { cp -f "$FULL" "$_FULL"; chmod 755 "$_FULL"; }
+            [ -x "$_FULL" ] || fail "U9: full 启动器缺失: $_FULL"
+        }
+        ensure_full
+        # U9c：离线升级到新版（update --file，python-free 路径；跨版本直接
+        # 比对 install.env AIRY_VERSION）
         NEW_SHAV="$(awk '{print $1}' "$TARBALL.sha256")"
-        "$AH/bin/airymaxrt" update --file "$TARBALL" --sha256 "$NEW_SHAV" \
+        ensure_full
+        bash "$_FULL" update --file "$TARBALL" --sha256 "$NEW_SHAV" \
             || fail "U9: airymaxrt update --file 升级失败"
         CUR="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | tr -d '"')"
         [ "$(norm "$CUR")" = "$(norm "$NEW_VER")" ] \
             || fail "U9: 升级版本断言失败（期望 $NEW_VER，实得 $CUR）"
         [ -f "$AH/config/user-marker.cfg" ] || fail "U9: 升级后用户配置丢失（config 兼容性失败）"
-        info "U9b: 升级至 $CUR，用户配置保留"
-        # U9c：回滚（apply_package 备份恢复；D8 回滚回收运行中 daemon）
-        "$AH/bin/airymaxrt" update --rollback || fail "U9: update --rollback 失败"
+        info "U9c: 升级至 $CUR，用户配置保留"
+        # U9d：回滚（apply_package 备份恢复；D8 回滚回收运行中 daemon）
+        ensure_full
+        bash "$_FULL" update --rollback || fail "U9: update --rollback 失败"
         CUR="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | tr -d '"')"
         [ "$(norm "$CUR")" = "$(norm "$PREV_VER")" ] \
             || fail "U9: 回滚版本断言失败（期望 $PREV_VER，实得 $CUR）"
         [ -f "$AH/config/user-marker.cfg" ] || fail "U9: 回滚后用户配置丢失"
-        info "U9c: 回滚至 $CUR，用户配置保留"
+        info "U9d: 回滚至 $CUR，用户配置保留"
         # 预重置至新版（后续 Phase 1 以新制品做标准离线安装冒烟；失败仅告警，
         # Phase 1 将再次完整安装——set -e 下这里用显式 if 防误中止）
         bash "$INSTALLER" --from-file "$TARBALL" >/dev/null 2>&1 \
