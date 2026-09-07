@@ -61,10 +61,13 @@ redact() { sed -E 's#(https?://)[^/@]*:[^/@]*@#\1***:***@#g'; }
 # ─── 通道判定 ──────────────────────────────────────────────────────────────
 # 语义：stable（生产）/ beta（预发布）/ rc（候选发布）。rc 独立通道
 # （manifest.rc.json），避免与 beta 混淆（问题 10：rc 通道曾塌缩为 beta）。
+# 0.1.13-rc4 实证：旧匹配 `*-rc.*` 只认 rc. 带点写法，rc4/rc5 等无点 tag
+# 落入 `*)` 被误判为 stable → rc 候选直写 manifest.stable.json（污染生产
+# 通道）。`-rc`（含 rcN 与 rc.N）一律按 rc 通道处理。
 case "$VERSION" in
-    *-rc.*)     CHANNEL="rc";     PRERELEASE="true" ;;
-    *-beta.*)   CHANNEL="beta";   PRERELEASE="true" ;;
-    *)          CHANNEL="stable"; PRERELEASE="false" ;;
+    *-rc*)     CHANNEL="rc";     PRERELEASE="true" ;;
+    *-beta*)   CHANNEL="beta";   PRERELEASE="true" ;;
+    *)         CHANNEL="stable"; PRERELEASE="false" ;;
 esac
 log_info "AgentRT 发布 ${VERSION}（通道: ${CHANNEL}）"
 log_info "制品目录: ${DIST_DIR}  目标: ${ATOMGIT_REPO}"
