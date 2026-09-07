@@ -522,12 +522,27 @@ check_daemon_health_tcp() {
     # 而非 REFUSE（历史根因：无超时 nc 在 8080 空闲时挂起 30s+，bootstrap
     # 卡在 Layer 4 gateway 健康检查，导致 gateway 启动极慢或失败，系统
     # 表现为"启动不稳定"）。
+    local have_probe=0
     if command -v nc &>/dev/null; then
+        have_probe=1
         nc -z -w 2 127.0.0.1 "$port" 2>/dev/null && return 0
-    elif command -v curl &>/dev/null; then
+    fi
+    if command -v curl &>/dev/null; then
+        have_probe=1
         curl -sf --max-time 2 "http://127.0.0.1:${port}/health" &>/dev/null && return 0
-    elif command -v ss &>/dev/null; then
+    fi
+    if command -v ss &>/dev/null; then
+        have_probe=1
         ss -tln 2>/dev/null | grep -q ":${port} " && return 0
+    fi
+    # 0.1.13 clean-room e2e：ubuntu:20.04 基容器无 nc/curl/ss（洁净前提 =
+    # 无开发工具链）。TCP-only daemon（gateway_d 无 Unix socket）健康判定
+    # 失去探针 → 恒误判 UNHEALTHY（rc3 e2e 实证：gateway 8080 已监听仍
+    # FAILED after 30s）。bash 内建 /dev/tcp 作最后一档探针；仅当外部探针
+    # 全缺时启用——外部探针存在但失败属真实未监听，语义不变。
+    if [[ "$have_probe" -eq 0 ]] \
+       && (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+        return 0
     fi
 
     # TCP 检查失败，回退到 Unix Socket 检查
