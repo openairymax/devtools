@@ -229,10 +229,16 @@ print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
         else
             log_info "创建 Gitee release ${VERSION}…"
             # 裸 curl + -w %{http_code} 判定（gitee_api 的 -f 吞响应体，
-            # 400 无从取证——rc9 实证）。JSON 失败自动 form 编码重试
-            # （Gitee v5 对 JSON POST 兼容性差是高嫌疑）；响应体/错误
-            # 流落盘，终败时打印尾部辅助定位。
-            printf '%s' "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")" >"$TMP/grel-payload.json"
+            # 400 无从取证——rc9 实证）。JSON 失败自动 form 编码重试。
+            # Gitee v5 创建 release 必填 target_commitish（GitHub 可选；
+            # rc9 二次实证缺省 400 {"messages":["target_commitish is
+            # missing"]}）。tag 已存在时该字段仅作占位，取仓库默认分支
+            # （动态获取防硬编码过时）。
+            _GITEE_DEFBRANCH="$(gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}" \
+                --data-urlencode "access_token=${GITEE_TOKEN}" \
+                | python3 -c 'import json,sys;print(json.load(sys.stdin).get("default_branch","master"))' 2>/dev/null || echo master)"
+            [ -n "$_GITEE_DEFBRANCH" ] || _GITEE_DEFBRANCH=master
+            printf '%s' "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true","target_commitish":sys.argv[4]}))' "$VERSION" "$BODY" "$PRERELEASE" "$_GITEE_DEFBRANCH")" >"$TMP/grel-payload.json"
             _REL_CODE="$(curl -sS --connect-timeout 20 -X POST -H "Content-Type: application/json" \
                 "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases?access_token=${GITEE_TOKEN}" \
                 --data-binary @"$TMP/grel-payload.json" \
@@ -247,6 +253,7 @@ print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
                     --data-urlencode "name=${VERSION}" \
                     --data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")" \
                     --data-urlencode "prerelease=${PRERELEASE}" \
+                    --data-urlencode "target_commitish=${_GITEE_DEFBRANCH}" \
                     -o "$TMP/grel.out" -w '%{http_code}' 2>"$TMP/grel.err" || true)"
             fi
             if [ "${_REL_CODE}" = "200" ] || [ "${_REL_CODE}" = "201" ]; then
