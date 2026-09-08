@@ -82,6 +82,35 @@ DRY_RUN=1 SKIP_UPLOAD=1 \
   支持密钥轮换；内嵌公钥仅作离线兜底。
 - **BAN-33**：打包产物默认输出 `~/.airymaxrt/dist/`（源码区外）。
 
+## 密钥轮换与应急恢复口径
+
+> 双轨签名（GPG 权威 manifest 链 + cosign 制品签名）的轮换与应急操作口径。
+> 公钥基线：`keys/agentrt.asc` + `keys/agentrt.fingerprint`（GPG 指纹硬比对）+
+> `keys/cosign.pub`；私钥仅在 CI Secrets 与本地 `~/.airymaxrt-signing/`（0600）。
+
+### 计划性轮换
+
+1. `init-signing-keys.sh` 生成新密钥对（记录新 GPG 指纹；`agentrt.fingerprint`
+   同步更新为新指纹）。
+2. 新公钥（`agentrt.asc` / `cosign.pub`）提交 `keys/`；**过渡期内保留旧公钥**
+   （安装器在线拉取任一公钥验签通过即可，内嵌公钥仅离线兜底）。
+3. 更新 CI Secrets：`COSIGN_PRIVATE_KEY` / `COSIGN_PASSWORD` /
+   `GPG_PRIVATE_KEY` / `GPG_PASSPHRASE`。
+4. 首个新版本发布后验证：`gpg --verify manifest.<channel>.json.asc`（新 GPG
+   公钥）+ `cosign verify-blob --key keys/cosign.pub --signature <pkg>.sig
+   <pkg>`（新 cosign 公钥）双双通过；`latest/keys/` 自动刷新即客户端完成切换。
+5. 过渡期（≥1 个正式版）后移除 `keys/` 内旧公钥。
+
+### 应急恢复
+
+- **私钥疑似泄露**：立即暂停发布 → 按 `YANK-SOP.md` 撤回受影响版本 → 跳过
+  过渡期直接执行上述轮换（旧公钥即行移除）→ 发布安全公告（受影响版本区间、
+  旧指纹、新指纹、验证指引）。
+- **私钥丢失（不可用）**：已发布制品验签不受影响（公钥仍在 `keys/`）；按上述
+  流程轮换后恢复发布，旧版本无需重签。
+- 纪律：任何情况下私钥不得进仓库、不得进日志/artifact；`agentrt.fingerprint`
+  与私钥必须同源更新，防止"新私钥 + 旧指纹基线"导致发布前置硬比对失败。
+
 ---
 
 © 2025-2026 SPHARX Ltd. All Rights Reserved.
