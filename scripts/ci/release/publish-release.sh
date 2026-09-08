@@ -394,62 +394,78 @@ upload_asset() {
         delete_existing_asset "$b"
     fi
     log_info "上传: ${b}…"
-    upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-        --data-urlencode "file_name=${b}" "${API}/${VERSION}/upload_url")" \
-        || { log_fail "upload_url 获取失败: ${b}"; return 1; }
-    upurl="$(python3 -c 'import json,sys;print((json.load(sys.stdin) or {}).get("url",""))' <<<"$upjson")"
-    [ -n "$upurl" ] || { log_fail "upload_url 为空: ${b}"; return 1; }
+    # U-1 看门狗（0.1.13 rc9 实证 2026-09-08）：大包单连接长 PUT 可能长时间
+    # 零进度后 502 或白等到 --max-time 3600（windows zip 实测 43min 502 /
+    # 60min 0 字节 timeout，两次 attempt 共浪费 >2h）。每文件看门狗重试：
+    # curl --speed-limit 1024 --speed-time 240 —— 连续 240s 速率 <1024B/s 即
+    # 中断（rc=28），杜绝白等；每次重试重新取 upload_url（预签名或已失效/
+    # 残留半对象），先删残留同名再 PUT；重试耗尽仍失败才计入 UP_FAILED。
+    local attempt=0 upjson upurl rc=1
     local -a uphdr=()
-    mapfile -t uphdr < <(python3 -c 'import json,sys
+    while [ "$attempt" -lt "${UPLOAD_RETRY:-4}" ]; do
+        attempt=$((attempt + 1))
+        if [ "$attempt" -gt 1 ]; then
+            log_warn "PUT 失败，重试 ${attempt}/${UPLOAD_RETRY:-4}: ${b}"
+            sleep "$((attempt * 12))"
+            asset_exists "$b" && delete_existing_asset "$b"
+        fi
+        upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+            --data-urlencode "file_name=${b}" "${API}/${VERSION}/upload_url")" \
+            || { log_warn "upload_url 获取失败(尝试 ${attempt}): ${b}"; continue; }
+        upurl="$(python3 -c 'import json,sys;print((json.load(sys.stdin) or {}).get("url",""))' <<<"$upjson")"
+        [ -n "$upurl" ] || { log_warn "upload_url 为空(尝试 ${attempt}): ${b}"; continue; }
+        uphdr=()
+        mapfile -t uphdr < <(python3 -c 'import json,sys
 for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     print("-H"); print(f"{k}: {v}")' <<<"$upjson")
-    # PUT 超时 3600s（0.2.0 加固，v0.1.9 R16 实证）：GitHub 美东 runner →
-    # atomgit/OBS 上传 ~20MB 需 ~15min，原 --max-time 900 恰在临界掐断大包
-    # （arm64/x64 两包同时在 900s 处失败）。上传在本地（大陆 → OBS）通常
-    # 数秒级，3600s 为远端/弱网环境留足余量。
-    if curl -fsS --connect-timeout 20 --max-time 3600 -X PUT \
-        "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null; then
-        # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
-        # 大小必须等于本地大小，防 OBS 截断/静默失败。0.1.10 实证补强：
-        # 仅比大小会漏 sha256/sig/manifest 等恒长小文件的覆盖失败（新旧
-        # 内容等长），故对非 tar.gz 附件追加 sha256 内容比对（大包受
-        # --max-time 300 下载约束，维持大小校验 + 文件名可判别覆盖与否）。
-        local local_size dl
-        local_size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
-        dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
-            "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null || echo 0)"
-        if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
-            case "$b" in
-              *.tar.gz|*.zip)
-                log_ok "已上传并校验: ${b}（${dl} 字节）" ;;
-              *)
-                # 恒长小文件（sha256/sig/asc/install.*/manifest）做 sha256 内容
-                # 比对，杜绝"等长旧文件假绿"（0.1.10 同 tag 覆盖未生效实证）。
-                # 下载走临时文件（set -euo pipefail 下 curl|sha256sum 管道
-                # 失败会直接中止脚本而非走失败分支，临时文件 + if 可兜底）。
-                local local_sha dl_sha dlf
-                local_sha="$(sha256sum "$f" | awk '{print $1}')"
-                dlf="$(mktemp)"
-                dl_sha=""
-                if curl -fsSL --connect-timeout 20 --max-time 120 \
-                    "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" \
-                    -o "$dlf" 2>/dev/null; then
-                    dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
-                fi
-                rm -f "$dlf"
-                if [ "$dl_sha" = "$local_sha" ]; then
-                    log_ok "已上传并校验: ${b}（sha256 一致）"
-                else
-                    log_fail "上传完整性校验失败: ${b}（sha256 不一致，疑似覆盖未生效）"
-                    return 1
-                fi ;;
-            esac
-        else
-            log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
-            return 1
+        if curl -fsS --connect-timeout 20 --speed-limit 1024 --speed-time 240 \
+            --max-time 3600 -X PUT "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null 2>&1; then
+            rc=0
+            break
         fi
+        log_warn "PUT 失败(尝试 ${attempt}, curl rc=$?): ${b}"
+    done
+    if [ "$rc" != 0 ]; then
+        log_fail "上传失败(重试耗尽): ${b}"
+        return 1
+    fi
+    # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
+    # 大小必须等于本地大小，防 OBS 截断/静默失败。0.1.10 实证补强：
+    # 仅比大小会漏 sha256/sig/manifest 等恒长小文件的覆盖失败（新旧
+    # 内容等长），故对非 tar.gz 附件追加 sha256 内容比对（大包受
+    # --max-time 300 下载约束，维持大小校验 + 文件名可判别覆盖与否）。
+    local local_size dl
+    local_size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
+    dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
+        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null || echo 0)"
+    if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
+        case "$b" in
+          *.tar.gz|*.zip)
+            log_ok "已上传并校验: ${b}（${dl} 字节）" ;;
+          *)
+            # 恒长小文件（sha256/sig/asc/install.*/manifest）做 sha256 内容
+            # 比对，杜绝"等长旧文件假绿"（0.1.10 同 tag 覆盖未生效实证）。
+            # 下载走临时文件（set -euo pipefail 下 curl|sha256sum 管道
+            # 失败会直接中止脚本而非走失败分支，临时文件 + if 可兜底）。
+            local local_sha dl_sha dlf
+            local_sha="$(sha256sum "$f" | awk '{print $1}')"
+            dlf="$(mktemp)"
+            dl_sha=""
+            if curl -fsSL --connect-timeout 20 --max-time 120 \
+                "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" \
+                -o "$dlf" 2>/dev/null; then
+                dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
+            fi
+            rm -f "$dlf"
+            if [ "$dl_sha" = "$local_sha" ]; then
+                log_ok "已上传并校验: ${b}（sha256 一致）"
+            else
+                log_fail "上传完整性校验失败: ${b}（sha256 不一致，疑似覆盖未生效）"
+                return 1
+            fi ;;
+        esac
     else
-        log_fail "上传失败: ${b}"
+        log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
         return 1
     fi
 }
