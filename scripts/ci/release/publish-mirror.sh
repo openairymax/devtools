@@ -213,20 +213,53 @@ if isinstance(d,list): d=d[0] if d else {}
 print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
         if [ -n "$GREL_ID" ]; then
             log_info "Gitee release 已存在 (id=${GREL_ID})，对齐元数据…"
-            gitee_api -X PATCH -H "Content-Type: application/json" \
+            # JSON 失败自动 form 重试：Gitee v5 部分端点对 JSON PATCH 兼容性
+            # 差（与 POST 同源，rc9 实证 POST JSON 400）；对齐失败不阻断。
+            if ! gitee_api -X PATCH -H "Content-Type: application/json" \
                 "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}?access_token=${GITEE_TOKEN}" \
-                -d "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")" >/dev/null \
-                || { log_warn "Gitee release 元数据对齐失败（不阻断附件上传）"; }
+                -d "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")" >/dev/null; then
+                curl -sS --connect-timeout 20 -X PATCH \
+                    "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}" \
+                    --data-urlencode "access_token=${GITEE_TOKEN}" \
+                    --data-urlencode "name=${VERSION}" \
+                    --data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")" \
+                    --data-urlencode "prerelease=${PRERELEASE}" >/dev/null 2>&1 \
+                    || { log_warn "Gitee release 元数据对齐失败（不阻断附件上传）"; }
+            fi
         else
             log_info "创建 Gitee release ${VERSION}…"
-            gitee_rel="$(gitee_api -X POST -H "Content-Type: application/json" \
+            # 裸 curl + -w %{http_code} 判定（gitee_api 的 -f 吞响应体，
+            # 400 无从取证——rc9 实证）。JSON 失败自动 form 编码重试
+            # （Gitee v5 对 JSON POST 兼容性差是高嫌疑）；响应体/错误
+            # 流落盘，终败时打印尾部辅助定位。
+            printf '%s' "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")" >"$TMP/grel-payload.json"
+            _REL_CODE="$(curl -sS --connect-timeout 20 -X POST -H "Content-Type: application/json" \
                 "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases?access_token=${GITEE_TOKEN}" \
-                -d "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")" || true)"
-            GREL_ID="$(python3 -c 'import json,sys
+                --data-binary @"$TMP/grel-payload.json" \
+                -o "$TMP/grel.out" -w '%{http_code}' 2>"$TMP/grel.err" || true)"
+            if [ "${_REL_CODE}" != "200" ] && [ "${_REL_CODE}" != "201" ]; then
+                log_warn "Gitee release JSON 创建 HTTP ${_REL_CODE:-?}: $(tail -c 240 "$TMP/grel.out" 2>/dev/null | tr '\n' ' ' || true)"
+                log_info "Gitee release form 编码重试…"
+                _REL_CODE="$(curl -sS --connect-timeout 20 -X POST \
+                    "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases" \
+                    --data-urlencode "access_token=${GITEE_TOKEN}" \
+                    --data-urlencode "tag_name=${VERSION}" \
+                    --data-urlencode "name=${VERSION}" \
+                    --data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")" \
+                    --data-urlencode "prerelease=${PRERELEASE}" \
+                    -o "$TMP/grel.out" -w '%{http_code}' 2>"$TMP/grel.err" || true)"
+            fi
+            if [ "${_REL_CODE}" = "200" ] || [ "${_REL_CODE}" = "201" ]; then
+                GREL_ID="$(python3 -c 'import json,sys
 d=json.load(sys.stdin)
-print(d.get("id","") if isinstance(d,dict) else "")' <<<"$gitee_rel" 2>/dev/null || true)"
-            if [ -n "$GREL_ID" ]; then log_ok "Gitee release 已创建 (id=${GREL_ID})"; else
-                log_fail "Gitee release 创建失败"; echo "gitee:create" >> "$TMP/failed.txt"; fi
+print(d.get("id","") if isinstance(d,dict) else "")' <"$TMP/grel.out" 2>/dev/null || true)"
+                log_ok "Gitee release 已创建 (id=${GREL_ID})"
+            else
+                log_fail "Gitee release 创建失败（HTTP ${_REL_CODE:-?}，错误体尾部如下）"
+                tail -c 400 "$TMP/grel.out" 2>/dev/null | sed 's/^/    rel: /' || true
+                tail -c 200 "$TMP/grel.err" 2>/dev/null | sed 's/^/    err: /' || true
+                echo "gitee:create" >> "$TMP/failed.txt"
+            fi
         fi
         if [ -n "${GREL_ID:-}" ]; then
             # 现有附件名清单（Gitee 无附件删除 API：同名一律跳过；大小差异仅告警）
