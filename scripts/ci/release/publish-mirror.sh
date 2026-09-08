@@ -185,10 +185,13 @@ gitee_api() {
 }
 
 if [ "${GITEE_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
-    # 前置：tag 必须已在 Gitee（sync-mirror 同步）；否则 release 会绑错对象
-    if ! gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/repository/tags" \
+    # 前置：tag 必须已在 Gitee（sync-mirror 同步）；否则 release 会绑错对象。
+    # 端点用单 tag 详情 GET /tags/{tag}（存在=200，缺失=404 由 curl -f 转
+    # 非 0）。切勿用 /repository/tags——Gitee v5 无此端点，恒 404 导致
+    # "tag 误报缺失"失败（rc9 实证）；列表 /tags 亦有分页截断隐患。
+    if ! gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/tags/${VERSION}" \
             --data-urlencode "access_token=${GITEE_TOKEN}" \
-            | python3 -c 'import json,sys;sys.exit(0 if any(t.get("name")==sys.argv[1] for t in json.load(sys.stdin)) else 1)' "$VERSION"; then
+            | python3 -c 'import json,sys;d=json.load(sys.stdin);sys.exit(0 if isinstance(d,dict) and d.get("name")==sys.argv[1] else 1)' "$VERSION"; then
         log_fail "Gitee 缺 tag ${VERSION}（先由 sync-mirror 同步，再镜像）"
         echo "gitee:tag-missing" >> "$TMP/failed.txt"
     else
