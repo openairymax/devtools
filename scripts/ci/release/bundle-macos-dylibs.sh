@@ -28,10 +28,19 @@
 # rc4-9 教训（rc5 run 34196069821 实证）：otool -L 真实输出第 1 行是文件
 # 路径行、第 2 行是文件自身 LC_ID_DYLIB（brew 构建期绝对路径），依赖从第 3
 # 行起——tail -n +2 把 id 行误当依赖，26 个入库 dylib 全部假性 FAIL；且
-# two-level namespace 下 dyld 要求引用者 LC_LOAD_DYLIB 与目标 LC_ID_DYLIB
-# 一致，入库 dylib 的 id 必须与引用面同步改写为 @executable_path/../lib/。
+# two-level namespace 下 dyld 要求引用者 LC_LOAD_DYLIB 与目标 LC_ID_DYLIB 一致,
+# 入库 dylib 的 id 必须与引用面同步改写为 @executable_path/../lib/。
 # mock 的 sidecar 缺 id 行故未拦截此雷（教训：mock 必须复刻真实工具输出
 # 结构，含头部与 id 行）。
+#
+# run13 教训（G4b run 34211415708 实证，0.1.13）：id 行只存在于 dylib；
+# 可执行文件（MH_EXECUTE）otool -L 第 2 行即第一条 LC_LOAD_* 依赖——
+# 一刀切 tail -n +3 使 bin/ 每个 daemon 恰好丢失首位依赖：漏收集、漏改写、
+# 漏 fail-closed 校验（三处同源 deps_of，全盲）。libmicrohttpd 仅被
+# gateway_d 首位依赖引用 → 未入库，干净机 dyld "no such file"，G4b phase4
+# 双腿必崩。根治：deps_of 弃用 otool -L 行跳，改 otool -l 精确枚举
+# LC_LOAD_DYLIB / LC_LOAD_WEAK_DYLIB / LC_LOAD_UPWARD_DYLIB（天然不含
+# LC_ID_DYLIB，对 exe/dylib 统一正确）。
 #
 # 用法：bundle-macos-dylibs.sh <stage_dir>
 #   stage_dir 内含 bin/（daemon + CLI + TUI 等）与 lib/（python 等）。
@@ -98,11 +107,15 @@ resolve_rpath_dep() {
     return 1
 }
 
-# 收集一个 Mach-O 的全部依赖路径。otool -L 真实输出三段时间：第 1 行文件
-# 路径行、第 2 行自身 LC_ID_DYLIB（非依赖），第 3 行起才是 LC_LOAD_* 依赖
-# （rc4-9 教训：只跳 1 行会把 id 行误当依赖，lib/ 全体假性 FAIL）。
+# 收集一个 Mach-O 的全部依赖路径。弃用 otool -L 行跳（rc4-9：dylib 漏 id 行
+# 误判；run13：exe 无 id 行吞首依赖——头结构因文件类型而异，行跳必漏一端），
+# 改 otool -l 精确枚举 LC_LOAD_*（天然不含 LC_ID_DYLIB，exe/dylib 统一正确）。
 deps_of() {
-    otool -L "$1" 2>/dev/null | tail -n +3 | awk '{print $1}'
+    otool -l "$1" 2>/dev/null | awk '
+        $1=="cmd" && ($2=="LC_LOAD_DYLIB" || $2=="LC_LOAD_WEAK_DYLIB" || $2=="LC_LOAD_UPWARD_DYLIB") {grab=1; next}
+        $1=="cmd" {grab=0}
+        grab && $1=="name" {print $2; grab=0}
+    '
 }
 
 declare -a QUEUE=()      # 待拷贝的绝对 dylib 路径
