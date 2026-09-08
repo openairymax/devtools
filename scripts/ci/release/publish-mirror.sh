@@ -146,10 +146,11 @@ if [ "${GH_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
             gh_api -X PATCH -H "Content-Type: application/json" -d "$patch_json" \
                 "https://api.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}" >/dev/null \
                 || { log_fail "GitHub release 元数据对齐失败"; echo "gh:patch" >> "$TMP/failed.txt"; }
-            # 现有附件清单：name size id
+            # 现有附件清单：name size id。注意 f-string 表达式内不得用 \"
+            # 转义（Python<3.12 语法错误，rc9 实证清单恒空→重传撞 422）。
             gh_api "https://api.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}/assets?per_page=100" \
                 | python3 -c 'import json,sys
-for a in json.load(sys.stdin): print(f"{a[\"name\"]} {a[\"size\"]} {a[\"id\"]}")' > "$TMP/gh-assets.txt" \
+for a in json.load(sys.stdin): print(a["name"], a["size"], a["id"])' > "$TMP/gh-assets.txt" \
                 || { : > "$TMP/gh-assets.txt"; log_warn "GitHub 附件清单获取失败，按全量新传处理"; }
             for f in "${ASSETS[@]}"; do
                 b="$(basename "$f")"; sz="$(stat -c%s "$f")"
@@ -163,10 +164,18 @@ for a in json.load(sys.stdin): print(f"{a[\"name\"]} {a[\"size\"]} {a[\"id\"]}")
                 fi
                 log_info "GitHub 上传: ${b} (${sz}B)"
                 if gh_api -X POST -H "Content-Type: application/octet-stream" --data-binary @"$f" \
-                    "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}/assets?name=${b}" >/dev/null; then
+                    "https://uploads.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}/assets?name=${b}" \
+                    >"$TMP/up.out"; then
                     log_ok "GitHub 上传完成: ${b}"
+                elif grep -q 'already_exists' "$TMP/up.out" 2>/dev/null; then
+                    # 422 already_exists=服务端同名确认（dedup 清单竞态兜底）：
+                    # 内容同源（atomgit SSOT 同一 dist），按幂等成功处理，
+                    # 不再误报 fail（rc9 实证 18 资产被误报）。
+                    log_ok "GitHub 已有（服务端确认，幂等跳过）: ${b}"
                 else
-                    log_fail "GitHub 上传失败: ${b}"; echo "gh:${b}" >> "$TMP/failed.txt"
+                    log_fail "GitHub 上传失败: ${b}（错误体尾部如下）"
+                    tail -c 400 "$TMP/up.out" | sed 's/^/    up: /'
+                    echo "gh:${b}" >> "$TMP/failed.txt"
                 fi
             done
         fi
@@ -186,12 +195,13 @@ gitee_api() {
 
 if [ "${GITEE_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
     # 前置：tag 必须已在 Gitee（sync-mirror 同步）；否则 release 会绑错对象。
-    # 端点用单 tag 详情 GET /tags/{tag}（存在=200，缺失=404 由 curl -f 转
-    # 非 0）。切勿用 /repository/tags——Gitee v5 无此端点，恒 404 导致
-    # "tag 误报缺失"失败（rc9 实证）；列表 /tags 亦有分页截断隐患。
-    if ! gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/tags/${VERSION}" \
+    # 端点用列表 GET /tags（Gitee v5 无单 tag 详情端点 /tags/{tag}——即使
+    # tag 存在也回 HTML 404 页而非 JSON，rc9 双向实证；/repository/tags 同
+    # 样不存在恒 404）。per_page=100 单页覆盖；tag 名精确匹配防前缀误配。
+    if ! gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/tags" \
             --data-urlencode "access_token=${GITEE_TOKEN}" \
-            | python3 -c 'import json,sys;d=json.load(sys.stdin);sys.exit(0 if isinstance(d,dict) and d.get("name")==sys.argv[1] else 1)' "$VERSION"; then
+            --data-urlencode "per_page=100" \
+            | python3 -c 'import json,sys;d=json.load(sys.stdin);sys.exit(0 if isinstance(d,list) and any(t.get("name")==sys.argv[1] for t in d if isinstance(t,dict)) else 1)' "$VERSION"; then
         log_fail "Gitee 缺 tag ${VERSION}（先由 sync-mirror 同步，再镜像）"
         echo "gitee:tag-missing" >> "$TMP/failed.txt"
     else
