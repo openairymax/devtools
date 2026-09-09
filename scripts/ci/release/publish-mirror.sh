@@ -21,6 +21,8 @@
 #   GITEE_TOKEN         Gitee 访问令牌（复用 sync-mirror 的 GT_TOKEN）
 #   GITHUB_REPO         默认 openairymax/agentrt
 #   GITEE_REPO          默认 openairymax/agentrt
+#   SKIP_GITEE=1        只镜像 GitHub（快通道先行），Gitee 段交由
+#                       mirror-release.yml 后台幂等补齐（U-3 方案 A）
 #   FETCH_MISSING=1     dist 缺件时从 atomgit release 下载补齐（历史版本
 #                       回填模式：release-dist 工件天然缺 manifest/sig 小件）
 #   DRY_RUN=1           模拟（零网络：仅打印将执行的动作）
@@ -198,7 +200,7 @@ gitee_api() {
     return $rc
 }
 
-if [ "${GITEE_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
+if [ "${GITEE_TOKEN:-}" ] && [ "${SKIP_GITEE:-0}" != "1" ] && [ "$DRY_RUN" != "1" ]; then
     # 前置：tag 必须已在 Gitee（sync-mirror 同步）；否则 release 会绑错对象。
     # 端点用列表 GET /tags（Gitee v5 无单 tag 详情端点 /tags/{tag}——即使
     # tag 存在也回 HTML 404 页而非 JSON，rc9 双向实证；/repository/tags 同
@@ -303,8 +305,13 @@ except Exception:
         fi
     fi
 else
-    [ "$DRY_RUN" = "1" ] && log_info "DRY-RUN: 跳过 Gitee 镜像（${#ASSETS[@]} 个附件）" \
-        || { log_fail "缺 GITEE_TOKEN"; echo "gitee:no-token" >> "$TMP/failed.txt"; }
+    if [ "$DRY_RUN" = "1" ]; then
+        log_info "DRY-RUN: 跳过 Gitee 镜像（${#ASSETS[@]} 个附件）"
+    elif [ "${SKIP_GITEE:-0}" = "1" ]; then
+        log_info "SKIP_GITEE=1: 跳过 Gitee 段（由 mirror-release.yml 后台幂等补齐）"
+    else
+        log_fail "缺 GITEE_TOKEN"; echo "gitee:no-token" >> "$TMP/failed.txt"
+    fi
 fi
 
 # ─── 汇总（fail-closed）────────────────────────────────────────────────────
