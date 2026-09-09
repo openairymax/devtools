@@ -341,7 +341,7 @@ TAG_EXISTS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN
 if [ -z "$TAG_EXISTS" ]; then
     curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
         -H "Content-Type: application/json" \
-        --data-binary "$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'name':'AgentRT '+sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$VERSION" "$RELEASE_BODY" "$PRERELEASE")" \
+        --data-binary "$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'name':sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$VERSION" "$RELEASE_BODY" "$PRERELEASE")" \
         "${API}" >/dev/null 2>&1 || { log_fail "Release 创建失败（检查 ATOMGIT_TOKEN 与 ${ATOMGIT_REPO} 权限）"; exit 1; }
 fi
 log_ok "Release 就绪: ${VERSION}（${ATOMGIT_REPO}）"
