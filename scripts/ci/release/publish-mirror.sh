@@ -96,12 +96,17 @@ for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" 
     fi
 done
 
-# 发布说明正文（release job 生成的 notes.txt 优先）
-BODY="AgentRT ${VERSION}\n\nhttps://atomgit.com/${ATOMGIT_REPO}/releases/tag/${VERSION}"
-if [ -f "$DIST_DIR/notes.txt" ]; then
+# 发布说明正文：RELEASE_NOTES / RELEASE_NOTES_FILE 显式传入优先，
+# 其次 release job 生成的 notes.txt，最后兜底一行（与 publish-release.sh
+# 语义对齐）。body 面向社区公开场合，不得出现内部工程流水。
+if [ -n "${RELEASE_NOTES:-}" ]; then
+    BODY="$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$RELEASE_NOTES")"
+elif [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
+    BODY="$(python3 -c 'import json,sys;print(json.dumps(open(sys.argv[1],encoding="utf-8").read()))' "$RELEASE_NOTES_FILE")"
+elif [ -f "$DIST_DIR/notes.txt" ]; then
     BODY="$(python3 -c 'import json,sys;print(json.dumps(open(sys.argv[1],encoding="utf-8").read()))' "$DIST_DIR/notes.txt")"
 else
-    BODY="$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$(printf "${BODY}")")"
+    BODY="$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$(printf "AgentRT ${VERSION}\n\nhttps://atomgit.com/${ATOMGIT_REPO}/releases/tag/${VERSION}")")"
 fi
 
 if [ "${#ASSETS[@]}" -eq 0 ]; then
