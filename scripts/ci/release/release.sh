@@ -28,6 +28,11 @@ PROTOCOL_TEST="${PROJECT_ROOT}/tools/tests/integration/python/test_protocol_comp
 # 与 in-source 构建，残留 CPackConfig/compile_commands/bin 污染源码区）。
 # 默认 = 伞仓同级 works-engineering（随源码仓库迁移自适应，不硬编码 $HOME）。
 GATE_BUILD="${GATE_BUILD_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/release-gate}"
+# 铁律 4.7：CI 临时产物（SBOM/覆盖率/测试报告）一律落源码区外。历史上
+# release/pipeline 脚本把 ci-artifacts/、ci-logs/ 直接写在伞仓根（源码区），
+# 造成构建产物污染。现统一外置到 works-engineering（可用环境变量覆盖）。
+WORKSPACE_ROOT="$(dirname "$PROJECT_ROOT")/works-engineering"
+CI_ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${WORKSPACE_ROOT}/airymaxrt-build/ci-artifacts}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -303,8 +308,8 @@ gate_sbom() {
     log_info "Generating SPDX SBOM..."
     cd "$PROJECT_ROOT"
 
-    mkdir -p ci-artifacts/release
-    local sbom_path="ci-artifacts/release/sbom-${VERSION}.spdx.json"
+    mkdir -p "${CI_ARTIFACT_DIR}/release"
+    local sbom_path="${CI_ARTIFACT_DIR}/release/sbom-${VERSION}.spdx.json"
 
     if command -v syft &>/dev/null; then
         if syft "dir:." -o "spdx-json=${sbom_path}" 2>&1 | tail -2; then
@@ -357,10 +362,10 @@ gate_cosign_sign() {
     cd "$PROJECT_ROOT"
     local signed=0
 
-    if [ -f "ci-artifacts/release/sbom-${VERSION}.spdx.json" ]; then
+    if [ -f "${CI_ARTIFACT_DIR}/release/sbom-${VERSION}.spdx.json" ]; then
         if env COSIGN_PASSWORD="${COSIGN_PASSWORD:-}" cosign sign-blob --key <(printf '%s' "$COSIGN_PRIVATE_KEY") \
-            --tlog-upload=false --yes "ci-artifacts/release/sbom-${VERSION}.spdx.json" \
-            --output-signature "ci-artifacts/release/sbom-${VERSION}.spdx.json.sig" 2>&1; then
+            --tlog-upload=false --yes "${CI_ARTIFACT_DIR}/release/sbom-${VERSION}.spdx.json" \
+            --output-signature "${CI_ARTIFACT_DIR}/release/sbom-${VERSION}.spdx.json.sig" 2>&1; then
             log_ok "SBOM signed"
             signed=$((signed + 1))
         fi

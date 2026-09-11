@@ -22,15 +22,15 @@
 #                           toolchain-riscv64.cmake，从 ports.ubuntu.com deb 解压）
 #     riscv64-cross/        riscv64 交叉 build（CMakeCache 持久 → 增量）
 #     <arch>/ <arch>-toolchain/ <arch>-pkg/   qemu 容器构建/工具链/打包工作区
-#   ${AIRY_DIST_OUT:-$UMBRELLA/developbuild/agentrt/dist}   统一产物台
-#       （developbuild 为发布工作区：出包后由 publish-release.sh 上传 atomgit；
-#         可用 AIRY_DIST_OUT 覆盖到其他目录）
+#   ${AIRY_DIST_OUT:-${AIRY_WORKSPACE}/developbuild/agentrt/dist}   统一产物台
+#       （developbuild 为发布工作区（works-engineering 内，源码区外）：出包后由
+#         publish-release.sh 上传 atomgit；可用 AIRY_DIST_OUT 覆盖到其他目录）
 #
 # 用法：
 #   build.sh <x86_64|arm64|riscv64> [--clean]
 # 环境变量：
 #   AIRY_WORKSPACE   构建台根（默认 = 伞仓同级 works-engineering，随源码仓库迁移自适应）
-#   AIRY_DIST_OUT    产物台（默认 $UMBRELLA/developbuild/agentrt/dist）
+#   AIRY_DIST_OUT    产物台（默认 ${AIRY_WORKSPACE}/developbuild/agentrt/dist）
 #   AIRY_VERSION     版本覆盖（默认读 agentrt/VERSION，SSoT）
 #   AIRY_ARCH_IMAGE  arm64/riscv64 基础镜像
 #   AIRY_BUILD_JOBS  并行编译数（默认 nproc）
@@ -64,12 +64,19 @@ case "$ARCH" in
     *) echo "[FAIL] 仅支持 x86_64 / i686 / arm64 / armv7l / riscv64 / riscv32（→ 产物平台 linux-x86-64 / linux-x86-32 / linux-arm-64 / linux-arm-32 / linux-riscv-64 / linux-riscv-32）"; exit 1 ;;
 esac
 
-# ─── 构建台与产物台（构建台源码区外；产物台=发布工作区 developbuild） ───
+# ─── 构建台与产物台（均在源码区外：AIRY_WORKSPACE=伞仓同级 works-engineering） ───
 AIRY_WORKSPACE="${AIRY_WORKSPACE:-$(dirname "$UMBRELLA")/works-engineering}"
 BUILD_ROOT="${AIRY_WORKSPACE}/airymaxrt-build"
-# 产物台默认 developbuild/agentrt/dist（发布工作区：build.sh 出包 →
-# publish-release.sh 上传 atomgit 的单一落点）；AIRY_DIST_OUT 可覆盖。
-DIST_DIR="${AIRY_DIST_OUT:-${UMBRELLA}/developbuild/agentrt/dist}"
+# 产物台默认 ${AIRY_WORKSPACE}/developbuild/agentrt/dist（发布工作区，源码区外：
+# build.sh 出包 → publish-release.sh 上传 atomgit 的单一落点）；AIRY_DIST_OUT 可覆盖。
+DIST_DIR="${AIRY_DIST_OUT:-${AIRY_WORKSPACE}/developbuild/agentrt/dist}"
+# BAN-33（产物台侧）：产物台严禁落回源码树内，guard 在构建前 fail-closed。
+DIST_REAL="$(realpath -m "$DIST_DIR")"
+case "$DIST_REAL/" in
+    "$UMBRELLA"/*)
+        echo "[FAIL] 产物台位于源码区（$DIST_REAL），违反铁律 4.7（BAN-33）。请用 AIRY_DIST_OUT 指向源码区外目录。" >&2
+        exit 1 ;;
+esac
 JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 SKIP_TUI="${SKIP_TUI:-0}"
 
@@ -83,8 +90,8 @@ mkdir -p "$BUILD_ROOT" "$DIST_DIR"
 log_info "构建台: $BUILD_ROOT"
 log_info "产物台: $DIST_DIR  版本: ${AIRY_VERSION}  (${PLATFORM})"
 
-# ─── 离线依赖缓存定位：优先构建台 deps/tui-vendor；回退 developbuild 旧缓存 ─
-LEGACY_CACHE="$UMBRELLA/developbuild/agentrt/.build-cache"
+# ─── 离线依赖缓存定位：优先构建台 deps/tui-vendor；回退发布工作区旧缓存 ─
+LEGACY_CACHE="${AIRY_WORKSPACE}/developbuild/agentrt/.build-cache"
 DEPS_DIR="${BUILD_ROOT}/deps"
 TUI_VENDOR_DIR="${BUILD_ROOT}/tui-vendor"
 [ -d "$DEPS_DIR" ] || { [ -d "$LEGACY_CACHE/deps" ] && { cp -rn "$LEGACY_CACHE/deps" "$BUILD_ROOT/" 2>/dev/null || true; }; }
