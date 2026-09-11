@@ -29,6 +29,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEYS_DIR="${SCRIPT_DIR}/keys"
+# 伞仓（源码区）与构建打包台（源码区外）定位：发布工作区 developbuild 已迁出
+# 源码区，位于伞仓同级 works-engineering（铁律 4.7 / BAN-33）。
+UMBRELLA="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+AIRY_WORKSPACE="${AIRY_WORKSPACE:-$(dirname "$UMBRELLA")/works-engineering}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;36m'; NC='\033[0m'
 log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
@@ -495,12 +499,12 @@ if [ -f "$INSTALLER_PS1_SRC" ]; then
 else
     log_warn "未找到 Windows 安装器源: ${INSTALLER_PS1_SRC}（PowerShell 一键安装将不可用）"
 fi
-# 安装器快照同步（SSoT → developbuild 离线归档快照，0.1.6 根治历史漂移）：
+# 安装器快照同步（SSoT → 发布工作区离线归档快照，0.1.6 根治历史漂移）：
 # agentrt/scripts/install.{sh,ps1} 是安装器唯一权威源（SSoT）；发布时必须
-# 同步到 developbuild/agentrt/scripts 快照（离线介质 install-offline.sh 的
-# 自包含依赖），否则两处脚本再次分叉（历史教训：0.1.5 快照残留旧公钥与
-# 旧版本号，导致离线安装与在线安装行为不一致）。
-SNAPSHOT_DIR="${AIRY_DEVELOPBUILD_SNAPSHOT_DIR:-${SCRIPT_DIR}/../../../../developbuild/agentrt/scripts}"
+# 同步到 works-engineering/developbuild/agentrt/scripts 快照（离线介质
+# install-offline.sh 的自包含依赖），否则两处脚本再次分叉（历史教训：0.1.5
+# 快照残留旧公钥与旧版本号，导致离线安装与在线安装行为不一致）。
+SNAPSHOT_DIR="${AIRY_DEVELOPBUILD_SNAPSHOT_DIR:-${AIRY_WORKSPACE}/developbuild/agentrt/scripts}"
 if [ -d "$SNAPSHOT_DIR" ] && [ -f "$INSTALLER_SRC" ] && [ -f "$INSTALLER_PS1_SRC" ]; then
     cp -f "$INSTALLER_SRC" "$SNAPSHOT_DIR/install.sh"
     cp -f "$INSTALLER_PS1_SRC" "$SNAPSHOT_DIR/install.ps1"
