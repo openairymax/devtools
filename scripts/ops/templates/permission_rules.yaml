@@ -1,6 +1,6 @@
 # =============================================================================
 # AgentRT 工具级权限规则（Tool-level permission rules）
-# 版本: v1.1.0
+# 版本: v1.2.0
 #
 # 由 daemon_security 在 daemon 启动时加载（daemon_security_load_rules_file），
 # 写入 tool_d / agent_d 等 daemon 的 ACL 表。判定为 fail-closed：
@@ -11,6 +11,12 @@
 #   - agent  : 智能体标识（见 ecosystem/agents/*/contract.json 的 agent_id）
 #   - tool   : 工具名（与 tool_d 注册的工具名一致，如 fs_read / shell_run）
 #   - effect : "allow" 或 "deny"（deny 规则优先于同一 (agent, tool) 的 allow）
+#
+# v1.2.0：agent.run 纳入权限模型（默认拒绝）（2026-09-11）。0.1.15 WS-2
+# T-11b 将网关最高敏执行入口 agent.run 收入 ACL 门禁（独立权限
+# cap:agent.run），agent.cancel 归入既有 cap:agent.control。本段为
+# "external" 主体补授权 cap:agent.run，本地会话任务执行开箱即用；
+# 生产部署默认拒绝，需显式评估后授权。
 #
 # v1.1.1：新增网关外部调用方授权（2026-08-31）。gateway_d 将本地
 # HTTP/WS JSON-RPC 调用方统一视为 "external"（localhost 个人运行时语义）。
@@ -383,8 +389,12 @@ rules:
 
   # ─── 网关外部调用方（"external"，localhost 个人运行时默认授权）─────
   # 对应 gateway_d GW_CAP_EXTRA_PERM 高敏能力清单；未授权则 fail-closed
-  # 拒绝（0x5002 / -32603），CLI/TUI 的任务取消、记忆删除、凭证存储、
-  # 插件管理、调度管理等能力将不可用。本地运行时默认放行。
+  # 拒绝（0x5002 / -32603），CLI/TUI 的任务执行（agent.run）、任务取消、
+  # 记忆删除、凭证存储、插件管理、调度管理等能力将不可用。本地运行时
+  # 默认放行；生产部署建议对 cap:agent.run 显式评估后授权。
+  - agent: "external"
+    tool: "cap:agent.run"
+    effect: "allow"
   - agent: "external"
     tool: "cap:agent.control"
     effect: "allow"
