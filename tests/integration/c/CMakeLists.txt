@@ -150,8 +150,19 @@ configure_real_lib_test(test_c_link_02_llm_loop
 # v0.1.1 修正：is_connected 在 create 成功后行为与桩一致（都返回 true）。
 # 真实 create 会启动 SD+IPC 引导，但 ipc_bus_helper_register_channel 按 ibh 实例
 # 独立注册（非全局 channel 名唯一性检查），多实例同 channel 名不冲突。
+# ARC-04：测试侧注入 svc_common 的 IPC/Tool ops 表后，链路经 svc_common
+# 传递到 cognition（engine_phase0/grad 依赖 gccp / plan_id 符号），而
+# airy_cognition 与 airy_coreloopthree 之间存在静态库循环：
+#   cognition(engine*.c) → airy_gccp_* / airy_config_*（定义于 coreloopthree）
+#   coreloopthree       → airy_cognition_*（定义于 cognition）
+# GNU ld 的 --start-group 仅能回解显式列出的直接依赖；CMake 会把传递依赖
+# 追加在 --end-group 之后，因此环外的 coreloopthree 成员无法被回拉，链接
+# 报未定义引用。对齐本文件 test_e2e_core 的既有做法，对 airy_coreloopthree
+# 使用 --whole-archive 强制纳入全部成员，闭合该环。
 configure_real_lib_test(test_c_link_04_tool_loop
-    LIBS airy_coreloopthree airy_core svc_common airy_tool_service
+    LIBS airy_cognition
+         "-Wl,--whole-archive" airy_coreloopthree "-Wl,--no-whole-archive"
+         airy_core svc_common airy_tool_service
 )
 
 # C-L05: Cupolas SafetyGuard → tool_d（已迁移到真实库）
