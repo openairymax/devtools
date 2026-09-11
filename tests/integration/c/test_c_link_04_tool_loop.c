@@ -22,6 +22,8 @@
 
 #include "memory_compat.h"
 #include "tool_svc_adapter.h"
+#include "daemon_ipc_ops_bootstrap.h"
+#include "daemon_tool_ops_bootstrap.h"
 
 /* ============================================================================
  * Test Helpers
@@ -174,12 +176,22 @@ static void test_concurrent_tool_instances(void) {
 int main(void) {
     printf("=== C-L04 Integration Tests: tool_d → CoreLoopThree ===\n\n");
 
+    /* ARC-04: the atoms tool adapter reaches svc_common/tool_d through the
+     * injected IPC/tool ops tables instead of linking daemon symbols
+     * directly. This harness plays the daemon role and installs the real
+     * implementations before exercising the adapter (idempotent). */
+    (void)daemon_ipc_ops_init("test_c_link_04");
+    (void)daemon_tool_ops_init("test_c_link_04");
+
     test_normal_tool_service_lifecycle();
     test_error_double_init();
     test_error_start_without_init();
     test_error_null_adapter();
     test_timeout_tool_execution();
     test_concurrent_tool_instances();
+
+    daemon_tool_ops_cleanup();
+    daemon_ipc_ops_cleanup();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            g_tests_passed, g_tests_total, g_tests_failed);

@@ -22,6 +22,7 @@
 
 #include "memory_compat.h"
 #include "llm_svc_adapter.h"
+#include "daemon_ipc_ops_bootstrap.h"
 
 /* ============================================================================
  * Test Helpers
@@ -225,11 +226,19 @@ static void test_concurrent_llm_instances(void) {
 int main(void) {
     printf("=== C-L02 Integration Tests: llm_d → CoreLoopThree ===\n\n");
 
+    /* ARC-04: the atoms LLM adapter reaches svc_common/llm_d through the
+     * injected IPC ops table instead of linking daemon symbols directly.
+     * This harness plays the daemon role and installs the real svc_common
+     * implementation before exercising the adapter (idempotent). */
+    (void)daemon_ipc_ops_init("test_c_link_02");
+
     test_normal_llm_service_lifecycle();
     test_error_double_create();
     test_error_null_adapter();
     test_timeout_request_config();
     test_concurrent_llm_instances();
+
+    daemon_ipc_ops_cleanup();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            g_tests_passed, g_tests_total, g_tests_failed);
