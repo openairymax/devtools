@@ -52,7 +52,9 @@ print_header() {
 # ============================================================================
 gate_compile() {
     section "Gate 1: Compilation Check"
-    local build_dir="${PROJECT_ROOT}/build-ci"
+    # 构建产物一律树外化：严禁在伞仓源码区落任何编译产物（工程铁律 a）。
+    # 可用 QUALITY_GATE_BUILD_DIR 覆盖；默认落到系统临时区而非 ${PROJECT_ROOT}。
+    local build_dir="${QUALITY_GATE_BUILD_DIR:-${TMPDIR:-/tmp}/agentrt-quality-gate-build}"
 
     if [ ! -f "${AGENTRT_SRC}/CMakeLists.txt" ]; then
         log_warn "CMakeLists.txt not found, skipping compilation check"
@@ -60,6 +62,7 @@ gate_compile() {
         return
     fi
 
+    log_info "Out-of-source build dir: ${build_dir}"
     mkdir -p "$build_dir"
     cd "$build_dir"
 
@@ -80,7 +83,7 @@ gate_compile() {
 gate_ban() {
     section "Gate 2: BAN Rule Scan"
 
-    local ban_script="${SCRIPT_DIR}/../../verify/forbidden_functions.sh"
+    local ban_script="${SCRIPT_DIR}/../../verify/security/forbidden_functions.sh"
     if [ -x "$ban_script" ]; then
         log_info "Running BAN rule scan..."
         if bash "$ban_script" 2>&1 | tail -10; then
@@ -94,9 +97,11 @@ gate_ban() {
     fi
 
     # BAN-191: 禁止 head -z 管道（POSIX 兼容性）
+    # 自排除本脚本：其注释/日志必然含该模式的字面文本，否则永远自命中。
     log_info "BAN-191: Scanning for 'head -z' usage..."
     local head_z_found
-    head_z_found=$(find "${PROJECT_ROOT}/scripts" -name "*.sh" -exec grep -lP "head\s+-z" {} \; 2>/dev/null || true)
+    head_z_found=$(find "${SCRIPTS_ROOT}" -name "*.sh" ! -name "quality-gate.sh" \
+        -exec grep -lP "head\s+-z" {} \; 2>/dev/null || true)
     if [ -n "$head_z_found" ]; then
         log_err "BAN-191: 'head -z' found in:"
         echo "$head_z_found" | while IFS= read -r f; do log_err "  $f"; done
@@ -109,7 +114,7 @@ gate_ban() {
     # BAN-193: 危险函数扫描必须使用 \b 词边界
     log_info "BAN-193: Scanning for unguarded dangerous function patterns..."
     local dangerous_patterns
-    dangerous_patterns=$(find "${PROJECT_ROOT}/scripts" -name "*.sh" -exec grep -lP 'grep\s+(?!.*\\\\b).*"(strcpy|strcat|sprintf|gets|scanf)"' {} \; 2>/dev/null || true)
+    dangerous_patterns=$(find "${SCRIPTS_ROOT}" -name "*.sh" -exec grep -lP 'grep\s+(?!.*\\\\b).*"(strcpy|strcat|sprintf|gets|scanf)"' {} \; 2>/dev/null || true)
     if [ -n "$dangerous_patterns" ]; then
         log_err "BAN-193: Unguarded dangerous function grep found in:"
         echo "$dangerous_patterns" | while IFS= read -r f; do log_err "  $f"; done
@@ -132,7 +137,7 @@ gate_security() {
         return
     fi
 
-    local sec_script="${SCRIPT_DIR}/../../../verify/security/security-scan.sh"
+    local sec_script="${SCRIPT_DIR}/../../verify/security/security-scan.sh"
     if [ -x "$sec_script" ]; then
         log_info "Running security scan..."
         if bash "$sec_script" "$@" 2>&1 | tail -20; then
