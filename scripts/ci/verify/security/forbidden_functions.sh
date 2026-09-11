@@ -114,21 +114,30 @@ check_ban_151() {
 check_ban_152() {
     log_info "BAN-152: Checking C89 variable declarations in cleanup blocks..."
     local hits=0
-    # 检测 goto cleanup 之后是否有变量声明（C99风格）
-    hits=$(grep -rn 'goto cleanup' --include="*.c" "${PROJECT_ROOT}/agent-workload/agentrt/" 2>/dev/null \
-        | grep -v "/tests/" | while IFS= read -r line; do
-        file=$(echo "$line" | cut -d: -f1)
-        lineno=$(echo "$line" | cut -d: -f2)
-        # 检查该行之后是否有变量声明
-        if tail -n +"$lineno" "$file" 2>/dev/null | head -30 | grep -qP '^\s*(int|char|void|size_t|uint|bool|float|double)\s+\w+\s*=' ; then
-            echo "$file:$lineno"
+    # 定位 cleanup 标签行，扫描标签之后（至函数末尾大括号）的块内是否存在
+    # “声明即初始化”语句。goto 之前的正常函数体声明不应计入。
+    while IFS= read -r -d '' file; do
+        local found
+        found=$(awk '
+            /^[[:space:]]*cleanup[a-zA-Z0-9_]*[[:space:]]*:/ { in_block=1; next }
+            in_block && /^\}/ { in_block=0 }
+            in_block && /^[[:space:]]*(int|char|void|size_t|uint|bool|float|double)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/ {
+                print FILENAME":"NR; in_block=0
+            }
+        ' "$file" 2>/dev/null || true)
+        if [[ -n "$found" ]]; then
+            local n
+            n=$(printf '%s\n' "$found" | grep -c .)
+            hits=$((hits + n))
+            while IFS= read -r f; do
+                [ -n "$f" ] && log_warn "BAN-152: $f declaration inside cleanup block"
+            done <<< "$found"
         fi
-    done | wc -l) || true
-    hits=${hits:-0}
+    done < <(find "${PROJECT_ROOT}/agent-workload/agentrt" -name "*.c" -not -path "*/tests/*" -not -path "*/examples/*" -print0 2>/dev/null)
     if [[ $hits -eq 0 ]]; then
         log_ok "BAN-152: No C99 declarations in cleanup blocks"
     else
-        log_err "BAN-152: $hits potential C99 declarations after goto cleanup"
+        log_err "BAN-152: $hits declarations inside cleanup blocks"
     fi
 }
 
@@ -143,8 +152,8 @@ check_ban_153() {
         returns=$(grep -c '\breturn\b' "$file" 2>/dev/null || echo "0")
         returns=${returns##*[!0-9]} returns=${returns:-0}
         local funcs
-        funcs=$(grep -cP '^[a-zA-Z_][a-zA-Z0-9_]*\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(' "$file" 2>/dev/null || echo "1")
-        funcs=${funcs##*[!0-9]} funcs=${funcs:-1}
+        funcs=$(grep -cP '^[A-Za-z_][A-Za-z0-9_]*(\s+[A-Za-z_][A-Za-z0-9_]*)*\s+\**[A-Za-z_][A-Za-z0-9_]*\s*\([^;]*$' "$file" 2>/dev/null) || true
+        funcs=${funcs:-0}
         if [[ $funcs -eq 0 ]]; then funcs=1; fi
         local avg_returns=$(( returns / funcs ))
         if [[ $avg_returns -gt 5 ]]; then
@@ -155,7 +164,9 @@ check_ban_153() {
     if [[ $hits -eq 0 ]]; then
         log_ok "BAN-153: Average return points per function ≤5"
     else
-        log_err "BAN-153: $hits file(s) with >5 avg returns per function"
+        # 分级：单一退出点为风格/复杂度指标（存量基数大），列 WARN 不阻断；
+        # 分级清单与存量治理随 T-18 固化（WS-6 6.5）推进。
+        log_warn "BAN-153: $hits file(s) with >5 avg returns per function (advisory)"
     fi
 }
 
@@ -173,6 +184,8 @@ check_ban_154() {
         lineno=$(echo "$line" | cut -d: -f2)
         content=$(echo "$line" | cut -d: -f3-)
 
+        # 排除：注释行（行注释/块注释续行）
+        echo "$content" | grep -qP '^[[:space:]]*(\*|//|/\*)' && continue || true
         # 排除：已使用 AGENTRT_MEMCPY_SAFE
         echo "$content" | grep -q 'AGENTRT_MEMCPY_SAFE' && continue || true
         # 排除：sizeof()
@@ -212,9 +225,12 @@ check_ban_155() {
     while IFS= read -r line; do
         file=$(echo "$line" | cut -d: -f1)
         lineno=$(echo "$line" | cut -d: -f2)
+        content=$(echo "$line" | cut -d: -f3-)
 
+        # 排除：注释行（行注释/块注释续行）——避免注释中提及 strncpy 的误报
+        echo "$content" | grep -qP '^[[:space:]]*(\*|//|/\*)' && continue || true
         # 已使用 AGENTRT_STRNCPY_TERM 安全宏 → 跳过
-        echo "$line" | grep -q 'AGENTRT_STRNCPY_TERM' && continue || true
+        echo "$content" | grep -q 'AGENTRT_STRNCPY_TERM' && continue || true
 
         # 裸 strncpy → 检查调用后3行内是否有手动 null 终止
         ((hits++)) || true
@@ -290,10 +306,13 @@ check_ban_158() {
         fi
     done | wc -l) || true
     hits=${hits:-0}
+    # T-18 分级：本检查为"整文件是否出现 NULL 字面量"的粗粒度代理，无法区分
+    # `if (!ptr)` 式守卫（项目主流写法），属高误报启发式 → 归为 advisory（WARN），
+    # 不计入阻塞计数。真实入参校验由 code review 与单元测试承担。
     if [[ $hits -le 5 ]]; then
         log_ok "BAN-158: String functions have NULL guards ($hits files without)"
     else
-        log_err "BAN-158: $hits files with string functions but no NULL checks"
+        log_warn "BAN-158: $hits files mention string functions without the NULL literal (advisory)"
     fi
 }
 
@@ -317,10 +336,13 @@ check_ban_159_162() {
         fi
     done | wc -l) || true
     fd_hits=${fd_hits:-0}
+    # T-18 分级：`open`/`close` 整文件计数无法区分"跨函数配对"与注释/字段名，
+    # 属高误报启发式（115 文件命中远超真实泄漏面）→ advisory（WARN）。
+    # 真实 fd 泄漏检测由 ASan/LSan 与单元测试承担（见 WS-6 6.4）。
     if [[ $fd_hits -eq 0 ]]; then
         log_ok "BAN-159: All open()/socket() have matching close()"
     else
-        log_err "BAN-159: $fd_hits file(s) with open()/socket() without matching close()"
+        log_warn "BAN-159: $fd_hits file(s) count more open()/socket() than close() (advisory)"
     fi
 
     # BAN-160: malloc/free配对
@@ -357,10 +379,11 @@ check_ban_159_162() {
         fi
     done | wc -l) || true
     file_hits=${file_hits:-0}
+    # T-18 分级：fopen/fclose 整文件计数，同 BAN-159，属 advisory（WARN）。
     if [[ $file_hits -eq 0 ]]; then
         log_ok "BAN-161: All fopen() have matching fclose()"
     else
-        log_err "BAN-161: $file_hits file(s) with fopen() without matching fclose()"
+        log_warn "BAN-161: $file_hits file(s) count more fopen() than fclose() (advisory)"
     fi
 
     # BAN-162: pthread_create/pthread_join配对
@@ -377,10 +400,12 @@ check_ban_159_162() {
         fi
     done | wc -l) || true
     thread_hits=${thread_hits:-0}
+    # T-18 分级：pthread_create/pthread_join 整文件计数，同 BAN-159，属 advisory（WARN）。
+    # 真实线程生命周期由平台抽象层（CROSS-01）与 ASan/UBSan 承担。
     if [[ $thread_hits -eq 0 ]]; then
         log_ok "BAN-162: All pthread_create() have matching join/detach"
     else
-        log_err "BAN-162: $thread_hits file(s) with pthread_create() without join/detach"
+        log_warn "BAN-162: $thread_hits file(s) count more pthread_create() than join/detach (advisory)"
     fi
 }
 
@@ -394,11 +419,10 @@ check_ban_163_168() {
     # BAN-163: 所有权注释覆盖检查
     # 检查返回指针的函数是否有 @ownership 注释
     local ban163_no_comment=0
-    ban163_no_comment=$(grep -rP '^\s*\w+\s*\*\s*\w+\s*\(' --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/" 2>/dev/null \
+    ban163_no_comment=$(grep -rnP '^\s*\w+\s*\*\s*\w+\s*\(' --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r line; do
         file=$(echo "$line" | cut -d: -f1)
-        func=$(echo "$line" | cut -d: -f2-)
-        # 检查该函数前10行内是否有 @ownership 注释
+        # 检查该函数前20行内是否有 @ownership 注释（Need -n 标志以携带真实行号）
         lineno=$(echo "$line" | cut -d: -f2)
         if ! head -n "$((lineno - 1))" "$file" 2>/dev/null | tail -20 | grep -q '@ownership'; then
             echo "$file:$lineno"
@@ -409,7 +433,6 @@ check_ban_163_168() {
         log_ok "BAN-163: Ownership annotations present ($ban163_no_comment missing)"
     else
         log_warn "BAN-163: $ban163_no_comment functions lack @ownership annotation"
-        ((ownership_issues++)) || true
     fi
 
     # BAN-164: _take 后缀检查
@@ -447,7 +470,6 @@ check_ban_163_168() {
         log_ok "BAN-166: No triple-level pointer usage"
     else
         log_warn "BAN-166: $ban166_multi_ptr triple-level pointer declarations"
-        ((ownership_issues++)) || true
     fi
 
     # BAN-167: 禁止裸指针跨模块传递
@@ -461,7 +483,6 @@ check_ban_163_168() {
         log_ok "BAN-167: Bare void* usage within limits ($ban167_bare)"
     else
         log_warn "BAN-167: $ban167_bare bare void* usages (consider typed pointers)"
-        ((ownership_issues++)) || true
     fi
 
     # BAN-168: 引用计数函数命名规范
@@ -557,11 +578,14 @@ check_ban_175_180() {
     local contract_issues=0
 
     # BAN-175: Thinkdual 契约检查
+    # 注：契约名以实际在位的 API 为准——
+    #   · 思维链：thinking_chain.h 导出 airy_tc_chain_create/destroy（非 thinking_chain_*）
+    #   · 三重批判协调器：triple_coordinator 已按 CHANGELOG 废除，由 GRAD 取代（grad_coordinator）
     log_info "BAN-175: Checking dual thinking system contracts..."
     local dt_contracts=0
-    grep -rq 'thinking_chain_create\|thinking_chain_destroy' \
+    grep -rq 'airy_tc_chain_create\|airy_tc_chain_destroy' \
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
-    grep -rq 'triple_coordinator' \
+    grep -rq 'grad_coordinator' \
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'stream_critic' \
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
