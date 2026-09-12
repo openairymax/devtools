@@ -21,7 +21,8 @@
 #   COSIGN_PRIVATE_KEY / COSIGN_PASSWORD   cosign 私钥（base64 或文件路径）
 #   GPG_PRIVATE_KEY / GPG_PASSPHRASE       GPG 私钥（base64）+ 口令
 #   ATOMGIT_TOKEN / ATOMGIT_REPO           atomgit 令牌 + 目标仓（默认 openairymax/agentrt）
-#   RELEASE_NOTES / RELEASE_NOTES_FILE     变更日志摘要
+#   RELEASE_NOTES / RELEASE_NOTES_FILE     变更日志摘要（Release 正文）
+#   AIRY_NOTES_ONLY=1                       仅对齐 Release 正文后退出（不签名/不上传）
 #   SKIP_SIGN=1 跳过签名（仅生成 manifest）  SKIP_UPLOAD=1 不上传  DRY_RUN=1 模拟
 # ============================================================================
 
@@ -75,6 +76,54 @@ case "$VERSION" in
 esac
 log_info "AgentRT 发布 ${VERSION}（通道: ${CHANNEL}）"
 log_info "制品目录: ${DIST_DIR}  目标: ${ATOMGIT_REPO}"
+
+# ─── 发布说明正文 ──────────────────────────────────────────────────────────
+# 面向社区公开场合，不得出现内部工程流水（bump/CI/镜像等）。显式传入的
+# RELEASE_NOTES 优先，其次 RELEASE_NOTES_FILE（release.yml 传 notes.txt）。
+NOTES="${RELEASE_NOTES:-}"
+if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
+    NOTES="$(cat "$RELEASE_NOTES_FILE")"
+fi
+RELEASE_BODY="${NOTES:-AgentRT ${VERSION}}"
+
+API="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
+
+# atomgit API v5（Gitee 兼容，Base api.atomgit.com）：PRIVATE-TOKEN 认证。
+# release 对象无 id 字段，以 tag_name 存在性探测（幂等）：不存在则创建，
+# 已存在则 PATCH 强制对齐 name/body/prerelease。对齐是必需的——release
+# 正文/名称面向社区公开场合，必须以本次 NOTES 为准，否则首建后永久固化
+# （0.1.15 实证：首建正文漏入内部 bump 流水后无纠正通道）。
+# 返回值：0=已创建或已对齐；1=创建失败（致命）；2=已存在但正文对齐失败。
+align_release_body() {
+    local tag="$1" body="$2" pre="$3" exists json
+    exists="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        "${API}/tags/${tag}" 2>/dev/null \
+        | python3 -c "import sys,json;print(1 if (json.load(sys.stdin) or {}).get('tag_name') else '')" 2>/dev/null || true)"
+    if [ -z "$exists" ]; then
+        json="$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'name':sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$tag" "$body" "$pre")"
+        curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+            -H "Content-Type: application/json" --data-binary "$json" \
+            "${API}" >/dev/null 2>&1 || { log_fail "Release 创建失败（检查 ATOMGIT_TOKEN 与 ${ATOMGIT_REPO} 权限）"; return 1; }
+        log_ok "Release 已创建: ${tag}（${ATOMGIT_REPO}）"
+        return 0
+    fi
+    json="$(python3 -c "import json,sys;print(json.dumps({'name':sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$tag" "$body" "$pre")"
+    curl -fsSL --connect-timeout 20 -X PATCH -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        -H "Content-Type: application/json" --data-binary "$json" \
+        "${API}/${tag}" >/dev/null 2>&1 || { log_fail "Release 正文对齐失败: ${tag}"; return 2; }
+    log_ok "Release 已存在，正文已对齐: ${tag}（${ATOMGIT_REPO}）"
+    return 0
+}
+
+# ─── 阶段 0：仅对齐 Release 正文（AIRY_NOTES_ONLY=1）──────────────────────
+# 发布说明修订 / 首建正文有误的事后纠偏，不应触发签名与制品上传全链路：
+# 与阶段 4 共用 align_release_body（幂等），避免两处实现漂移。
+if [ "${AIRY_NOTES_ONLY:-0}" = "1" ]; then
+    [ -n "${ATOMGIT_TOKEN:-}" ] || { log_fail "AIRY_NOTES_ONLY=1 需 ATOMGIT_TOKEN"; exit 1; }
+    log_info "仅对齐 Release 正文: ${VERSION}"
+    align_release_body "$VERSION" "$RELEASE_BODY" "$PRERELEASE" || exit 1
+    exit 0
+fi
 
 # ─── 收集制品 ──────────────────────────────────────────────────────────────
 ARTIFACTS=()
@@ -210,10 +259,6 @@ fi
 # ─── 阶段 2：生成 manifest.<channel>.json ─────────────────────────────────
 MANIFEST="$DIST_DIR/manifest.${CHANNEL}.json"
 RELEASE_BASE="https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}"
-NOTES="${RELEASE_NOTES:-}"
-if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
-    NOTES="$(cat "$RELEASE_NOTES_FILE")"
-fi
 log_info "生成 manifest（${CHANNEL}）…"
 # 幂等保护：manifest 已存在则不重生成——updated_at 漂移会使既有 .asc 签名
 # 失配（GPG 对整文件签名），断点重跑场景下绝不能静默漂移已签名内容。
@@ -335,20 +380,8 @@ if [ "$SKIP_UPLOAD" = "1" ] || [ -z "${ATOMGIT_TOKEN:-}" ]; then
     exit 0
 fi
 
-API="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
-RELEASE_BODY="${NOTES:-AgentRT ${VERSION}}"
 log_info "创建/更新 Release ${VERSION}…"
-# atomgit API v5（Gitee 兼容，Base api.atomgit.com）：PRIVATE-TOKEN 认证。
-# release 对象无 id 字段，以 tag_name 存在性探测（幂等），不存在则创建。
-TAG_EXISTS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-    "${API}/tags/${VERSION}" 2>/dev/null | python3 -c "import sys,json;print(1 if (json.load(sys.stdin) or {}).get('tag_name') else '')" 2>/dev/null || true)"
-if [ -z "$TAG_EXISTS" ]; then
-    curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-        -H "Content-Type: application/json" \
-        --data-binary "$(python3 -c "import json,sys;print(json.dumps({'tag_name':sys.argv[1],'name':sys.argv[1],'body':sys.argv[2],'prerelease':sys.argv[3]}))" "$VERSION" "$RELEASE_BODY" "$PRERELEASE")" \
-        "${API}" >/dev/null 2>&1 || { log_fail "Release 创建失败（检查 ATOMGIT_TOKEN 与 ${ATOMGIT_REPO} 权限）"; exit 1; }
-fi
-log_ok "Release 就绪: ${VERSION}（${ATOMGIT_REPO}）"
+align_release_body "$VERSION" "$RELEASE_BODY" "$PRERELEASE" || exit 1
 
 # 附件上传走预签名两步流（POST /releases/{tag}/attach_files 端点不存在，
 # 服务端 404）：GET /releases/{tag}/upload_url?file_name=X 返回 OBS 预签名
