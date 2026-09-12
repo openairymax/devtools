@@ -295,6 +295,40 @@ gate_abi_frozen() {
 }
 
 # ============================================================================
+# Gate 10: corekern 运行时达标检查 (WS-8 8.4.2)
+# 从"库在构建内"升级为"运行时调用链证据"：真实拉起 15 daemon + airy_cli，
+# 从启动输出取证调用链证据；降级运行（badge=0）一票否决。
+# 退出码: 0=通过 1=未达标(阻断) 2=环境错误(告警)
+# ============================================================================
+gate_corekern_runtime() {
+    section "Gate 10: corekern Runtime Check (WS-8 8.4.2)"
+
+    local ckrt_script="${SCRIPT_DIR}/corekern-runtime-check.sh"
+    if [ -f "$ckrt_script" ]; then
+        # 复用 Gate 1 的树外构建目录（构建产物一律树外化，工程铁律 a）
+        local ckrt_build_dir="${QUALITY_GATE_BUILD_DIR:-${TMPDIR:-/tmp}/agentrt-quality-gate-build}"
+        log_info "Probing production processes for runtime evidence (build: ${ckrt_build_dir})..."
+        local ckrt_out
+        if ckrt_out=$(bash "$ckrt_script" --build-dir "$ckrt_build_dir" 2>&1); then
+            echo "$ckrt_out" | tail -8
+            check_gate "CorekernRuntime" 0
+        else
+            local ckrt_exit=$?
+            echo "$ckrt_out" | tail -15
+            if [ $ckrt_exit -eq 2 ]; then
+                log_warn "corekern runtime check: build artifacts missing, manual review required"
+                check_gate "CorekernRuntime" 2
+            else
+                check_gate "CorekernRuntime" 1
+            fi
+        fi
+    else
+        log_warn "corekern runtime check script not found: ${ckrt_script}"
+        check_gate "CorekernRuntime" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -302,6 +336,7 @@ main() {
     local security_only=false
     local skip_cross_repo=false
     local skip_complexity=false
+    local skip_corekern_runtime=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -322,12 +357,16 @@ main() {
                 skip_complexity=true
                 shift
                 ;;
+            --skip-corekern-runtime)
+                skip_corekern_runtime=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -339,12 +378,14 @@ main() {
                 echo "  7. SSoT Authority Validation"
                 echo "  8. Header Duplication Check (IRON-6 re-export)"
                 echo "  9. ABI Frozen Check (coreloopthree)"
+                echo "  10. corekern Runtime Check (WS-8 8.4.2)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
                 echo "  --skip-security       Skip security scan"
                 echo "  --skip-cross-repo     Skip cross-repo verification"
                 echo "  --skip-complexity     Skip complexity check"
+                echo "  --skip-corekern-runtime  Skip corekern runtime evidence check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -369,6 +410,7 @@ main() {
         gate_ssot
         gate_header_duplication
         gate_abi_frozen
+        $skip_corekern_runtime || gate_corekern_runtime
     fi
 
     # 输出结果
