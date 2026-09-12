@@ -11,7 +11,7 @@
 #
 # 幂等（同版本重跑安全，对齐 C4 覆盖语义）：
 #   - 同名同大小附件 → 跳过（不重复上传、不产生重复附件）；
-#   - 同名不同大小附件 → 删除后重传（GH）；Gitee 无附件删除 API，跳过并告警；
+#   - 同名不同大小附件 → 删除后重传（GH/Gitee 均按附件 id 删除）；
 #   - Release 元数据（标题/正文/prerelease）每次强制对齐。
 #
 # 用法：
@@ -276,22 +276,31 @@ print(d.get("id","") if isinstance(d,dict) else "")' <"$TMP/grel.out" 2>/dev/nul
             fi
         fi
         if [ -n "${GREL_ID:-}" ]; then
-            # 现有附件名清单（Gitee 无附件删除 API：同名一律跳过；大小差异仅告警）
+            # 现有附件清单 name/size/id。Gitee v5 默认页长 20，必须显式
+            # per_page=100；否则 >20 附件的 release 重跑时只看到前 20 个，
+            # 会把其余附件当缺失重复上传（rc10 实证：无参 20 条，per_page=100 28 条）。
             gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}/attach_files" \
                 --data-urlencode "access_token=${GITEE_TOKEN}" \
+                --data-urlencode "per_page=100" \
                 | python3 -c 'import json,sys
 try:
-    for a in json.load(sys.stdin): print(a.get("name",""), a.get("size",""))
+    for a in json.load(sys.stdin): print(a.get("name",""), a.get("size",""), a.get("id",""))
 except Exception:
     pass' > "$TMP/gitee-assets.txt" || { : > "$TMP/gitee-assets.txt"; log_warn "Gitee 附件清单获取失败，按全量新传处理"; }
             for f in "${ASSETS[@]}"; do
                 b="$(basename "$f")"; sz="$(stat -c%s "$f")"
-                if grep -qF "$b" "$TMP/gitee-assets.txt"; then
-                    esz="$(awk -v n="$b" '$1==n{print $2}' "$TMP/gitee-assets.txt" | head -1)"
-                    if [ -n "$esz" ] && [ "$esz" != "$sz" ]; then
-                        log_warn "Gitee 同名不同大小（${esz}≠${sz}，无删除 API 人工核对）: ${b}"
+                existing="$(awk -v n="$b" '$1==n{print $3" "$2; exit}' "$TMP/gitee-assets.txt")"
+                if [ -n "$existing" ]; then
+                    eid="${existing%% *}"; esz="${existing##* }"
+                    if [ -z "$esz" ] || [ "$esz" = "$sz" ]; then
+                        log_ok "Gitee 已有（跳过）: ${b}"; continue
                     fi
-                    log_ok "Gitee 已有（跳过）: ${b}"; continue
+                    # 同名不同大小：删除旧附件后重传，避免留下陈旧二进制。
+                    log_warn "Gitee 同名不同大小（${esz}≠${sz}），删除旧附件重传: ${b}"
+                    if [ -z "$eid" ] || ! gitee_api -X DELETE \
+                        "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}/attach_files/${eid}?access_token=${GITEE_TOKEN}" >/dev/null; then
+                        log_warn "Gitee 旧附件删除失败（不阻断），保留原附件: ${b}"; continue
+                    fi
                 fi
                 log_info "Gitee 上传: ${b} (${sz}B)"
                 if gitee_api -X POST \
