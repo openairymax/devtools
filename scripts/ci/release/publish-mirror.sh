@@ -51,6 +51,12 @@ ATOMGIT_REPO="${ATOMGIT_REPO:-openairymax/agentrt}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# 停滞中断（注入所有数据面 curl）：默认 curl 无读超时，对端 socket 假死即
+# 无界等待——0.1.15 实证一次镜像 run 的上传步挂住 76min+，并因并发组把后续
+# 纠偏 run 一并堵死。语义取"停滞"而非"限时"：连续 60s 平均速率 <1KB/s 才
+# 放弃，大件正常传输不受影响。
+CURL_STALL=(--speed-limit 1024 --speed-time 60)
+
 # 凭据脱敏（对齐 publish-release.sh redact 语义）：Gitee access_token 走
 # query/form，curl 失败时会把完整 URL 回显到 stderr，必须过滤。
 redact() { sed -E 's#(https?://)[^/?]*[^?]*\?*#https://***#' /dev/null; \
@@ -90,7 +96,7 @@ for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" 
         if [ "$DRY_RUN" = "1" ]; then
             log_info "DRY-RUN: curl -fsSL -o '$f' '$url'"
             ASSETS+=("$f")   # DRY-RUN 假定回填成功，走通后续打印
-        elif curl -fsSL --connect-timeout 20 --retry 3 -o "$f" "$url"; then
+        elif curl -fsSL --connect-timeout 20 --retry 3 "${CURL_STALL[@]}" -o "$f" "$url"; then
             ASSETS+=("$f")
         else
             log_fail "回填失败: $(basename "$f")（atomgit release 无此附件？）"
@@ -119,7 +125,7 @@ elif [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
 elif [ -f "$DIST_DIR/notes.txt" ]; then
     BODY="$(python3 -c 'import json,sys;print(json.dumps(open(sys.argv[1],encoding="utf-8").read()))' "$DIST_DIR/notes.txt")"
 else
-    _ssot="$(curl -fsS --connect-timeout 20 \
+    _ssot="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
         "https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases/tags/${VERSION}" 2>/dev/null \
         | python3 -c 'import json,sys
 try: d=json.load(sys.stdin)
@@ -146,7 +152,7 @@ log_info "待镜像附件 ${#ASSETS[@]} 个"
 
 # ─── 阶段 1：GitHub Releases ───────────────────────────────────────────────
 gh_api() {
-    curl -fsS --connect-timeout 20 \
+    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
         -H "Authorization: Bearer ${GH_TOKEN}" \
         -H "Accept: application/vnd.github+json" "$@" 2>&1
 }
@@ -226,7 +232,7 @@ fi
 # ─── 阶段 2：Gitee Releases ────────────────────────────────────────────────
 gitee_api() {
     local out rc
-    out="$(curl -fsS --connect-timeout 20 "$@" 2> >(redact >&2))"; rc=$?
+    out="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" "$@" 2> >(redact >&2))"; rc=$?
     [ $rc -eq 0 ] && printf '%s' "$out"
     return $rc
 }
@@ -269,7 +275,7 @@ print(json.dumps(d))' "$VERSION" "$BODY" "$PRERELEASE")"
                 if [ -n "$BODY" ]; then
                     _rel_form_args+=(--data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")")
                 fi
-                curl -sS --connect-timeout 20 -X PATCH \
+                curl -sS --connect-timeout 20 "${CURL_STALL[@]}" -X PATCH \
                     "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}" \
                     "${_rel_form_args[@]}" >/dev/null 2>&1 \
                     || { log_warn "Gitee release 元数据对齐失败（不阻断附件上传）"; }
@@ -287,14 +293,14 @@ print(json.dumps(d))' "$VERSION" "$BODY" "$PRERELEASE")"
                 | python3 -c 'import json,sys;print(json.load(sys.stdin).get("default_branch","master"))' 2>/dev/null || echo master)"
             [ -n "$_GITEE_DEFBRANCH" ] || _GITEE_DEFBRANCH=master
             printf '%s' "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true","target_commitish":sys.argv[4]}))' "$VERSION" "$BODY_CREATE" "$PRERELEASE" "$_GITEE_DEFBRANCH")" >"$TMP/grel-payload.json"
-            _REL_CODE="$(curl -sS --connect-timeout 20 -X POST -H "Content-Type: application/json" \
+            _REL_CODE="$(curl -sS --connect-timeout 20 "${CURL_STALL[@]}" -X POST -H "Content-Type: application/json" \
                 "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases?access_token=${GITEE_TOKEN}" \
                 --data-binary @"$TMP/grel-payload.json" \
                 -o "$TMP/grel.out" -w '%{http_code}' 2>"$TMP/grel.err" || true)"
             if [ "${_REL_CODE}" != "200" ] && [ "${_REL_CODE}" != "201" ]; then
                 log_warn "Gitee release JSON 创建 HTTP ${_REL_CODE:-?}: $(tail -c 240 "$TMP/grel.out" 2>/dev/null | tr '\n' ' ' || true)"
                 log_info "Gitee release form 编码重试…"
-                _REL_CODE="$(curl -sS --connect-timeout 20 -X POST \
+                _REL_CODE="$(curl -sS --connect-timeout 20 "${CURL_STALL[@]}" -X POST \
                     "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases" \
                     --data-urlencode "access_token=${GITEE_TOKEN}" \
                     --data-urlencode "tag_name=${VERSION}" \
