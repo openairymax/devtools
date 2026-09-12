@@ -21,7 +21,8 @@
 #   COSIGN_PRIVATE_KEY / COSIGN_PASSWORD   cosign 私钥（base64 或文件路径）
 #   GPG_PRIVATE_KEY / GPG_PASSPHRASE       GPG 私钥（base64）+ 口令
 #   ATOMGIT_TOKEN / ATOMGIT_REPO           atomgit 令牌 + 目标仓（默认 openairymax/agentrt）
-#   RELEASE_NOTES / RELEASE_NOTES_FILE     变更日志摘要（Release 正文）
+#   RELEASE_NOTES / RELEASE_NOTES_FILE     Release 正文（显式 RELEASE_NOTES
+#                                          优先，文件仅兜底）
 #   AIRY_NOTES_ONLY=1                       仅对齐 Release 正文后退出（不签名/不上传）
 #   SKIP_SIGN=1 跳过签名（仅生成 manifest）  SKIP_UPLOAD=1 不上传  DRY_RUN=1 模拟
 # ============================================================================
@@ -79,9 +80,11 @@ log_info "制品目录: ${DIST_DIR}  目标: ${ATOMGIT_REPO}"
 
 # ─── 发布说明正文 ──────────────────────────────────────────────────────────
 # 面向社区公开场合，不得出现内部工程流水（bump/CI/镜像等）。显式传入的
-# RELEASE_NOTES 优先，其次 RELEASE_NOTES_FILE（release.yml 传 notes.txt）。
+# RELEASE_NOTES 优先，RELEASE_NOTES_FILE（release.yml 传 notes.txt）仅
+# 在其缺省时兜底——调用方需要「就地覆盖」时必定是显式 notes 语义（如
+# mirror-release.yml 的三端正文纠偏），文件兜底不得反向压过它。
 NOTES="${RELEASE_NOTES:-}"
-if [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
+if [ -z "$NOTES" ] && [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
     NOTES="$(cat "$RELEASE_NOTES_FILE")"
 fi
 RELEASE_BODY="${NOTES:-AgentRT ${VERSION}}"
