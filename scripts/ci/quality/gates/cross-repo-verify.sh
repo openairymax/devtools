@@ -335,12 +335,15 @@ check_tool_schema_consistency() {
         return
     fi
 
-    if python3 "$check_script" "${PROJECT_ROOT}"; then
+    local schema_out
+    if schema_out=$(python3 "$check_script" "${PROJECT_ROOT}" 2>&1); then
         log_ok "Python BUILTIN_TOOL_SCHEMAS is a subset of C tool_d registry"
         check_pass
     else
-        add_issue "Python tool schema set violates C-side subset constraint"
-        log_warn "PYTHON TOOL SCHEMA NOT A SUBSET OF C TOOL REGISTRY"
+        # 脚本对"真实子集违反"与"对比源缺席"返回同一退出码，原因必须原样
+        # 上报，否则误诊（run #60 实证：生态系统子模块缺席被报成子集违反）。
+        add_issue "Tool schema cross-repo check failed: $(printf '%s\n' "$schema_out" | tail -1)"
+        log_warn "$schema_out"
     fi
 }
 
