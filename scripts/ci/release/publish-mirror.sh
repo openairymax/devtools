@@ -10,9 +10,10 @@
 # 镜像到两平台，附件字节与 atomgit 完全同源（不再经 atomgit 慢通道回拉大件）。
 #
 # 幂等（同版本重跑安全，对齐 C4 覆盖语义）：
-#   - 同名同大小附件 → 跳过（不重复上传、不产生重复附件）；
-#   - 同名不同大小附件 → 删除后重传（GH/Gitee 均按附件 id 删除）；
+#   - 远端内容与本地一致 → 跳过（不重复上传、不产生重复附件）；
+#   - 远端内容不一致 → 按附件 id 删除后重传（GH/Gitee 同语义）；
 #   - Release 元数据（标题/正文/prerelease）每次强制对齐。
+#   判据是"内容一致"而非"大小一致"，理由与分级见 remote_identical()。
 #
 # 用法：
 #   ./publish-mirror.sh v0.1.13-rc9 [DIST_DIR]
@@ -29,6 +30,8 @@
 #   RELEASE_NOTES_FILE  发布说明文件（release.yml 传 dist/notes.txt）
 #                       正文来源全缺时：既有 Release 正文保持不动，仅创建
 #                       新 Release 退回落款行（历史回填不得清空社区说明）
+#   MIRROR_VERIFY_MAX_BYTES  内容级校验体积上限（默认 1MiB）：远端无摘要
+#                       时，不超过该体积的附件会取回远端字节做 sha256 比对
 #   DRY_RUN=1           模拟（零网络：仅打印将执行的动作）
 # 退出：fail-closed——任一平台任一附件失败即非零退出。
 # ============================================================================
@@ -56,6 +59,10 @@ trap 'rm -rf "$TMP"' EXIT
 # 纠偏 run 一并堵死。语义取"停滞"而非"限时"：连续 60s 平均速率 <1KB/s 才
 # 放弃，大件正常传输不受影响。
 CURL_STALL=(--speed-limit 1024 --speed-time 60)
+
+# 内容级校验体积上限（字节）。文本侧车（.sha256/.sig/.asc/manifest.*.json/
+# install 脚本）远小于此值，平台包远大于此值。
+MIRROR_VERIFY_MAX_BYTES="${MIRROR_VERIFY_MAX_BYTES:-1048576}"
 
 # 凭据脱敏（对齐 publish-release.sh redact 语义）：Gitee access_token 走
 # query/form，curl 失败时会把完整 URL 回显到 stderr，必须过滤。
@@ -150,11 +157,56 @@ if [ "${#ASSETS[@]}" -eq 0 ]; then
 fi
 log_info "待镜像附件 ${#ASSETS[@]} 个"
 
+# ─── 幂等判据：内容一致（而非大小一致）──────────────────────────────────────
+# 附件字节大小相同 ≠ 内容相同：.sha256/.sig/.asc 等文本侧车长度恒定，重新
+# 构建后内容已变而大小不变——只比大小会永久跳过陈旧侧车，而平台包因大小
+# 变化被删除重传，于是"本体已刷新、侧车停留上一轮"，端内自相矛盾。
+# 0.1.15 实证：GitHub v0.1.15 有 17 项侧车与本体哈希不符（atomgit SSoT 正确）。
+# 判据分级（自上而下取第一个可用的）：
+#   1) 远端给出 sha256 摘要（GitHub assets.digest）→ 精确比对，零额外网络；
+#   2) 远端无摘要，且本地体积 ≤ MIRROR_VERIFY_MAX_BYTES → 取回远端字节比对；
+#   3) 远端无摘要且为大件 → 退化到大小比对（回拉全量二进制的成本高于收益；
+#      Gitee 无摘要端点，平台包只能止步于此）。
+# 返回 0 = 远端内容与本地一致（可跳过）；非 0 = 需要重传。
+# 用法：remote_identical <本地文件> <远端大小> <远端摘要或空> [取字节命令 参数…]
+remote_identical() {
+    local f="$1" esz="$2" edig="${3:-}" lsha rsha t
+    lsha="$(sha256sum "$f" | awk '{print $1}')"
+    if [ -n "$edig" ]; then
+        [ "${edig#sha256:}" = "$lsha" ] && return 0
+        log_warn "远端摘要与本地不符（重传收敛）: $(basename "$f")"
+        return 1
+    fi
+    if [ -n "$esz" ] && [ "$esz" != "$(stat -c%s "$f")" ]; then return 1; fi
+    if [ "$#" -le 3 ] || [ "$(stat -c%s "$f")" -gt "$MIRROR_VERIFY_MAX_BYTES" ]; then
+        return 0   # 无摘要且无从取样：仅大小可判，且大小已一致
+    fi
+    t="$(mktemp)"
+    if "$4" "${@:5}" >"$t" 2>/dev/null; then
+        rsha="$(sha256sum "$t" | awk '{print $1}')"; rm -f "$t"
+        [ "$rsha" = "$lsha" ] && return 0
+        log_warn "远端内容与本地不符（重传收敛）: $(basename "$f")"
+        return 1
+    fi
+    rm -f "$t"
+    log_warn "远端内容取样失败，按不一致处理（重传收敛）: $(basename "$f")"
+    return 1
+}
+
 # ─── 阶段 1：GitHub Releases ───────────────────────────────────────────────
 gh_api() {
     curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
         -H "Authorization: Bearer ${GH_TOKEN}" \
         -H "Accept: application/vnd.github+json" "$@" 2>&1
+}
+
+# 取回 GitHub 附件原始字节（内容级校验用）。匿名 download_url 会撞 WAF，
+# 必须走 API + application/octet-stream（0.1.15 实证匿名 403）。
+gh_asset_bytes() {
+    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+        -H "Authorization: Bearer ${GH_TOKEN}" \
+        -H "Accept: application/octet-stream" \
+        "https://api.github.com/repos/${GITHUB_REPO}/releases/assets/$1"
 }
 
 if [ "${GH_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
@@ -190,19 +242,24 @@ print(json.dumps(d))' "$VERSION" "$BODY" "$PRERELEASE")"
             gh_api -X PATCH -H "Content-Type: application/json" -d "$patch_json" \
                 "https://api.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}" >/dev/null \
                 || { log_fail "GitHub release 元数据对齐失败"; echo "gh:patch" >> "$TMP/failed.txt"; }
-            # 现有附件清单：name size id。注意 f-string 表达式内不得用 \"
-            # 转义（Python<3.12 语法错误，rc9 实证清单恒空→重传撞 422）。
+            # 现有附件清单：name size id digest。digest 为服务端计算的
+            # "sha256:<hex>"，是零成本的内容级判据（无 digest 的旧附件以
+            # "-" 占位）。注意 f-string 表达式内不得用 \" 转义（Python<3.12
+            # 语法错误，rc9 实证清单恒空→重传撞 422）。
             gh_api "https://api.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}/assets?per_page=100" \
                 | python3 -c 'import json,sys
-for a in json.load(sys.stdin): print(a["name"], a["size"], a["id"])' > "$TMP/gh-assets.txt" \
+for a in json.load(sys.stdin): print(a["name"], a["size"], a["id"], a.get("digest") or "-")' > "$TMP/gh-assets.txt" \
                 || { : > "$TMP/gh-assets.txt"; log_warn "GitHub 附件清单获取失败，按全量新传处理"; }
             for f in "${ASSETS[@]}"; do
                 b="$(basename "$f")"; sz="$(stat -c%s "$f")"
                 line="$(grep -F "$b " "$TMP/gh-assets.txt" | head -1 || true)"
                 if [ -n "$line" ]; then
                     esz="$(awk '{print $2}' <<<"$line")"; aid="$(awk '{print $3}' <<<"$line")"
-                    if [ "$esz" = "$sz" ]; then log_ok "GitHub 已有（跳过）: ${b}"; continue; fi
-                    log_warn "GitHub 同名不同大小（${esz}≠${sz}），删除重传: ${b}"
+                    edig="$(awk '{print $4}' <<<"$line")"; [ "$edig" = "-" ] && edig=""
+                    if remote_identical "$f" "$esz" "$edig" gh_asset_bytes "$aid"; then
+                        log_ok "GitHub 内容一致（跳过）: ${b}"; continue
+                    fi
+                    log_warn "GitHub 附件需刷新，删除重传: ${b}"
                     gh_api -X DELETE "https://api.github.com/repos/${GITHUB_REPO}/releases/assets/${aid}" >/dev/null \
                         || { log_fail "GitHub 旧附件删除失败: ${b}"; echo "gh:${b}" >> "$TMP/failed.txt"; continue; }
                 fi
@@ -235,6 +292,13 @@ gitee_api() {
     out="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" "$@" 2> >(redact >&2))"; rc=$?
     [ $rc -eq 0 ] && printf '%s' "$out"
     return $rc
+}
+
+# 取回 Gitee 附件原始字节（内容级校验用）。Gitee attach_files 无摘要端点，
+# 只能按 release 下载路径取样比对。
+gitee_asset_bytes() {
+    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+        "https://gitee.com/${GITEE_REPO}/releases/download/${VERSION}/$1"
 }
 
 if [ "${GITEE_TOKEN:-}" ] && [ "${SKIP_GITEE:-0}" != "1" ] && [ "$DRY_RUN" != "1" ]; then
@@ -339,11 +403,12 @@ except Exception:
                 existing="$(awk -v n="$b" '$1==n{print $3" "$2; exit}' "$TMP/gitee-assets.txt")"
                 if [ -n "$existing" ]; then
                     eid="${existing%% *}"; esz="${existing##* }"
-                    if [ -z "$esz" ] || [ "$esz" = "$sz" ]; then
-                        log_ok "Gitee 已有（跳过）: ${b}"; continue
+                    # Gitee 无摘要端点：文本侧车取回比对，大件退化到大小比对。
+                    if remote_identical "$f" "$esz" "" gitee_asset_bytes "$b"; then
+                        log_ok "Gitee 内容一致（跳过）: ${b}"; continue
                     fi
-                    # 同名不同大小：删除旧附件后重传，避免留下陈旧二进制。
-                    log_warn "Gitee 同名不同大小（${esz}≠${sz}），删除旧附件重传: ${b}"
+                    # 内容不一致：删除旧附件后重传，避免留下陈旧附件。
+                    log_warn "Gitee 附件需刷新，删除旧附件重传: ${b}"
                     if [ -z "$eid" ] || ! gitee_api -X DELETE \
                         "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}/attach_files/${eid}?access_token=${GITEE_TOKEN}" >/dev/null; then
                         log_warn "Gitee 旧附件删除失败（不阻断），保留原附件: ${b}"; continue
