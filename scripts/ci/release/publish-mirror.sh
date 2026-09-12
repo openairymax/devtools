@@ -25,6 +25,10 @@
 #                       mirror-release.yml 后台幂等补齐（U-3 方案 A）
 #   FETCH_MISSING=1     dist 缺件时从 atomgit release 下载补齐（历史版本
 #                       回填模式：release-dist 工件天然缺 manifest/sig 小件）
+#   RELEASE_NOTES       发布说明正文（显式优先；三端正文纠偏用）
+#   RELEASE_NOTES_FILE  发布说明文件（release.yml 传 dist/notes.txt）
+#                       正文来源全缺时：既有 Release 正文保持不动，仅创建
+#                       新 Release 退回落款行（历史回填不得清空社区说明）
 #   DRY_RUN=1           模拟（零网络：仅打印将执行的动作）
 # 退出：fail-closed——任一平台任一附件失败即非零退出。
 # ============================================================================
@@ -98,9 +102,16 @@ for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" 
     fi
 done
 
-# 发布说明正文：RELEASE_NOTES / RELEASE_NOTES_FILE 显式传入优先，
-# 其次 release job 生成的 notes.txt，最后兜底一行（与 publish-release.sh
-# 语义对齐）。body 面向社区公开场合，不得出现内部工程流水。
+# 发布说明正文（BODY 为 JSON 字符串字面量；**空表示无来源**——此时对已存在
+# 的 Release 一律不覆盖正文，见下方各 PATCH 分支）。历史回填实证：dist 无
+# notes.txt 时若用一行占位串落库，会把已发布的社区说明清空，故占位串只允许
+# 用于"创建新 Release"（创建必须有正文）。来源优先级：
+#   1) 显式 RELEASE_NOTES（调用方就地覆盖，如三端正文纠偏）
+#   2) RELEASE_NOTES_FILE（release.yml 传 notes.txt）
+#   3) dist/notes.txt（release job 生成）
+#   4) atomgit（SSoT）Release 既有正文——历史回填与 SSoT 同源，天然三端一致
+# 前三者面均向社区公开场合，不得出现内部工程流水。
+BODY=""
 if [ -n "${RELEASE_NOTES:-}" ]; then
     BODY="$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$RELEASE_NOTES")"
 elif [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
@@ -108,8 +119,25 @@ elif [ -n "${RELEASE_NOTES_FILE:-}" ] && [ -f "$RELEASE_NOTES_FILE" ]; then
 elif [ -f "$DIST_DIR/notes.txt" ]; then
     BODY="$(python3 -c 'import json,sys;print(json.dumps(open(sys.argv[1],encoding="utf-8").read()))' "$DIST_DIR/notes.txt")"
 else
-    BODY="$(python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$(printf "AgentRT ${VERSION}\n\nhttps://atomgit.com/${ATOMGIT_REPO}/releases/tag/${VERSION}")")"
+    _ssot="$(curl -fsS --connect-timeout 20 \
+        "https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases/tags/${VERSION}" 2>/dev/null \
+        | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d={}
+print(json.dumps(d.get("body") or ""))' 2>/dev/null || true)"
+    if [ -n "$_ssot" ] && [ "$_ssot" != '""' ]; then
+        BODY="$_ssot"
+        log_info "正文取自 atomgit（SSoT）既有 Release"
+    fi
 fi
+[ -n "$BODY" ] || log_warn "无正文来源（notes/notes.txt/atomgit 均缺）：既有 Release 正文保持不动"
+
+# 创建新 Release 用的正文：无来源时退回一行兜底（创建必须有正文；
+# 对齐既有 Release 时 BODY 空则整体不覆盖）。
+BODY_CREATE="$(python3 -c 'import json,sys
+b=json.loads(sys.argv[1])
+print(json.dumps(b or ("AgentRT %s\n\nhttps://atomgit.com/%s/releases/tag/%s" % (sys.argv[2], sys.argv[3], sys.argv[2]))))' \
+    "${BODY:-null}" "$VERSION" "$ATOMGIT_REPO")"
 
 if [ "${#ASSETS[@]}" -eq 0 ]; then
     log_fail "无可镜像附件"; exit 1
@@ -139,7 +167,7 @@ if [ "${GH_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
             log_info "GitHub release 已存在 (id=${REL_ID})，对齐元数据…"
         else
             log_info "创建 GitHub release ${VERSION}…"
-            create_json="$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")"
+            create_json="$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY_CREATE" "$PRERELEASE")"
             rel_json="$(gh_api -X POST -H "Content-Type: application/json" \
                 -d "$create_json" "https://api.github.com/repos/${GITHUB_REPO}/releases" || true)"
             REL_ID=""
@@ -149,7 +177,10 @@ if [ "${GH_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
         fi
         if [ -n "${REL_ID:-}" ]; then
             # 元数据强制对齐（幂等）
-            patch_json="$(python3 -c 'import json,sys;print(json.dumps({"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")"
+            patch_json="$(python3 -c 'import json,sys
+d={"name":sys.argv[1],"prerelease":sys.argv[3]=="true"}
+if sys.argv[2]: d["body"]=json.loads(sys.argv[2])
+print(json.dumps(d))' "$VERSION" "$BODY" "$PRERELEASE")"
             gh_api -X PATCH -H "Content-Type: application/json" -d "$patch_json" \
                 "https://api.github.com/repos/${GITHUB_REPO}/releases/${REL_ID}" >/dev/null \
                 || { log_fail "GitHub release 元数据对齐失败"; echo "gh:patch" >> "$TMP/failed.txt"; }
@@ -222,15 +253,25 @@ print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
             log_info "Gitee release 已存在 (id=${GREL_ID})，对齐元数据…"
             # JSON 失败自动 form 重试：Gitee v5 部分端点对 JSON PATCH 兼容性
             # 差（与 POST 同源，rc9 实证 POST JSON 400）；对齐失败不阻断。
+            # 正文仅在确有来源时携带：BODY 空 = 无正文来源，保持既有社区
+            # 说明不动（历史回填不得把已发布正文清空）。
+            _rel_patch_json="$(python3 -c 'import json,sys
+d={"tag_name":sys.argv[1],"name":sys.argv[1],"prerelease":sys.argv[3]=="true"}
+if sys.argv[2]: d["body"]=json.loads(sys.argv[2])
+print(json.dumps(d))' "$VERSION" "$BODY" "$PRERELEASE")"
             if ! gitee_api -X PATCH -H "Content-Type: application/json" \
                 "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}?access_token=${GITEE_TOKEN}" \
-                -d "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true"}))' "$VERSION" "$BODY" "$PRERELEASE")" >/dev/null; then
+                -d "$_rel_patch_json" >/dev/null; then
+                _rel_form_args=(
+                    --data-urlencode "access_token=${GITEE_TOKEN}"
+                    --data-urlencode "name=${VERSION}"
+                    --data-urlencode "prerelease=${PRERELEASE}")
+                if [ -n "$BODY" ]; then
+                    _rel_form_args+=(--data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")")
+                fi
                 curl -sS --connect-timeout 20 -X PATCH \
                     "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}" \
-                    --data-urlencode "access_token=${GITEE_TOKEN}" \
-                    --data-urlencode "name=${VERSION}" \
-                    --data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")" \
-                    --data-urlencode "prerelease=${PRERELEASE}" >/dev/null 2>&1 \
+                    "${_rel_form_args[@]}" >/dev/null 2>&1 \
                     || { log_warn "Gitee release 元数据对齐失败（不阻断附件上传）"; }
             fi
         else
@@ -245,7 +286,7 @@ print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
                 --data-urlencode "access_token=${GITEE_TOKEN}" \
                 | python3 -c 'import json,sys;print(json.load(sys.stdin).get("default_branch","master"))' 2>/dev/null || echo master)"
             [ -n "$_GITEE_DEFBRANCH" ] || _GITEE_DEFBRANCH=master
-            printf '%s' "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true","target_commitish":sys.argv[4]}))' "$VERSION" "$BODY" "$PRERELEASE" "$_GITEE_DEFBRANCH")" >"$TMP/grel-payload.json"
+            printf '%s' "$(python3 -c 'import json,sys;print(json.dumps({"tag_name":sys.argv[1],"name":sys.argv[1],"body":json.loads(sys.argv[2]),"prerelease":sys.argv[3]=="true","target_commitish":sys.argv[4]}))' "$VERSION" "$BODY_CREATE" "$PRERELEASE" "$_GITEE_DEFBRANCH")" >"$TMP/grel-payload.json"
             _REL_CODE="$(curl -sS --connect-timeout 20 -X POST -H "Content-Type: application/json" \
                 "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases?access_token=${GITEE_TOKEN}" \
                 --data-binary @"$TMP/grel-payload.json" \
@@ -258,7 +299,7 @@ print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
                     --data-urlencode "access_token=${GITEE_TOKEN}" \
                     --data-urlencode "tag_name=${VERSION}" \
                     --data-urlencode "name=${VERSION}" \
-                    --data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY")" \
+                    --data-urlencode "body=$(python3 -c 'import json,sys;print(json.loads(sys.argv[1]))' "$BODY_CREATE")" \
                     --data-urlencode "prerelease=${PRERELEASE}" \
                     --data-urlencode "target_commitish=${_GITEE_DEFBRANCH}" \
                     -o "$TMP/grel.out" -w '%{http_code}' 2>"$TMP/grel.err" || true)"
