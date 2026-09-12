@@ -236,7 +236,10 @@ gate_ssot() {
     local ssot_script="${SCRIPT_DIR}/../../verify/validate-ssot.py"
     if [ -x "$ssot_script" ] || [ -f "$ssot_script" ]; then
         log_info "Running SSoT authority validation..."
-        if python3 "$ssot_script" "${PROJECT_ROOT}" 2>&1 | tail -20; then
+        # 不截断输出：validate-ssot.py 的失败清单走 stderr、[OK] 明细走
+        # stdout，管道下二者刷新次序不定，tail 会吃掉失败原因（run #60
+        # 即因此只余 [OK] 行、真因不可见）。全量透出以保证可诊断。
+        if python3 "$ssot_script" "${PROJECT_ROOT}" 2>&1; then
             check_gate "SSoT-Validate" 0
         else
             check_gate "SSoT-Validate" 1
