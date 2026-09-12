@@ -420,6 +420,27 @@ asset_exists() {
     awk -F '\t' -v n="$1" '$1==n{found=1} END{exit !found}' <<<"$EXISTING_ASSETS"
 }
 
+# 远端附件内容是否与本地完全一致（sha256）。仅用于 AIRY_FORCE_UPLOAD=1 的
+# 同 tag 重发：重传是发布链最长杆（windows zip 实测 43min 502 / 60min 零字节
+# timeout，两次 attempt 白耗 >2h），内容已一致者免重传，把带宽集中给真正
+# 缺失/变更的附件。下载侧比上传侧快且匿名 GET 直连（不走向 WAF 拦 HEAD 的
+# 路径），失败即判不一致（保守回退到先删后传，语义不弱化）。
+remote_matches_local() {
+    local f="$1" b="$2" dlf dl_sha local_sha
+    dlf="$(mktemp)"
+    if curl -fsSL --connect-timeout 20 --speed-limit 1024 --speed-time 60 \
+        --max-time 1800 -o "$dlf" \
+        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null; then
+        dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
+        local_sha="$(sha256sum "$f" | awk '{print $1}')"
+        rm -f "$dlf"
+        [ "$dl_sha" = "$local_sha" ]
+    else
+        rm -f "$dlf"
+        return 1
+    fi
+}
+
 upload_asset() {
     local f="$1" b upjson upurl
     b="$(basename "$f")"
@@ -429,6 +450,12 @@ upload_asset() {
     if asset_exists "$b"; then
         if [ "${AIRY_FORCE_UPLOAD:-0}" != "1" ]; then
             log_warn "跳过（远端已存在同名附件，AIRY_FORCE_UPLOAD=1 可先删后传）: ${b}"
+            return 0
+        fi
+        # 强制重发语义保留（同 tag 重发必须能覆盖 OBS 旧对象），但内容
+        # 已一致者免重传——省下的带宽与墙钟全部留给真正需要重传的附件。
+        if remote_matches_local "$f" "$b"; then
+            log_ok "跳过（远端内容与本地一致，免重传）: ${b}"
             return 0
         fi
         delete_existing_asset "$b"
