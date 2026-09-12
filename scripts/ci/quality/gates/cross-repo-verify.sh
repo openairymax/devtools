@@ -62,6 +62,14 @@ declare -A SUBREPOS=(
     ["AgentLinux"]="${PROJECT_ROOT}/agent-linux"
 )
 
+# 结构性缺位仓：docs-closed 为闭源（无公网镜像）、agent-linux 为 1.5G 归档
+# （不宜纳入 CI 数据集）。二者缺席时按 skip 处理，不计入 issue；在本仓完整
+# 工作区中存在则照常校验，保持本地全量校验语义不变。
+declare -A OPTIONAL_SUBREPOS=(
+    ["DocsClosed"]=1
+    ["AgentLinux"]=1
+)
+
 # 版本一致性基线：以 agentrt/VERSION 为唯一权威（SSoT，0.1.6）
 EXPECTED_VERSION="$(cat "${PROJECT_ROOT}/agent-workload/agentrt/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "0.1.5")"
 
@@ -76,6 +84,8 @@ check_repo_existence() {
         if [[ -d "$path" ]]; then
             log_ok "$repo: exists ($path)"
             check_pass
+        elif [[ -n "${OPTIONAL_SUBREPOS[$repo]:-}" ]]; then
+            log_info "$repo: absent (not part of this dataset, skipped)"
         else
             add_issue "$repo: directory not found at $path"
             log_warn "$repo: NOT FOUND ($path)"
