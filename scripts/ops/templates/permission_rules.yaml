@@ -1,6 +1,6 @@
 # =============================================================================
 # AgentRT 工具级权限规则（Tool-level permission rules）
-# 版本: v1.2.0
+# 版本: v1.3.0
 #
 # 由 daemon_security 在 daemon 启动时加载（daemon_security_load_rules_file），
 # 写入 tool_d / agent_d 等 daemon 的 ACL 表。判定为 fail-closed：
@@ -11,6 +11,14 @@
 #   - agent  : 智能体标识（见 ecosystem/agents/*/contract.json 的 agent_id）
 #   - tool   : 工具名（与 tool_d 注册的工具名一致，如 fs_read / shell_run）
 #   - effect : "allow" 或 "deny"（deny 规则优先于同一 (agent, tool) 的 allow）
+#
+# v1.3.0：external 主体补工具级授权（2026-09-13）。0.1.15 收口 R-6：
+# /mcp 端点的 tools/call 由 gateway 以 "external" 主体做 PEP 判定（PDP
+# 权威），与 CLI 聊天回路（主体 coding_v1）不是同一主体。此前 external
+# 只授权 cap:* 管理能力、未列任何工具，导致 MCP 客户端 tools/list 能列出
+# 工具但 tools/call 一律 fail-closed 返回 -32603（现象："工具全部不可用"）。
+# 本段按 gateway_d gw_acl_register_defaults() 的本地默认 ACL 补齐 external
+# 工具授权，并覆盖 /mcp tools/list 暴露的全部工具。
 #
 # v1.2.0：agent.run 纳入权限模型（默认拒绝）（2026-09-11）。0.1.15 WS-2
 # T-11b 将网关最高敏执行入口 agent.run 收入 ACL 门禁（独立权限
@@ -409,6 +417,57 @@ rules:
     effect: "allow"
   - agent: "external"
     tool: "cap:cupolas.admin"
+    effect: "allow"
+
+  # ── external 工具级授权（v1.3.0）────────────────────────────────
+  # /mcp tools/call 以 "external" 主体过 PEP，与 CLI 聊天（coding_v1）
+  # 不同主体；下列工具与 gateway_d gw_acl_register_defaults() 本地默认
+  # ACL 对齐，并覆盖 /mcp tools/list 暴露的全部工具。缺少任一条即
+  # fail-closed 返回 -32603（工具齐列但不可调用）。
+  - agent: "external"
+    tool: "fs_read"
+    effect: "allow"
+  - agent: "external"
+    tool: "fs_write"
+    effect: "allow"
+  - agent: "external"
+    tool: "fs_edit"
+    effect: "allow"
+  - agent: "external"
+    tool: "fs_delete"
+    effect: "allow"
+  - agent: "external"
+    tool: "fs_list"
+    effect: "allow"
+  - agent: "external"
+    tool: "fs_glob"
+    effect: "allow"
+  - agent: "external"
+    tool: "fs_grep"
+    effect: "allow"
+  - agent: "external"
+    tool: "shell_run"
+    effect: "allow"
+  - agent: "external"
+    tool: "git_diff"
+    effect: "allow"
+  - agent: "external"
+    tool: "git_exec"
+    effect: "allow"
+  - agent: "external"
+    tool: "git_apply"
+    effect: "allow"
+  - agent: "external"
+    tool: "web_search"
+    effect: "allow"
+  - agent: "external"
+    tool: "web_fetch"
+    effect: "allow"
+  - agent: "external"
+    tool: "maths_eval"
+    effect: "allow"
+  - agent: "external"
+    tool: "maths_stats"
     effect: "allow"
 
   # ─── 明确拒绝示例（默认已 fail-closed，无需枚举）────────────────
