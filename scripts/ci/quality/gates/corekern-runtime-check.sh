@@ -5,14 +5,20 @@
 # 堵 0.1.15 架构改进方案 §7.3 结构性口径漏洞：运行时达标不接受
 # "库在构建内/头文件在位"，只接受运行时调用链证据——逐个真实拉起
 # 生产进程（15 daemon + airy_cli），从其启动输出取证：
-#   a) 进程内调用证据  "corekern core initialized"
+#   a) daemon 进程内调用证据  "corekern core initialized"
 #      （main.c 中 airy_init()==AIRY_SUCCESS 分支在本进程真实走到）
-#   b) corekern 链路证据  "core_init: [OK] AgentRT core initialized successfully"
-#      （airy_init() 内部 mem/oom/task/ipc/eventloop 子系统初始化链，
-#      daemon 必配；airy_cli 因 CLI 日志级别钉在 ERROR 不打印链路行，
-#      仅要求 a)
-#   c) 一票否决  "corekern init failed ... running degraded (badge=0)"
+#   b) daemon corekern 链路证据  "core_init: [OK] AgentRT core initialized successfully"
+#      （airy_init() 内部 mem/oom/task/ipc/eventloop 子系统初始化链，daemon 必配）
+#   c) daemon 一票否决  "corekern init failed ... running degraded (badge=0)"
 #      （airy_init() 失败 = 降级运行 = 运行时不达标）
+#   d) airy_cli 启动证据  "[airy_cli] gateway reachable - client mode ready"
+#      或 "[airy_cli] gateway unreachable - calls will fail until it is up"
+#      （0.1.16 B2 架构裁决（设计 §5.2 步骤 5）：CLI 为纯网关客户端，进程内
+#      微核心已收回（airy_init() 撤回，2026-09-14），启动诊断改为网关连通性
+#      探测；网关离线仅意味调用待网关就绪后才能成功，**不是**降级运行，故上述
+#      两条证据均判达标。链路证据 b) 为 daemon 专有，CLI 不再要求；一票否决
+#      c) 对 CLI 恒不触发（CLI 已无 corekern 初始化路径）——旧串
+#      "corekern core initialized" 已随 airy_init() 从 CLI 撤回而不复存在）
 #
 # 退出码: 0=全部达标  1=任一未达标(阻断)  2=环境错误(构建产物缺失,告警)
 #
@@ -44,13 +50,17 @@ DAEMON_LIST=(a2a_d agent_d channel_d cupolas_d gateway_d hook_d llm_d
 EVIDENCE_CALL='corekern core initialized'
 EVIDENCE_CHAIN='AgentRT core initialized successfully'
 EVIDENCE_DEGRADED='corekern init failed'
+# 0.1.16 B2（设计 §5.2 步骤 5 要求同步的门禁消费点）：CLI 的探针证据随架构
+# 收口改为网关连通性诊断行；两条诊断（reachable / unreachable）同为「CLI 已
+# 正常启动」的证据，故取公共前缀。含 "[" 字面量，匹配一律用 grep -F。
+EVIDENCE_CLI_CALL='[airy_cli] gateway '
 
-# probe <name> <binary> [extra-args...]
+# probe <name> <call-evidence> <binary> [extra-args...]
 # 拉起进程 → 轮询扫描启动输出（0.2s 步长，至多 WAIT_SEC，见证即收）→
 # TERM→宽限→KILL 收尾。守护进程常驻不退出，取证靠输出扫描而非退出码。
 probe() {
-    local name="$1" bin="$2"
-    shift 2
+    local name="$1" call_evidence="$2" bin="$3"
+    shift 3
     local outfile
     outfile="$(mktemp "${TMPDIR:-/tmp}/corekern-gate-${name}.XXXXXX")"
 
@@ -66,7 +76,7 @@ probe() {
             verdict="degraded"
             break
         fi
-        if grep -q "$EVIDENCE_CALL" "$outfile" 2>/dev/null; then
+        if grep -qF "$call_evidence" "$outfile" 2>/dev/null; then
             verdict="ok"
             break
         fi
@@ -87,7 +97,7 @@ probe() {
     if [ "$verdict" != "degraded" ]; then
         if grep -q "$EVIDENCE_DEGRADED" "$outfile" 2>/dev/null; then
             verdict="degraded"
-        elif grep -q "$EVIDENCE_CALL" "$outfile" 2>/dev/null; then
+        elif grep -qF "$call_evidence" "$outfile" 2>/dev/null; then
             verdict="ok"
         fi
     fi
@@ -116,7 +126,9 @@ usage() {
 Usage: corekern-runtime-check.sh [--build-dir DIR] [--timeout SEC]
 
 Probes every production process (15 daemons + airy_cli) of a build tree
-and requires runtime corekern call-chain evidence from its startup output.
+and requires runtime boot evidence from its startup output: daemons must
+show the corekern call-chain (plus, for CLI, the gateway client-mode
+boot line, since 0.1.16 B2 withdrew the in-process microkernel).
 Exit codes: 0 = all certified, 1 = any failure (blocking), 2 = environment
 (build artifacts missing; warning-level).
 EOF
@@ -168,7 +180,7 @@ main() {
             failed_list+=("$d (missing)")
             continue
         fi
-        if probe "$d" "$bin"; then
+        if probe "$d" "$EVIDENCE_CALL" "$bin"; then
             pass=$((pass + 1))
         else
             fail=$((fail + 1))
@@ -180,7 +192,7 @@ main() {
         log_error "airy_cli: binary not found at ${cli_bin}"
         fail=$((fail + 1))
         failed_list+=("airy_cli (missing)")
-    elif probe "airy_cli" "$cli_bin" -p ""; then
+    elif probe "airy_cli" "$EVIDENCE_CLI_CALL" "$cli_bin" -p ""; then
         pass=$((pass + 1))
     else
         fail=$((fail + 1))
