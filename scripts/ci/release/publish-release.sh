@@ -325,6 +325,10 @@ for plat in list(artifacts):
 manifest = {
     "schema": 1,
     "channel": channel,
+    # U-02（2026-09-13）：显式声明通道状态。active=本通道有真实制品；
+    # reserved=保留通道（无制品，见 emit_channel_declarations）。客户端据此
+    # 在“网络异常”与“该通道无制品”之间确定性区分，不再依赖 404 猜测。
+    "state": "active",
     "latest": version,
     "updated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "releases": {
@@ -595,6 +599,44 @@ if [ -s "$UP_FAIL_LOG" ]; then
     exit 1
 fi
 
+# ─── U-02：无制品通道的「声明式 manifest」（通道选择 fail-closed）─────────
+# latest/ 必须为通道全集（stable/rc/beta）各备一份 manifest。某通道从未发布
+# 过制品时其 manifest 缺失，客户端 fetch 只得 404——「网络异常」与「该通道
+# 暂无制品」无从区分，旧文案只能并列两种可能，用户反复无意义重试。发布链
+# 在此为「latest/ 中尚无 manifest 的通道」合成显式声明（state=reserved、
+# latest 空串、releases 空集）并 GPG 签名，客户端据此确定性 fail-closed 并
+# 给出可用通道指引。已有 manifest 的通道一律不动（绝不覆盖真实制品指针）；
+# 声明内容幂等（updated_at 取固定哨兵值），重跑不产生无意义 diff。
+ALL_CHANNELS="stable rc beta"
+emit_channel_declarations() { # <latest_repo_dir> <current_channel>
+    local ldir="$1" cur="$2" ch decl
+    for ch in $ALL_CHANNELS; do
+        [ "$ch" = "$cur" ] && continue
+        decl="$ldir/latest/manifest.${ch}.json"
+        [ -s "$decl" ] && continue
+        python3 - "$ch" "$decl" <<'PYEOF'
+import json, sys
+ch, out = sys.argv[1], sys.argv[2]
+manifest = {
+    "schema": 1,
+    "channel": ch,
+    "state": "reserved",
+    "latest": "",
+    "updated_at": "1970-01-01T00:00:00Z",
+    "releases": {},
+    "notes": f"{ch} 为保留通道，暂无制品；当前可用：stable（生产）/ rc（候选）。",
+}
+with open(out, "w", encoding="utf-8") as f:
+    json.dump(manifest, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PYEOF
+        run gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${GPG_PASSPHRASE:-}" --armor --detach-sign \
+            -o "${decl}.asc" "$decl"
+        log_ok "通道声明 manifest: manifest.${ch}.json（state=reserved → 通道选择 fail-closed）"
+    done
+}
+
 # ─── 阶段 5：更新 latest/ 固定入口（更新器轮询） ─────────────────────────
 if [ "${SKIP_LATEST:-0}" != "1" ]; then
     log_info "更新 latest/ 固定入口…"
@@ -623,6 +665,16 @@ if [ "${SKIP_LATEST:-0}" != "1" ]; then
             cp -f "$LAUNCHER_SRC" "$LATEST_DIR/latest/airymaxrt"
         else
             log_warn "未找到更新器源: ${LAUNCHER_SRC}（二进制模式 update 自举将不可用）"
+        fi
+        # U-02：通道全集收敛——为无制品的保留通道补发声明式 manifest。
+        # 仅在可签名时执行：SKIP_SIGN/SKIP_GPG 下无有效签名，客户端 GPG
+        # 验签必然失败（误导为“签名被篡改”），宁缺不假签。
+        if [ "$SKIP_SIGN" = "1" ] || [ "$SKIP_GPG" = "1" ]; then
+            log_warn "跳过保留通道声明 manifest（SKIP_SIGN/SKIP_GPG，无法产生有效签名）"
+        elif command -v gpg >/dev/null 2>&1; then
+            emit_channel_declarations "$LATEST_DIR" "$CHANNEL"
+        else
+            log_warn "跳过保留通道声明 manifest（gpg 不可用）"
         fi
         # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
         # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
