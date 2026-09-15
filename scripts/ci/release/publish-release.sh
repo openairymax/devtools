@@ -24,6 +24,8 @@
 #   RELEASE_NOTES / RELEASE_NOTES_FILE     Release 正文（显式 RELEASE_NOTES
 #                                          优先，文件仅兜底）
 #   AIRY_NOTES_ONLY=1                       仅对齐 Release 正文后退出（不签名/不上传）
+#   AIRY_PRUNE_ONLY=1                       仅执行版本保留处理（窗口收敛）后退出
+#   AIRY_KEEP_VERSIONS=N                    每通道保留版本数（默认 3：当前+上两个）
 #   SKIP_SIGN=1 跳过签名（仅生成 manifest）  SKIP_UPLOAD=1 不上传  DRY_RUN=1 模拟
 # ============================================================================
 
@@ -125,6 +127,167 @@ if [ "${AIRY_NOTES_ONLY:-0}" = "1" ]; then
     [ -n "${ATOMGIT_TOKEN:-}" ] || { log_fail "AIRY_NOTES_ONLY=1 需 ATOMGIT_TOKEN"; exit 1; }
     log_info "仅对齐 Release 正文: ${VERSION}"
     align_release_body "$VERSION" "$RELEASE_BODY" "$PRERELEASE" || exit 1
+    exit 0
+fi
+
+# ─── 版本保留（社区窗口：每通道仅留最新 N 版）──────────────────────────────
+# 社区策略（0.1.17 预先工作定案）：只保留当前版本 + 上两个。按通道分窗
+# （stable/rc/beta 各留 AIRY_KEEP_VERSIONS，默认 3），绝不全局统一窗口——
+# rc 迭代密集（0.1.13 实证 rc1~rc9+），全局窗口会被 rc 挤占，导致 stable
+# 生产通道旧版下载 URL 404，破坏在装用户的自更新链。
+# 判定基准 = 远端 Release 全集 ∪ 本地 dist 版本集合：远端列举失败
+# （fail-soft，视为空）时仅对本地判窗，保守不误删；AIRY_PRUNE_ONLY 重跑
+# 幂等（已删 tag 不再出现，窗口由现存版本构成，判定稳定）。
+airy_channel_of() {
+    case "$1" in
+        *-rc*)   echo "rc" ;;
+        *-beta*) echo "beta" ;;
+        *)       echo "stable" ;;
+    esac
+}
+
+# 远端 Release 列举（tag 每行一个，分页 per_page=100）。列表端点匿名可读
+# （0.1.16 实证），带 token 更稳。
+airy_list_remote() {
+    local page=1 batch n
+    local -a auth=()
+    [ -n "${ATOMGIT_TOKEN:-}" ] && auth=(-H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}")
+    while :; do
+        batch="$(curl -fsSL --connect-timeout 20 "${auth[@]}" \
+            "${API}?per_page=100&page=${page}" 2>/dev/null \
+            | python3 -c 'import sys,json; print("\n".join((r.get("tag_name") or "") for r in (json.load(sys.stdin) or [])))' 2>/dev/null || true)"
+        batch="$(printf '%s\n' "$batch" | sed '/^$/d')"
+        [ -n "$batch" ] || break
+        printf '%s\n' "$batch"
+        n="$(printf '%s\n' "$batch" | wc -l)"
+        [ "$n" -lt 100 ] && break
+        page=$((page + 1))
+    done
+}
+
+# 超窗判定（排序+分窗在 python 内完成，semver 感知）：
+#   主/次/补丁版本数值比较；同版本号内分层 正式(4) > 字母后缀(3) >
+#   rc(2) > beta(1)；rc/beta 序号数值比较（防 rc10 < rc9 字典序误判）。
+# 入参: 1=全部 tag（每行一个） 2=keep 3=当前版本（永不 prune）
+# 出参: 每行一个超窗 tag
+airy_overkept() {
+    python3 - "$1" "$2" "$3" <<'PYEOF'
+import re, sys
+
+tags = [t.strip() for t in sys.argv[1].splitlines() if t.strip()]
+keep = int(sys.argv[2])
+current = sys.argv[3]
+
+def chan(t):
+    if "-rc" in t: return "rc"
+    if "-beta" in t: return "beta"
+    return "stable"
+
+def vkey(t):
+    m = re.match(r"^v(\d+)\.(\d+)\.(\d+)(.*)$", t)
+    if not m:
+        return (0, 0, 0, 0, 0, "", t)
+    maj, mnr, pat, suf = int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4)
+    rank, num, sfx = 4, 0, ""
+    m2 = re.match(r"^[-.]?(rc|beta)[-.]?(\d+)", suf)
+    if m2:
+        rank = 2 if m2.group(1) == "rc" else 1
+        num = int(m2.group(2)) if m2.group(2) else 0
+    elif suf:
+        rank = 3
+        sfx = suf.lstrip("-.")
+    return (maj, mnr, pat, rank, num, sfx, t)
+
+groups = {}
+for t in tags:
+    groups.setdefault(chan(t), []).append(t)
+for ch in sorted(groups):
+    ts = sorted(groups[ch], key=vkey)
+    for t in ts[:-keep]:
+        if t != current:
+            print(t)
+PYEOF
+}
+
+# 超窗远端 Release 删除。删除端点为 Gitee 兼容形态（DELETE /releases/{tag}）；
+# fail-soft：无 token 或删除失败仅告警，不阻断发布主链路（下载链不受
+# 影响的旧版本多留一期无害，下期发布自动重试收敛）。
+airy_delete_remote() {
+    local tag="$1"
+    if [ -z "${ATOMGIT_TOKEN:-}" ]; then
+        log_warn "未配置 ATOMGIT_TOKEN，跳过远端删除: ${tag}（需人工处理或下期重试）"
+        return 1
+    fi
+    if curl -fsS --connect-timeout 20 -X DELETE \
+        -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" "${API}/${tag}" >/dev/null 2>&1; then
+        log_ok "远端 Release 已删除（超窗）: ${tag}"
+    else
+        log_warn "远端 Release 删除失败（fail-soft，不阻断发布）: ${tag}"
+        return 1
+    fi
+}
+
+airy_prune_old() {
+    local keep="${AIRY_KEEP_VERSIONS:-3}"
+    log_info "版本保留处理（每通道保留 ${keep} 版，当前 ${VERSION} 永保留）…"
+    local remote_tags f base ver all over t
+    remote_tags="$(airy_list_remote || true)"
+    local -a localv=()
+    for f in "$DIST_DIR"/agentrt-*-*.tar.gz "$DIST_DIR"/agentrt-*-*.zip; do
+        [ -e "$f" ] || continue
+        base="$(basename "$f")"
+        ver="${base#agentrt-}"
+        ver="${ver%%-*}"
+        case " ${localv[*]-} " in *" ${ver} "*) ;; *) localv+=("$ver") ;; esac
+    done
+    all="$( { printf '%s\n' "$remote_tags"; printf '%s\n' "${localv[@]-}"; } | sed '/^$/d' | sort -u )"
+    if [ -z "$all" ]; then
+        log_ok "版本保留处理: 无历史版本，跳过"
+        return 0
+    fi
+    over="$(airy_overkept "$all" "$keep" "$VERSION")"
+    if [ -z "$over" ]; then
+        log_ok "版本保留处理: 窗口合规（每通道 ${keep} 版）"
+        return 0
+    fi
+    log_info "超窗版本:"
+    sed 's/^/  - /' <<<"$over"
+    # 本地 dist 台面整理：超窗版本全系文件（tar.gz/sha256/sig）归档
+    # archive/<ver>/（既有归档惯例），当前版本文件永不动。dist 台面在
+    # 源码区外（works-engineering），归档不触碰源码区（铁律 BAN-33）。
+    while IFS= read -r t; do
+        [ -n "$t" ] || continue
+        local -a mvs=()
+        for f in "$DIST_DIR"/agentrt-"$t"-*; do
+            [ -e "$f" ] || continue
+            mvs+=("$f")
+        done
+        [ ${#mvs[@]} -gt 0 ] || continue
+        if [ "$DRY_RUN" = "1" ]; then
+            log_info "DRY-RUN: mv ${#mvs[@]} 个文件 → archive/${t}/"
+        else
+            mkdir -p "$DIST_DIR/archive/${t}"
+            mv -f "${mvs[@]}" "$DIST_DIR/archive/${t}/"
+            log_ok "本地已归档: ${t}（${#mvs[@]} 个文件 → archive/${t}/）"
+        fi
+    done <<<"$over"
+    while IFS= read -r t; do
+        [ -n "$t" ] || continue
+        printf '%s\n' "$remote_tags" | grep -qxF "$t" || continue
+        if [ "$DRY_RUN" = "1" ]; then
+            log_info "DRY-RUN: DELETE ${API}/${t}"
+        else
+            airy_delete_remote "$t" || true
+        fi
+    done <<<"$over"
+}
+
+# ─── 阶段 0.1：仅执行版本保留处理（AIRY_PRUNE_ONLY=1）─────────────────────
+# 版本清理独立成模式：无需签名/上传全链路即可对现状（本地 dist 台面 +
+# 远端 Release）执行窗口收敛，与 AIRY_NOTES_ONLY 同为运维后门。
+if [ "${AIRY_PRUNE_ONLY:-0}" = "1" ]; then
+    log_info "仅执行版本保留处理: ${VERSION}"
+    airy_prune_old
     exit 0
 fi
 
@@ -703,5 +866,10 @@ if [ "${SKIP_LATEST:-0}" != "1" ]; then
         log_ok "latest/manifest.${CHANNEL}.json 已更新"
     fi
 fi
+
+# ─── 阶段 6：版本保留处理（社区窗口：每通道仅留最新 N 版）─────────────────
+# 发布即收敛：窗口处理放在发布主链路末端（latest/ 已更新、manifest.releases
+# 只引用当前版本），此时删除超窗旧 Release 不影响本次发布产物一致性。
+airy_prune_old
 
 log_ok "发布完成: ${VERSION}（${CHANNEL}）"
