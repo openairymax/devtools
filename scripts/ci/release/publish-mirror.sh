@@ -32,6 +32,9 @@
 #                       新 Release 退回落款行（历史回填不得清空社区说明）
 #   MIRROR_VERIFY_MAX_BYTES  内容级校验体积上限（默认 1MiB）：远端无摘要
 #                       时，不超过该体积的附件会取回远端字节做 sha256 比对
+#   AIRY_PRUNE_ONLY=1   仅执行镜像面版本保留（窗口收敛）后退出（运维后门，
+#                       不读取本地 dist，无需 DIST_DIR）
+#   AIRY_KEEP_VERSIONS=N 每通道保留版本数（默认 3：当前+上两个，同 SSoT 面）
 #   DRY_RUN=1           模拟（零网络：仅打印将执行的动作）
 # 退出：fail-closed——任一平台任一附件失败即非零退出。
 # ============================================================================
@@ -69,8 +72,168 @@ MIRROR_VERIFY_MAX_BYTES="${MIRROR_VERIFY_MAX_BYTES:-1048576}"
 redact() { sed -E 's#(https?://)[^/?]*[^?]*\?*#https://***#' /dev/null; \
            sed -E 's#access_token=[^&" ]*#access_token=***#g'; }
 
+# 本脚本目录（共享超窗判定脚本 airy_release_prune.py 所在；与 SSoT 面
+# publish-release.sh 的判窗实现严格同源，禁止内联副本）。
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── 平台 API 基元（镜像主链与版本保留共用，定义上移避免重复）──────────────
+gh_api() {
+    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+        -H "Authorization: Bearer ${GH_TOKEN}" \
+        -H "Accept: application/vnd.github+json" "$@" 2>&1
+}
+
+# 取回 GitHub 附件原始字节（内容级校验用）。匿名 download_url 会撞 WAF，
+# 必须走 API + application/octet-stream（0.1.15 实证匿名 403）。
+gh_asset_bytes() {
+    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+        -H "Authorization: Bearer ${GH_TOKEN}" \
+        -H "Accept: application/octet-stream" \
+        "https://api.github.com/repos/${GITHUB_REPO}/releases/assets/$1"
+}
+
+gitee_api() {
+    local out rc
+    out="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" "$@" 2> >(redact >&2))"; rc=$?
+    [ $rc -eq 0 ] && printf '%s' "$out"
+    return $rc
+}
+
+# 取回 Gitee 附件原始字节（内容级校验用）。Gitee attach_files 无摘要端点，
+# 只能按 release 下载路径取样比对。
+gitee_asset_bytes() {
+    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+        "https://gitee.com/${GITEE_REPO}/releases/download/${VERSION}/$1"
+}
+
 [ -n "$VERSION" ] || { echo "用法: $0 <版本号> [DIST_DIR]"; exit 1; }
-[ -n "$DIST_DIR" ] && [ -d "$DIST_DIR" ] || { log_fail "DIST_DIR 不存在: ${DIST_DIR:-<空>}"; exit 1; }
+# AIRY_PRUNE_ONLY=1 为运维后门（仅收敛镜像面版本窗口，不读取本地 dist），
+# 不要求 DIST_DIR（对齐 publish-release.sh 后门语义）；其余模式必须存在。
+if [ "${AIRY_PRUNE_ONLY:-0}" != "1" ]; then
+    [ -n "$DIST_DIR" ] && [ -d "$DIST_DIR" ] || { log_fail "DIST_DIR 不存在: ${DIST_DIR:-<空>}"; exit 1; }
+fi
+
+# ─── 阶段 0：镜像面版本保留（社区窗口：每通道仅留最新 N 版）────────────────
+# 策略与 SSoT 面（publish-release.sh airy_prune_old）同源：只保留当前版本
+# + 上两个，按通道分窗（stable/rc/beta 各留 AIRY_KEEP_VERSIONS，默认 3），
+# 绝不全局统一窗口——rc 迭代密集会挤占 stable 窗口，破坏在装用户自更新链。
+# 超窗判定共用 airy_release_prune.py（判定实现只此一份）。镜像面职责只在
+# 远端：判窗基准 = 镜像平台远端现存 Release 全集（本地 dist 台面整理由
+# SSoT 面负责）；列举失败视为空 → 不判删，保守不误删（fail-soft）。
+gh_list_rel_tags() {
+    # GitHub Release 列举：输出 "tag_name id" 对（每行）。跳过 draft——
+    # 可能是并发进行中的发布，且 draft 不占社区下载面。分页 per_page=100。
+    local page=1 batch n
+    while :; do
+        batch="$(gh_api "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&page=${page}" \
+            | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d=[]
+for r in d:
+    if isinstance(r,dict) and not r.get("draft"):
+        print(r.get("tag_name",""), r.get("id",""))' || true)"
+        batch="$(printf '%s\n' "$batch" | sed '/^$/d')"
+        [ -n "$batch" ] || break
+        printf '%s\n' "$batch"
+        n="$(printf '%s\n' "$batch" | wc -l)"
+        [ "$n" -lt 100 ] && break
+        page=$((page + 1))
+    done
+}
+
+gitee_list_rel_tags() {
+    # Gitee Release 列举：输出 "tag_name id" 对。Gitee 无 draft 概念；
+    # 显式 per_page=100（v5 默认页长 20，rc10 实证教训）。
+    local page=1 batch n
+    while :; do
+        batch="$(gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases" \
+            --data-urlencode "access_token=${GITEE_TOKEN}" \
+            --data-urlencode "per_page=100" \
+            --data-urlencode "page=${page}" \
+            | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d=[]
+for r in d:
+    if isinstance(r,dict):
+        print(r.get("tag_name",""), r.get("id",""))' || true)"
+        batch="$(printf '%s\n' "$batch" | sed '/^$/d')"
+        [ -n "$batch" ] || break
+        printf '%s\n' "$batch"
+        n="$(printf '%s\n' "$batch" | wc -l)"
+        [ "$n" -lt 100 ] && break
+        page=$((page + 1))
+    done
+}
+
+# 镜像面超窗删除（DELETE release 对象，tag 本体保留——三平台口径一致）。
+# 删除 fail-soft：失败仅告警不进 failed.txt，不阻断镜像主链；旧版本多留
+# 一期无害，下期发布/PRUNE_ONLY 重跑自动收敛。远端全集为空（列举失败）
+# 时判定自然为空，不误删。
+mirror_prune_face() {
+    local keep="${AIRY_KEEP_VERSIONS:-3}"
+    log_info "镜像面版本保留处理（每通道保留 ${keep} 版，当前 ${VERSION} 永保留）…"
+    local tags over t rid
+    if [ -n "${GH_TOKEN:-}" ]; then
+        tags="$(gh_list_rel_tags || true)"
+        over="$(printf '%s\n' "$tags" | awk '{print $1}' \
+            | python3 "${SCRIPT_DIR}/airy_release_prune.py" "$keep" "$VERSION" || true)"
+        if [ -n "$over" ]; then
+            log_info "GitHub 超窗版本:"
+            sed 's/^/  - /' <<<"$over"
+            while IFS= read -r t; do
+                [ -n "$t" ] || continue
+                rid="$(awk -v t="$t" '$1==t{print $2; exit}' <<<"$tags")"
+                [ -n "$rid" ] || { log_warn "GitHub 超窗版本无 release id，跳过: ${t}"; continue; }
+                if [ "$DRY_RUN" = "1" ]; then
+                    log_info "DRY-RUN: DELETE GitHub release ${t} (id=${rid})"
+                elif gh_api -X DELETE "https://api.github.com/repos/${GITHUB_REPO}/releases/${rid}" >/dev/null; then
+                    log_ok "GitHub 超窗 Release 已删除: ${t}"
+                else
+                    log_warn "GitHub 超窗 Release 删除失败（fail-soft，下期重试收敛）: ${t}"
+                fi
+            done <<<"$over"
+        else
+            log_ok "GitHub 版本窗口合规（每通道 ${keep} 版）"
+        fi
+    else
+        log_warn "缺 GH_TOKEN，跳过 GitHub 镜像面版本保留"
+    fi
+    if [ -n "${GITEE_TOKEN:-}" ]; then
+        tags="$(gitee_list_rel_tags || true)"
+        over="$(printf '%s\n' "$tags" | awk '{print $1}' \
+            | python3 "${SCRIPT_DIR}/airy_release_prune.py" "$keep" "$VERSION" || true)"
+        if [ -n "$over" ]; then
+            log_info "Gitee 超窗版本:"
+            sed 's/^/  - /' <<<"$over"
+            while IFS= read -r t; do
+                [ -n "$t" ] || continue
+                rid="$(awk -v t="$t" '$1==t{print $2; exit}' <<<"$tags")"
+                [ -n "$rid" ] || { log_warn "Gitee 超窗版本无 release id，跳过: ${t}"; continue; }
+                if [ "$DRY_RUN" = "1" ]; then
+                    log_info "DRY-RUN: DELETE Gitee release ${t} (id=${rid})"
+                elif gitee_api -X DELETE \
+                    "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${rid}?access_token=${GITEE_TOKEN}" >/dev/null; then
+                    log_ok "Gitee 超窗 Release 已删除: ${t}"
+                else
+                    log_warn "Gitee 超窗 Release 删除失败（fail-soft，下期重试收敛）: ${t}"
+                fi
+            done <<<"$over"
+        else
+            log_ok "Gitee 版本窗口合规（每通道 ${keep} 版）"
+        fi
+    else
+        log_warn "缺 GITEE_TOKEN，跳过 Gitee 镜像面版本保留"
+    fi
+}
+
+# 后门入口：无需走镜像主链，独立对两平台远端现状执行窗口收敛。
+if [ "${AIRY_PRUNE_ONLY:-0}" = "1" ]; then
+    [ -n "${GH_TOKEN:-}" ] || [ -n "${GITEE_TOKEN:-}" ] \
+        || { log_fail "AIRY_PRUNE_ONLY=1 需 GH_TOKEN 或 GITEE_TOKEN 至少其一"; exit 1; }
+    log_info "仅执行镜像面版本保留: ${VERSION}"
+    mirror_prune_face
+    exit 0
+fi
 
 # ─── 通道判定（与 publish-release.sh 同源）─────────────────────────────────
 case "$VERSION" in
@@ -194,21 +357,6 @@ remote_identical() {
 }
 
 # ─── 阶段 1：GitHub Releases ───────────────────────────────────────────────
-gh_api() {
-    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
-        -H "Authorization: Bearer ${GH_TOKEN}" \
-        -H "Accept: application/vnd.github+json" "$@" 2>&1
-}
-
-# 取回 GitHub 附件原始字节（内容级校验用）。匿名 download_url 会撞 WAF，
-# 必须走 API + application/octet-stream（0.1.15 实证匿名 403）。
-gh_asset_bytes() {
-    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
-        -H "Authorization: Bearer ${GH_TOKEN}" \
-        -H "Accept: application/octet-stream" \
-        "https://api.github.com/repos/${GITHUB_REPO}/releases/assets/$1"
-}
-
 if [ "${GH_TOKEN:-}" ] && [ "$DRY_RUN" != "1" ]; then
     # 前置：tag 必须已在 GH（sync-mirror 同步）。GH create release 对不存在
     # 的 tag 会静默在默认分支头建 tag——那是错误对象，必须 fail-closed。
@@ -287,20 +435,6 @@ else
 fi
 
 # ─── 阶段 2：Gitee Releases ────────────────────────────────────────────────
-gitee_api() {
-    local out rc
-    out="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" "$@" 2> >(redact >&2))"; rc=$?
-    [ $rc -eq 0 ] && printf '%s' "$out"
-    return $rc
-}
-
-# 取回 Gitee 附件原始字节（内容级校验用）。Gitee attach_files 无摘要端点，
-# 只能按 release 下载路径取样比对。
-gitee_asset_bytes() {
-    curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
-        "https://gitee.com/${GITEE_REPO}/releases/download/${VERSION}/$1"
-}
-
 if [ "${GITEE_TOKEN:-}" ] && [ "${SKIP_GITEE:-0}" != "1" ] && [ "$DRY_RUN" != "1" ]; then
     # 前置：tag 必须已在 Gitee（sync-mirror 同步）；否则 release 会绑错对象。
     # 端点用列表 GET /tags（Gitee v5 无单 tag 详情端点 /tags/{tag}——即使
@@ -434,6 +568,9 @@ else
         log_fail "缺 GITEE_TOKEN"; echo "gitee:no-token" >> "$TMP/failed.txt"
     fi
 fi
+
+# ─── 镜像面版本保留（发布先落地，窗口后收敛；fail-soft 不入 failed.txt）───
+mirror_prune_face
 
 # ─── 汇总（fail-closed）────────────────────────────────────────────────────
 if [ -f "$TMP/failed.txt" ] && [ -s "$TMP/failed.txt" ]; then

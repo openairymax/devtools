@@ -165,48 +165,14 @@ airy_list_remote() {
     done
 }
 
-# 超窗判定（排序+分窗在 python 内完成，semver 感知）：
+# 超窗判定（排序+分窗在共享脚本 airy_release_prune.py 内完成，semver 感知，
+# 与 publish-mirror.sh 镜像面严格同源——判定实现只此一份，禁止内联副本）：
 #   主/次/补丁版本数值比较；同版本号内分层 正式(4) > 字母后缀(3) >
 #   rc(2) > beta(1)；rc/beta 序号数值比较（防 rc10 < rc9 字典序误判）。
 # 入参: 1=全部 tag（每行一个） 2=keep 3=当前版本（永不 prune）
 # 出参: 每行一个超窗 tag
 airy_overkept() {
-    python3 - "$1" "$2" "$3" <<'PYEOF'
-import re, sys
-
-tags = [t.strip() for t in sys.argv[1].splitlines() if t.strip()]
-keep = int(sys.argv[2])
-current = sys.argv[3]
-
-def chan(t):
-    if "-rc" in t: return "rc"
-    if "-beta" in t: return "beta"
-    return "stable"
-
-def vkey(t):
-    m = re.match(r"^v(\d+)\.(\d+)\.(\d+)(.*)$", t)
-    if not m:
-        return (0, 0, 0, 0, 0, "", t)
-    maj, mnr, pat, suf = int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4)
-    rank, num, sfx = 4, 0, ""
-    m2 = re.match(r"^[-.]?(rc|beta)[-.]?(\d+)", suf)
-    if m2:
-        rank = 2 if m2.group(1) == "rc" else 1
-        num = int(m2.group(2)) if m2.group(2) else 0
-    elif suf:
-        rank = 3
-        sfx = suf.lstrip("-.")
-    return (maj, mnr, pat, rank, num, sfx, t)
-
-groups = {}
-for t in tags:
-    groups.setdefault(chan(t), []).append(t)
-for ch in sorted(groups):
-    ts = sorted(groups[ch], key=vkey)
-    for t in ts[:-keep]:
-        if t != current:
-            print(t)
-PYEOF
+    printf '%s\n' "$1" | python3 "${SCRIPT_DIR}/airy_release_prune.py" "$2" "$3"
 }
 
 # 超窗远端 Release 删除。删除端点为 Gitee 兼容形态（DELETE /releases/{tag}）；
