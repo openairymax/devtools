@@ -1,6 +1,6 @@
 # =============================================================================
 # AgentRT 工具级权限规则（Tool-level permission rules）
-# 版本: v1.3.0
+# 版本: v1.4.0
 #
 # 由 daemon_security 在 daemon 启动时加载（daemon_security_load_rules_file），
 # 写入 tool_d / agent_d 等 daemon 的 ACL 表。判定为 fail-closed：
@@ -11,6 +11,12 @@
 #   - agent  : 智能体标识（见 ecosystem/agents/*/contract.json 的 agent_id）
 #   - tool   : 工具名（与 tool_d 注册的工具名一致，如 fs_read / shell_run）
 #   - effect : "allow" 或 "deny"（deny 规则优先于同一 (agent, tool) 的 allow）
+#
+# v1.4.0：coding_v1 补齐 maths_eval/maths_stats/maths_plot，external 补
+# maths_plot（2026-09-15）。此前 maths 工具只授权了 external 主体，CLI
+# 聊天回路主体 coding_v1 未显式 allow，数学工具被 fail-closed 拒绝
+# （0x5002），这是"数学计算调用不上"的授权面根因。三个 maths 工具均为
+# TOOL_ACCESS_READ 纯数值计算（无文件/网络副作用），执行主体默认放行。
 #
 # v1.3.0：external 主体补工具级授权（2026-09-13）。0.1.15 收口 R-6：
 # /mcp 端点的 tools/call 由 gateway 以 "external" 主体做 PEP 判定（PDP
@@ -82,6 +88,15 @@ rules:
     effect: "allow"
   - agent: "coding_v1"
     tool: "web_fetch"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "maths_eval"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "maths_stats"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "maths_plot"
     effect: "allow"
 
   - agent: "backend_v1"
@@ -468,6 +483,9 @@ rules:
     effect: "allow"
   - agent: "external"
     tool: "maths_stats"
+    effect: "allow"
+  - agent: "external"
+    tool: "maths_plot"
     effect: "allow"
 
   # ─── 明确拒绝示例（默认已 fail-closed，无需枚举）────────────────
