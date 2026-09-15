@@ -262,7 +262,7 @@ class TestTokenCounter(unittest.TestCase):
         provider = self.counter._detect_provider("claude-3-opus")
         self.assertEqual(provider, ModelProvider.ANTHROPIC)
         
-        provider = self.counter._detect_provider("deepseek-chat")
+        provider = self.counter._detect_provider("deepseek-flash")
         self.assertEqual(provider, ModelProvider.DEEPSEEK)
         
         provider = self.counter._detect_provider("unknown-model")
