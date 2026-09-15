@@ -149,7 +149,7 @@ typedef struct {
 static char *openai_models[]     = {"gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", NULL};
 static char *anthropic_models[]  = {"claude-sonnet", "claude-haiku", NULL};
 static char *google_models[]     = {"gemini-pro", "gemini-flash", NULL};
-static char *deepseek_models[]   = {"deepseek-v3", "deepseek-chat", NULL};
+static char *deepseek_models[]   = {"deepseek-v3", "deepseek-flash", NULL};
 static char *local_models[]      = {"local-llama3", "local-mistral", NULL};
 
 static test_provider_entry_t test_providers[] = {
@@ -202,7 +202,7 @@ static void test_int15_1_provider_registry(void)
         "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo",
         "claude-sonnet", "claude-haiku",
         "gemini-pro", "gemini-flash",
-        "deepseek-v3", "deepseek-chat",
+        "deepseek-v3", "deepseek-flash",
         "local-llama3", "local-mistral",
     };
     int model_count = (int)(sizeof(expected_models) / sizeof(expected_models[0]));
