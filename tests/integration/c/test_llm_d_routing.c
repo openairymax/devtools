@@ -170,8 +170,10 @@ static void test_int15_1_provider_registry(void)
 {
     printf("\n--- [INT-15.1] Provider Registry: 注册与发现 ---\n");
 
-    /* 构建配置 */
+    /* 构建配置：整体清零后再逐字段赋值，避免结构体扩展出的新字段
+     * （如容量表 model_max_output）携带栈垃圾而被下游解引用 */
     provider_config_t prov_cfg_entries[TEST_PROVIDER_COUNT];
+    __builtin_memset(prov_cfg_entries, 0, sizeof(prov_cfg_entries));
 
     for (size_t i = 0; i < TEST_PROVIDER_COUNT; i++) {
         prov_cfg_entries[i].name         = test_providers[i].name;
@@ -260,8 +262,8 @@ static void test_int15_2_find_provider(void)
     printf("\n--- [INT-15.2] find_provider: 查找与错误处理 ---\n");
 
     provider_config_t prov_cfg[] = {
-        {"openai",    NULL, NULL, NULL, 30.0, 3, NULL},
-        {"anthropic", NULL, NULL, NULL, 30.0, 3, NULL},
+        {"openai",    NULL, NULL, NULL, 30.0, 3, NULL, NULL},
+        {"anthropic", NULL, NULL, NULL, 30.0, 3, NULL, NULL},
     };
 
     service_config_t cfg = {
@@ -589,8 +591,8 @@ static void test_int15_5_provider_health_check(void)
 
     /* Step 6: 健康提供商的模型仍可通过 registry 查找 */
     provider_config_t prov_cfg[] = {
-        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL},
-        {"local",    NULL, NULL, NULL, 60.0, 1, NULL},
+        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL, NULL},
+        {"local",    NULL, NULL, NULL, 60.0, 1, NULL, NULL},
     };
 
     service_config_t cfg = {
@@ -629,8 +631,8 @@ static void test_int15_6_e2e_routing_pipeline(void)
 
     /* Step 1: 创建服务配置与注册表 */
     provider_config_t prov_cfg[] = {
-        {"openai",   NULL, NULL, NULL, 30.0, 3, NULL},
-        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL},
+        {"openai",   NULL, NULL, NULL, 30.0, 3, NULL, NULL},
+        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL, NULL},
     };
 
     service_config_t cfg = {
