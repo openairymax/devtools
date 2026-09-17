@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <unistd.h>
 
 /* corekern */
@@ -612,14 +613,14 @@ static void e2e_scenario_10_idempotency(void)
 /*  场景11: 线程池集成工作流                                                 */
 /* ======================================================================== */
 
-static int g_tpool_completed = 0;
+static _Atomic int g_tpool_completed = 0;
 static airy_mtx_t* g_tpool_mtx = NULL;
 
 static void tpool_task_fn(void* arg)
 {
-    int* counter = (int*)arg;
+    _Atomic int* counter = (_Atomic int*)arg;
     if (g_tpool_mtx) airy_mtx_lock(g_tpool_mtx);
-    (*counter)++;
+    atomic_fetch_add(counter, 1);
     if (g_tpool_mtx) airy_mtx_unlock(g_tpool_mtx);
 }
 
