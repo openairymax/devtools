@@ -9,10 +9,11 @@
 # 通道：tag 含 -beta./-rc. → beta 通道；否则 stable。
 #   官方制品仓库：https://atomgit.com/openairymax/agentrt（用户指定）
 #   制品 URL:      https://atomgit.com/openairymax/agentrt/releases/download/<tag>/<file>
-#   manifest 固定入口（更新器轮询）：仓库代码树 latest/ 目录，
-#      URL: https://atomgit.com/openairymax/agentrt/raw/main/latest/manifest.<channel>.json
-#      （0.1.6b：主域 raw 路径。raw.atomgit.com 子域对非 Markdown 返回
-#      "暂不支持预览"403，部分网络不可达，安装器/更新器一律用主域。）
+#   安装/更新唯一事实源（B12，0.1.18 乙口径）：滚动 tag "latest" 的
+#   release 附件面，每次发布由阶段 4.6 强制刷新（V12.3 附件保鲜）：
+#      .../releases/download/latest/{install.sh,install.ps1,airymaxrt,agentrt.asc,manifest.<channel>.json(.asc)}
+#   仓库代码树 latest/ 目录仅作同源归档快照（阶段 5 指针 commit），不再是
+#   客户端读取面——contents/raw 第二事实源已随 B12 废除。
 #
 # 用法：
 #   ./publish-release.sh v0.1.5 [DIST_DIR]              # stable 发布
@@ -528,11 +529,18 @@ align_release_body "$VERSION" "$RELEASE_BODY" "$PRERELEASE" || exit 1
 # upload_url 每次签发全新 OBS key，PUT 到新对象后 release 附件记录未切绑，
 # 下载仍返回旧文件（tar.gz 新旧大小差即暴露，sha256/sig 恒长假绿）。因此
 # AIRY_FORCE_UPLOAD=1 的正确语义 = 先 DELETE 同名附件（全新 key 绑定）再 PUT。
-UP_FAILED=0
-# 拉取现有附件 {name<TAB>id}（attach 有数字 id，source 源码包无 id）
-EXISTING_ASSETS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-    "${API}/tags/${VERSION}" 2>/dev/null \
-    | python3 -c "import sys,json;print('\n'.join(f\"{a.get('name','')}\t{a.get('id') or ''}\" for a in (json.load(sys.stdin).get('assets') or [])))" 2>/dev/null || true)"
+# 拉取现有附件 {name<TAB>id}（attach 有数字 id，source 源码包无 id）。
+# tag 参数化（CUR_TAG）：版本 tag 与滚动 latest tag（阶段 4.6）共用同一套
+# 上传/校验实现，禁止为 latest 另写第二份（SSoT）。
+CUR_TAG=""
+EXISTING_ASSETS=""
+fetch_existing_assets() {
+    CUR_TAG="$1"
+    EXISTING_ASSETS="$(curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+        "${API}/tags/${CUR_TAG}" 2>/dev/null \
+        | python3 -c "import sys,json;print('\n'.join(f\"{a.get('name','')}\t{a.get('id') or ''}\" for a in (json.load(sys.stdin).get('assets') or [])))" 2>/dev/null || true)"
+}
+fetch_existing_assets "$VERSION"
 
 # 删除远端同名附件（AIRY_FORCE_UPLOAD=1 先删后传；DELETE 失败仅告警不阻断，
 # PUT 本身带幂等，残留旧附件会再暴露于上传后校验并 fail-closed）。
@@ -541,7 +549,7 @@ delete_existing_asset() {
     aid="$(awk -F '\t' -v n="$b" '$1==n{print $2;exit}' <<<"$EXISTING_ASSETS")"
     [ -n "$aid" ] || return 0
     if curl -fsS --connect-timeout 20 -X DELETE -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-        "${API}/${VERSION}/attach_files/${aid}" >/dev/null 2>&1; then
+        "${API}/${CUR_TAG}/attach_files/${aid}" >/dev/null 2>&1; then
         log_ok "已删除远端同名附件（先删后传）: ${b} (asset ${aid})"
     else
         log_warn "远端附件删除失败（upload_url 将签发新 key，残留风险由校验兜底）: ${b}"
@@ -563,7 +571,7 @@ remote_matches_local() {
     dlf="$(mktemp)"
     if curl -fsSL --connect-timeout 20 --speed-limit 1024 --speed-time 60 \
         --max-time 1800 -o "$dlf" \
-        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null; then
+        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" 2>/dev/null; then
         dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
         local_sha="$(sha256sum "$f" | awk '{print $1}')"
         rm -f "$dlf"
@@ -599,7 +607,7 @@ upload_asset() {
     # 60min 0 字节 timeout，两次 attempt 共浪费 >2h）。每文件看门狗重试：
     # curl --speed-limit 1024 --speed-time 240 —— 连续 240s 速率 <1024B/s 即
     # 中断（rc=28），杜绝白等；每次重试重新取 upload_url（预签名或已失效/
-    # 残留半对象），先删残留同名再 PUT；重试耗尽仍失败才计入 UP_FAILED。
+    # 残留半对象），先删残留同名再 PUT；重试耗尽仍失败才计入 UP_FAIL_LOG。
     local attempt=0 upjson upurl rc=1
     local -a uphdr=()
     while [ "$attempt" -lt "${UPLOAD_RETRY:-4}" ]; do
@@ -610,7 +618,7 @@ upload_asset() {
             asset_exists "$b" && delete_existing_asset "$b"
         fi
         upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-            --data-urlencode "file_name=${b}" "${API}/${VERSION}/upload_url")" \
+            --data-urlencode "file_name=${b}" "${API}/${CUR_TAG}/upload_url")" \
             || { log_warn "upload_url 获取失败(尝试 ${attempt}): ${b}"; continue; }
         upurl="$(python3 -c 'import json,sys;print((json.load(sys.stdin) or {}).get("url",""))' <<<"$upjson")"
         [ -n "$upurl" ] || { log_warn "upload_url 为空(尝试 ${attempt}): ${b}"; continue; }
@@ -637,7 +645,7 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     local local_size dl
     local_size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
     dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
-        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" 2>/dev/null || echo 0)"
+        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" 2>/dev/null || echo 0)"
     if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
         case "$b" in
           *.tar.gz|*.zip)
@@ -652,7 +660,7 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
             dlf="$(mktemp)"
             dl_sha=""
             if curl -fsSL --connect-timeout 20 --max-time 120 \
-                "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${VERSION}/${b}" \
+                "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" \
                 -o "$dlf" 2>/dev/null; then
                 dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
             fi
@@ -669,6 +677,126 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
         return 1
     fi
 }
+
+# ─── 阶段 4.4：准备 latest/ 发布树（通道全集 + 启动器 + 密钥）─────────────
+# B12（0.1.18）：安装/更新面全量收敛到 release 附件——install.sh / install.ps1 /
+# airymaxrt 只读 releases/download/<tag>/，不再经 contents API + base64 直读
+# 分支。为此 release 附件必须与 latest/ 代码树同构补齐：除当前通道 manifest
+# 外，还须附其余通道的 manifest（通道选择 fail-closed 依赖全通道可见）与启动
+# 器 airymaxrt（安装器/更新器自举源）、GPG 公钥 agentrt.asc（manifest 验签）。
+# 三者缺失会让 install 侧退化成读分支，即第二套事实源（§10-8）。
+# 阶段顺序：先备树再上传，最后才切 latest/ 指针——附件不齐绝不切指针。
+ALL_CHANNELS="stable rc beta"
+
+# U-02：无制品通道的「声明式 manifest」（通道选择 fail-closed）───────────
+# latest/ 必须为通道全集（stable/rc/beta）各备一份 manifest。某通道从未发布
+# 过制品时其 manifest 缺失，客户端 fetch 只得 404——「网络异常」与「该通道
+# 暂无制品」无从区分，旧文案只能并列两种可能，用户反复无意义重试。发布链
+# 在此为「latest/ 中尚无 manifest 的通道」合成显式声明（state=reserved、
+# latest 空串、releases 空集）并 GPG 签名，客户端据此确定性 fail-closed 并
+# 给出可用通道指引。已有 manifest 的通道一律不动（绝不覆盖真实制品指针）；
+# 声明内容幂等（updated_at 取固定哨兵值），重跑不产生无意义 diff。
+emit_channel_declarations() { # <latest_repo_dir> <current_channel>
+    local ldir="$1" cur="$2" ch decl
+    for ch in $ALL_CHANNELS; do
+        [ "$ch" = "$cur" ] && continue
+        decl="$ldir/latest/manifest.${ch}.json"
+        [ -s "$decl" ] && continue
+        python3 - "$ch" "$decl" <<'PYEOF'
+import json, sys
+ch, out = sys.argv[1], sys.argv[2]
+manifest = {
+    "schema": 1,
+    "channel": ch,
+    "state": "reserved",
+    "latest": "",
+    "updated_at": "1970-01-01T00:00:00Z",
+    "releases": {},
+    "notes": f"{ch} 为保留通道，暂无制品；当前可用：stable（生产）/ rc（候选）。",
+}
+with open(out, "w", encoding="utf-8") as f:
+    json.dump(manifest, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PYEOF
+        run gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${GPG_PASSPHRASE:-}" --armor --detach-sign \
+            -o "${decl}.asc" "$decl"
+        log_ok "通道声明 manifest: manifest.${ch}.json（state=reserved → 通道选择 fail-closed）"
+    done
+}
+
+# 启动器源（安装器/更新器自举）：sdk 仓私有，匿名 contents API 不可达，自举
+# 源必须落在公开 agentrt 发布面内。
+LAUNCHER_SRC="${AIRY_LAUNCHER_SRC:-${SCRIPT_DIR}/../../../../agent-workload/sdk/tui/scripts/airymaxrt}"
+
+LATEST_DIR="$TMP/agentrt-latest"
+LATEST_READY=0
+if [ "${SKIP_LATEST:-0}" = "1" ]; then
+    log_warn "跳过 latest/ 发布树准备（SKIP_LATEST=1）：附件面将缺通道全集与启动器"
+elif [ "$DRY_RUN" = "1" ]; then
+    log_info "DRY-RUN: 跳过 latest/ 发布树准备"
+else
+    log_info "准备 latest/ 发布树（通道全集 + 启动器 + 密钥）…"
+    # URL 内嵌 PAT 的 clone 失败时 git 会把带 token 的 URL 回显到 stderr，
+    # 脱敏后输出（DRY-RUN 的 run() 同样会打印参数，须自行过滤）。
+    LATEST_URL="https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/${ATOMGIT_REPO}.git"
+    # clone 先于上传：fail-fast（省下数百 MB 上传后才发现指针树不可得），
+    # 且保证切指针时附件已齐（原子性绑定）。
+    if ! clone_out="$(git clone --depth 1 "$LATEST_URL" "$LATEST_DIR" 2>&1)"; then
+        printf '%s\n' "$clone_out" | redact >&2
+        log_fail "latest/ 仓 clone 失败（输出已脱敏）"
+        exit 1
+    fi
+    mkdir -p "$LATEST_DIR/latest/keys"
+    cp -f "$MANIFEST" "$MANIFEST.asc" "$LATEST_DIR/latest/" 2>/dev/null || true
+    # 公钥随 latest/ 发布（latest/keys/），与 install.sh / airymaxrt 拉取路径
+    # 一致，支持密钥轮换同步。
+    cp -f "$KEYS_DIR/agentrt.asc" "$KEYS_DIR/cosign.pub" "$LATEST_DIR/latest/keys/" 2>/dev/null || true
+    if [ -f "$LAUNCHER_SRC" ]; then
+        cp -f "$LAUNCHER_SRC" "$LATEST_DIR/latest/airymaxrt"
+    else
+        log_warn "未找到更新器源: ${LAUNCHER_SRC}（二进制模式 update 自举将不可用）"
+    fi
+    # 仅在可签名时执行：SKIP_SIGN/SKIP_GPG 下无有效签名，客户端 GPG 验签必然
+    # 失败（误导为“签名被篡改”），宁缺不假签。
+    if [ "$SKIP_SIGN" = "1" ] || [ "$SKIP_GPG" = "1" ]; then
+        log_warn "跳过保留通道声明 manifest（SKIP_SIGN/SKIP_GPG，无法产生有效签名）"
+    elif command -v gpg >/dev/null 2>&1; then
+        emit_channel_declarations "$LATEST_DIR" "$CHANNEL"
+    else
+        log_warn "跳过保留通道声明 manifest（gpg 不可用）"
+    fi
+    LATEST_READY=1
+fi
+
+# 附件面 manifest 集：备树成功时取 latest/ 树内通道全集（与代码树逐字节同
+# 源），否则退回仅当前通道（SKIP_LATEST/DRY-RUN 的降级路径）。
+MANIFEST_ASSETS=()
+if [ "$LATEST_READY" = "1" ]; then
+    for f in "$LATEST_DIR"/latest/manifest.*.json "$LATEST_DIR"/latest/manifest.*.json.asc; do
+        [ -f "$f" ] && MANIFEST_ASSETS+=("$f")
+    done
+else
+    [ -f "$MANIFEST" ] && MANIFEST_ASSETS+=("$MANIFEST")
+    [ -f "$MANIFEST.asc" ] && MANIFEST_ASSETS+=("$MANIFEST.asc")
+fi
+
+# 启动器附件：备树成功时取树内副本（与代码树同源），否则直接取 sdk 源。
+LAUNCHER_ASSET=""
+if [ "$LATEST_READY" = "1" ] && [ -f "$LATEST_DIR/latest/airymaxrt" ]; then
+    LAUNCHER_ASSET="$LATEST_DIR/latest/airymaxrt"
+elif [ -f "$LAUNCHER_SRC" ]; then
+    LAUNCHER_ASSET="$LAUNCHER_SRC"
+fi
+
+# GPG 公钥：manifest 验签必需件（附件面扁平名，无 keys/ 子路径——release
+# 附件域不支持目录结构）。
+PUBKEY_ASSET=""
+if [ -f "$KEYS_DIR/agentrt.asc" ]; then
+    PUBKEY_ASSET="$KEYS_DIR/agentrt.asc"
+else
+    log_warn "未找到 GPG 公钥: ${KEYS_DIR}/agentrt.asc（客户端将退回内置公钥）"
+fi
 
 # ─── 阶段 4.5：并行上传所有附件 ────────────────────────────────────────
 
@@ -716,7 +844,8 @@ fi
 UPLOAD_PAR="${UPLOAD_PAR:-3}"
 UP_FAIL_LOG="$TMP/upfailed.txt"
 rm -f "$UP_FAIL_LOG"
-for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" "$MANIFEST" "$MANIFEST.asc" "$INSTALLER" "$INSTALLER_PS1"; do
+for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" \
+         "$INSTALLER" "$INSTALLER_PS1" "${MANIFEST_ASSETS[@]}" "$PUBKEY_ASSET" "$LAUNCHER_ASSET"; do
     [ -e "$f" ] || continue
     ( upload_asset "$f" || echo "$(basename "$f")" >> "$UP_FAIL_LOG" ) &
     while [ "$(jobs -rp | wc -l)" -ge "$UPLOAD_PAR" ]; do wait -n 2>/dev/null || break; done
@@ -728,109 +857,100 @@ if [ -s "$UP_FAIL_LOG" ]; then
     exit 1
 fi
 
-# ─── U-02：无制品通道的「声明式 manifest」（通道选择 fail-closed）─────────
-# latest/ 必须为通道全集（stable/rc/beta）各备一份 manifest。某通道从未发布
-# 过制品时其 manifest 缺失，客户端 fetch 只得 404——「网络异常」与「该通道
-# 暂无制品」无从区分，旧文案只能并列两种可能，用户反复无意义重试。发布链
-# 在此为「latest/ 中尚无 manifest 的通道」合成显式声明（state=reserved、
-# latest 空串、releases 空集）并 GPG 签名，客户端据此确定性 fail-closed 并
-# 给出可用通道指引。已有 manifest 的通道一律不动（绝不覆盖真实制品指针）；
-# 声明内容幂等（updated_at 取固定哨兵值），重跑不产生无意义 diff。
-ALL_CHANNELS="stable rc beta"
-emit_channel_declarations() { # <latest_repo_dir> <current_channel>
-    local ldir="$1" cur="$2" ch decl
-    for ch in $ALL_CHANNELS; do
-        [ "$ch" = "$cur" ] && continue
-        decl="$ldir/latest/manifest.${ch}.json"
-        [ -s "$decl" ] && continue
-        python3 - "$ch" "$decl" <<'PYEOF'
-import json, sys
-ch, out = sys.argv[1], sys.argv[2]
-manifest = {
-    "schema": 1,
-    "channel": ch,
-    "state": "reserved",
-    "latest": "",
-    "updated_at": "1970-01-01T00:00:00Z",
-    "releases": {},
-    "notes": f"{ch} 为保留通道，暂无制品；当前可用：stable（生产）/ rc（候选）。",
-}
-with open(out, "w", encoding="utf-8") as f:
-    json.dump(manifest, f, ensure_ascii=False, indent=2)
-    f.write("\n")
-PYEOF
-        run gpg --batch --yes --pinentry-mode loopback \
-            --passphrase "${GPG_PASSPHRASE:-}" --armor --detach-sign \
-            -o "${decl}.asc" "$decl"
-        log_ok "通道声明 manifest: manifest.${ch}.json（state=reserved → 通道选择 fail-closed）"
-    done
-}
+# ─── 阶段 4.6：滚动 latest tag release 同步（B12 唯一事实源恒新面）────────
+# 客户端一键安装/自更新从 releases/download/latest/ 抓取入口附件，V12.3
+# 附件保鲜要求 latest 恒等于最新发布。版本 tag 附件全部上传校验通过后才
+# 同步 latest——这一步就是对社区的"指针切换"：latest 面任一附件校验失败
+# 即中止（fail-closed，阶段 5 指针 commit 不再执行），杜绝"代码树新、
+# 下载面旧"分叉；latest 同名附件强制先删后传（0.1.10 覆盖不可靠实证），
+# 内容逐字节一致者免重传（幂等重跑）。git tag "latest" 是 release 面存在
+# 前提：备好树时由树 HEAD 强刷补建；SKIP_LATEST 降级路径交由 release 端点
+# 自建 tag，失败即 fail-closed（无 tag 即无入口面，绝不静默放行）。
+if [ "$DRY_RUN" = "1" ]; then
+    log_info "DRY-RUN: 跳过滚动 latest tag 同步"
+else
+    log_info "同步滚动 latest tag release（安装/更新唯一事实源）…"
+    LATEST_NOTES="AgentRT 滚动安装入口（非版本发布；附件恒等于最新发布 ${VERSION}）
 
-# ─── 阶段 5：更新 latest/ 固定入口（更新器轮询） ─────────────────────────
-if [ "${SKIP_LATEST:-0}" != "1" ]; then
-    log_info "更新 latest/ 固定入口…"
-    LATEST_DIR="$TMP/agentrt-latest"
-    # URL 内嵌 PAT 的 clone 失败时 git 会把带 token 的 URL 回显到 stderr，
-    # 脱敏后输出（DRY-RUN 的 run() 同样会打印参数，须自行过滤）。
-    LATEST_URL="https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/${ATOMGIT_REPO}.git"
-    if [ "$DRY_RUN" = "1" ]; then
-        log_info "DRY-RUN: git clone --depth 1 $(printf '%s' "$LATEST_URL" | redact) $LATEST_DIR"
-    elif ! clone_out="$(git clone --depth 1 "$LATEST_URL" "$LATEST_DIR" 2>&1)"; then
-        printf '%s\n' "$clone_out" | redact >&2
-        log_fail "latest/ 仓 clone 失败（输出已脱敏）"
-        exit 1
+Linux/macOS: curl -fsSL https://atomgit.com/${ATOMGIT_REPO}/releases/download/latest/install.sh | bash
+Windows:     irm https://atomgit.com/${ATOMGIT_REPO}/releases/download/latest/install.ps1 | iex"
+    if [ "$LATEST_READY" = "1" ] && \
+        ! git -C "$LATEST_DIR" ls-remote --tags origin 2>/dev/null | \
+            awk '$2=="refs/tags/latest"{f=1} END{exit !f}'; then
+        git -C "$LATEST_DIR" tag -f latest >/dev/null 2>&1 || \
+            { log_fail "本地 tag 'latest' 创建失败"; exit 1; }
+        if ! push_out="$(git -C "$LATEST_DIR" push -f origin refs/tags/latest 2>&1)"; then
+            printf '%s\n' "$push_out" | redact >&2
+            log_fail "tag 'latest' 推送失败（输出已脱敏）"
+            exit 1
+        fi
+        log_ok "滚动 tag 'latest' 已建立/强刷（指向 latest/ 发布树 HEAD）"
     fi
-    if [ "$DRY_RUN" != "1" ]; then
-        mkdir -p "$LATEST_DIR/latest/keys"
-        cp -f "$MANIFEST" "$MANIFEST.asc" "$LATEST_DIR/latest/" 2>/dev/null || true
-        # 公钥随 latest/ 发布（latest/keys/），客户端安装器/自更新器在线拉取，
-        # 支持密钥轮换同步（问题 13）。与 install.sh / airymaxrt 拉取路径一致。
-        cp -f "$KEYS_DIR/agentrt.asc" "$KEYS_DIR/cosign.pub" "$LATEST_DIR/latest/keys/" 2>/dev/null || true
-        # 完整更新器随 latest/ 发布（latest/airymaxrt）：二进制模式轻量启动器
-        # 的 update 自举源。sdk 仓私有，匿名 contents API 不可达，自举源必须
-        # 在公开 agentrt 仓内（与 manifest 同路径域，无需额外凭据）。
-        LAUNCHER_SRC="${AIRY_LAUNCHER_SRC:-${SCRIPT_DIR}/../../../../agent-workload/sdk/tui/scripts/airymaxrt}"
-        if [ -f "$LAUNCHER_SRC" ]; then
-            cp -f "$LAUNCHER_SRC" "$LATEST_DIR/latest/airymaxrt"
-        else
-            log_warn "未找到更新器源: ${LAUNCHER_SRC}（二进制模式 update 自举将不可用）"
+    align_release_body "latest" "$LATEST_NOTES" "false" || \
+        { log_fail "latest Release 对齐失败：安装入口面不可用，中止发布"; exit 1; }
+    fetch_existing_assets "latest"
+    LATEST_FAIL=0
+    for f in "$INSTALLER" "$INSTALLER_PS1" "$LAUNCHER_ASSET" "$PUBKEY_ASSET" \
+             "${MANIFEST_ASSETS[@]}"; do
+        [ -e "$f" ] || continue
+        if ! AIRY_FORCE_UPLOAD=1 upload_asset "$f"; then
+            LATEST_FAIL=1
         fi
-        # U-02：通道全集收敛——为无制品的保留通道补发声明式 manifest。
-        # 仅在可签名时执行：SKIP_SIGN/SKIP_GPG 下无有效签名，客户端 GPG
-        # 验签必然失败（误导为“签名被篡改”），宁缺不假签。
-        if [ "$SKIP_SIGN" = "1" ] || [ "$SKIP_GPG" = "1" ]; then
-            log_warn "跳过保留通道声明 manifest（SKIP_SIGN/SKIP_GPG，无法产生有效签名）"
-        elif command -v gpg >/dev/null 2>&1; then
-            emit_channel_declarations "$LATEST_DIR" "$CHANNEL"
-        else
-            log_warn "跳过保留通道声明 manifest（gpg 不可用）"
-        fi
-        # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
-        # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
-        git -C "$LATEST_DIR" add -A -f latest/
-        git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
-            commit -m "release: update manifest.${CHANNEL}.json for ${VERSION}" >/dev/null 2>&1 || \
-            log_warn "latest/ 无变更或提交失败"
-        git -C "$LATEST_DIR" push origin HEAD:main >/dev/null 2>&1 || \
-            log_warn "latest/ push 失败（可手动同步）"
-        # P23 根修：manifest commit 双端同步。历史缺陷（6186a5cd1 实证）：
-        # 本阶段只 clone/push atomgit，GitHub main 永远收不到 manifest 更新
-        # commit，双端分叉只能手动 merge（cef8f277 补丁）。两仓为同一提交图
-        # 的镜像，此处向 GitHub main 补推同一 commit（fail-soft：失败仅告警，
-        # 不阻断 atomgit 发布主链路）。
-        if [ -n "${GITHUB_REPO:-}" ] && [ -n "${GITHUB_PAT:-}" ]; then
-            if git -C "$LATEST_DIR" push \
-                "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git" \
-                HEAD:main >/dev/null 2>&1; then
-                log_ok "latest/ manifest 已同步 GitHub main"
-            else
-                log_warn "latest/ manifest 同步 GitHub 失败（双端分叉时 non-fast-forward，需手动 merge）"
-            fi
-        else
-            log_warn "GITHUB_REPO/GITHUB_PAT 未设置，跳过 GitHub manifest 同步"
-        fi
-        log_ok "latest/manifest.${CHANNEL}.json 已更新"
+    done
+    [ "$LATEST_FAIL" = "0" ] || { log_fail "latest 入口面附件同步未全数通过（重跑可续传），中止发布"; exit 1; }
+    log_ok "滚动 latest 面已同步（${VERSION} → releases/download/latest/）"
+fi
+
+# ─── 阶段 5：latest/ 代码树归档快照提交 ──────────────────────────────────
+# B12（乙口径）后客户端读取面是滚动 latest release 附件（阶段 4.6），代码树
+# latest/ 仅作同源归档快照 + 下轮发布的他通道 manifest 种子。顺序不可倒置：
+# 版本 tag 附件校验 → latest 面同步 → 树快照提交，客户端永不看到
+# "指针已新、附件未齐"。
+if [ "$LATEST_READY" = "1" ]; then
+    # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
+    # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
+    git -C "$LATEST_DIR" add -A -f latest/
+    LATEST_COMMITTED=0
+    if git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
+        commit -m "release: update manifest.${CHANNEL}.json for ${VERSION}" >/dev/null 2>&1; then
+        LATEST_COMMITTED=1
+    else
+        log_warn "latest/ 无变更或提交失败"
     fi
+    LATEST_PUSHED=0
+    if git -C "$LATEST_DIR" push origin HEAD:main >/dev/null 2>&1; then
+        LATEST_PUSHED=1
+    else
+        log_warn "latest/ push 失败（可手动同步）"
+    fi
+    # 归档树前进后，latest tag 归位指向本轮 commit（阶段 4.6 建 tag 时本轮
+    # commit 尚不存在，只能借上一轮 HEAD；不归位则 clone -b latest 恒取
+    # 旧树）。下载面按 release tag_name 解析、与此无关，故仅 fail-soft。
+    if [ "$LATEST_COMMITTED" = "1" ] && [ "$LATEST_PUSHED" = "1" ]; then
+        if git -C "$LATEST_DIR" tag -f latest >/dev/null 2>&1 && \
+            git -C "$LATEST_DIR" push -f origin refs/tags/latest >/dev/null 2>&1; then
+            log_ok "滚动 tag 'latest' 已指向本轮归档树"
+        else
+            log_warn "latest tag 归位失败（不影响下载附件面，下轮发布重刷）"
+        fi
+    fi
+    # P23 根修：manifest commit 双端同步。历史缺陷（6186a5cd1 实证）：
+    # 本阶段只 clone/push atomgit，GitHub main 永远收不到 manifest 更新
+    # commit，双端分叉只能手动 merge（cef8f277 补丁）。两仓为同一提交图
+    # 的镜像，此处向 GitHub main 补推同一 commit（fail-soft：失败仅告警，
+    # 不阻断 atomgit 发布主链路）。
+    if [ -n "${GITHUB_REPO:-}" ] && [ -n "${GITHUB_PAT:-}" ]; then
+        if git -C "$LATEST_DIR" push \
+            "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git" \
+            HEAD:main >/dev/null 2>&1; then
+            log_ok "latest/ manifest 已同步 GitHub main"
+        else
+            log_warn "latest/ manifest 同步 GitHub 失败（双端分叉时 non-fast-forward，需手动 merge）"
+        fi
+    else
+        log_warn "GITHUB_REPO/GITHUB_PAT 未设置，跳过 GitHub manifest 同步"
+    fi
+    log_ok "latest/manifest.${CHANNEL}.json 已更新"
 fi
 
 # ─── 阶段 6：版本保留处理（社区窗口：每通道仅留最新 N 版）─────────────────
