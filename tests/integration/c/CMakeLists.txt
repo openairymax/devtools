@@ -311,7 +311,7 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/cost_tracker.c
     ${LLM_D_DIR}/src/llm_svc_adapter.c
     ${LLM_D_DIR}/src/providers/core/registry.c
-    ${LLM_D_DIR}/src/providers/core/provider.c
+    ${LLM_D_DIR}/src/providers/core/secrets.c
     ${LLM_D_DIR}/src/providers/core/http.c
     ${LLM_D_DIR}/src/providers/core/envelope.c
     ${LLM_D_DIR}/src/providers/core/sse.c
