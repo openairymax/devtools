@@ -23,7 +23,7 @@
 #include "cache.h"
 #include "cost_tracker.h"
 #include "llm_service.h"
-#include "providers/core/provider.h"
+#include "providers/core/adapter.h"
 #include "providers/core/registry.h"
 #include "response.h"
 
@@ -243,10 +243,10 @@ static void test_int15_1_provider_registry(void)
     /* Step 4: 验证提供商 ops 表已正确绑定 */
     p = provider_registry_find(reg, "gpt-4o");
     if (p) {
-        TEST_ASSERT_NOT_NULL(p->ops, "Step 4: openai provider ops 非空");
-        TEST_ASSERT_NOT_NULL(p->ops->name, "Step 4: ops->name 非空");
-        TEST_ASSERT_NOT_NULL(p->ops->complete, "Step 4: ops->complete 函数指针非空");
-        TEST_ASSERT_NOT_NULL(p->ops->destroy, "Step 4: ops->destroy 函数指针非空");
+        TEST_ASSERT_NOT_NULL(p->adapter, "Step 4: openai provider adapter 非空");
+        TEST_ASSERT_NOT_NULL(p->adapter->name, "Step 4: adapter->name 非空");
+        TEST_ASSERT_NOT_NULL(p->adapter->complete, "Step 4: adapter->complete 函数指针非空");
+        TEST_ASSERT_NOT_NULL(p->adapter->destroy, "Step 4: adapter->destroy 函数指针非空");
     }
 
     provider_registry_destroy(reg);
@@ -661,7 +661,7 @@ static void test_int15_6_e2e_routing_pipeline(void)
         TEST_ASSERT_NOT_NULL(provider, "Step 3: 找到目标提供商");
         TEST_ASSERT_STREQ(provider->name, "openai",
                           "Step 3: gpt-4o 属于 openai 提供商");
-        TEST_ASSERT_NOT_NULL(provider->ops, "Step 3: ops 表非空");
+        TEST_ASSERT_NOT_NULL(provider->adapter, "Step 3: adapter 表非空");
     } else {
         TEST_ASSERT(1, "Step 3: gpt-4o 提供商查找 (可能未初始化)");
     }
