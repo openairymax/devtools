@@ -321,8 +321,7 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/adapters/openai.c
     ${LLM_D_DIR}/src/providers/core/rate_limit.c
     ${LLM_D_DIR}/src/providers/adapters/anthropic.c
-    ${LLM_D_DIR}/src/providers/adapters/deepseek.c
-    ${LLM_D_DIR}/src/providers/adapters/google.c
+    # B16-S4：deepseek.c / google.c 清理（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/adapters/local.c
     # B16-S3 c7：适配器装配 SSoT（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/adapters/adapter_table.c
