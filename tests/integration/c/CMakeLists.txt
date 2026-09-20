@@ -310,18 +310,18 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/response.c
     ${LLM_D_DIR}/src/cost_tracker.c
     ${LLM_D_DIR}/src/llm_svc_adapter.c
-    ${LLM_D_DIR}/src/providers/registry.c
-    ${LLM_D_DIR}/src/providers/provider.c
-    ${LLM_D_DIR}/src/providers/provider_http.c
-    ${LLM_D_DIR}/src/providers/provider_codec.c
-    ${LLM_D_DIR}/src/providers/provider_stream.c
-    ${LLM_D_DIR}/src/providers/openai.c
-    ${LLM_D_DIR}/src/providers/openai_rate_limit.c
-    ${LLM_D_DIR}/src/providers/openai_stream.c
-    ${LLM_D_DIR}/src/providers/anthropic.c
-    ${LLM_D_DIR}/src/providers/deepseek.c
-    ${LLM_D_DIR}/src/providers/google.c
-    ${LLM_D_DIR}/src/providers/local.c
+    ${LLM_D_DIR}/src/providers/core/registry.c
+    ${LLM_D_DIR}/src/providers/core/provider.c
+    ${LLM_D_DIR}/src/providers/core/http.c
+    ${LLM_D_DIR}/src/providers/core/envelope.c
+    ${LLM_D_DIR}/src/providers/core/sse.c
+    ${LLM_D_DIR}/src/providers/adapters/openai.c
+    ${LLM_D_DIR}/src/providers/core/rate_limit.c
+    ${LLM_D_DIR}/src/providers/adapters/openai_stream.c
+    ${LLM_D_DIR}/src/providers/adapters/anthropic.c
+    ${LLM_D_DIR}/src/providers/adapters/deepseek.c
+    ${LLM_D_DIR}/src/providers/adapters/google.c
+    ${LLM_D_DIR}/src/providers/adapters/local.c
     ${LLM_D_DIR}/src/router/llm_router.c
     ${LLM_D_DIR}/src/router/cost_aware_router.c
     ${LLM_D_DIR}/src/router/round_robin_router.c
