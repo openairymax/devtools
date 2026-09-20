@@ -489,7 +489,6 @@ airy_prompt_template_free
 airy_prompt_template_get
 airy_prompt_template_load
 airy_prompt_validate_output
-airy_provider_explicit_bzero
 airy_provider_register_common
 airy_random_pool_take
 airy_re_compile_repeat
