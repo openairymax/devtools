@@ -315,6 +315,7 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/core/http.c
     ${LLM_D_DIR}/src/providers/core/envelope.c
     ${LLM_D_DIR}/src/providers/core/sse.c
+    ${LLM_D_DIR}/src/providers/core/toolstream.c
     ${LLM_D_DIR}/src/providers/adapters/openai.c
     ${LLM_D_DIR}/src/providers/core/rate_limit.c
     ${LLM_D_DIR}/src/providers/adapters/openai_stream.c
