@@ -322,6 +322,8 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/adapters/deepseek.c
     ${LLM_D_DIR}/src/providers/adapters/google.c
     ${LLM_D_DIR}/src/providers/adapters/local.c
+    # B16-S3 c7：适配器装配 SSoT（与 llm_d 主目标同步）
+    ${LLM_D_DIR}/src/providers/adapters/adapter_table.c
     ${LLM_D_DIR}/src/router/llm_router.c
     ${LLM_D_DIR}/src/router/cost_aware_router.c
     ${LLM_D_DIR}/src/router/round_robin_router.c
