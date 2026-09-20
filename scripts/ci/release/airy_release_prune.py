@@ -17,6 +17,12 @@
 import re
 import sys
 
+# 滚动入口 tag（B12, 0.1.18）：releases/download/latest/ 是安装/自更新唯一
+# 事实源恒新面，不是版本而是指针，永不参与窗口。vkey 不匹配 vX.Y.Z 会给
+# 最低序、chan 归入 stable，无此保护时会被当 stable 超窗误删，社区一键
+# 安装与在装用户自更新链当场断裂。
+PROTECTED = {"latest"}
+
 
 def chan(t):
     if "-rc" in t:
@@ -45,7 +51,8 @@ def vkey(t):
 def main():
     keep = int(sys.argv[1])
     current = sys.argv[2]
-    tags = [t.strip() for t in sys.stdin.read().splitlines() if t.strip()]
+    tags = [t.strip() for t in sys.stdin.read().splitlines()
+            if t.strip() and t.strip() not in PROTECTED]
 
     groups = {}
     for t in tags:
