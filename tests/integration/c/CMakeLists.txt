@@ -309,7 +309,7 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/accounting/token_counter.c
     ${LLM_D_DIR}/src/response.c
     ${LLM_D_DIR}/src/accounting/cost_tracker.c
-    ${LLM_D_DIR}/src/llm_svc_adapter.c
+    ${LLM_D_DIR}/src/adapter/adapter.c
     ${LLM_D_DIR}/src/providers/core/registry.c
     ${LLM_D_DIR}/src/providers/core/secrets.c
     ${LLM_D_DIR}/src/providers/core/http.c
