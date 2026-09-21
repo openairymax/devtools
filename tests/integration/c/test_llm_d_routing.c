@@ -20,7 +20,7 @@
 #define _POSIX_C_SOURCE 199309L
 #endif
 
-#include "cache.h"
+#include "cache_common.h"
 #include "cost_tracker.h"
 #include "llm_service.h"
 #include "providers/core/adapter.h"
@@ -736,21 +736,21 @@ static void test_int15_6_e2e_routing_pipeline(void)
     }
 
     /* Step 7: 缓存集成验证 */
-    llm_cache_t *cache = llm_cache_create(100, 3600);
+    cache_t cache = cache_create_string_cache(100, 3600);
     TEST_ASSERT_NOT_NULL(cache, "Step 7: 缓存创建成功");
 
     /* 缓存未命中 */
     char *cached_val = NULL;
-    int cache_ret = llm_cache_get(cache, "gpt-4o:e2e_hash", &cached_val);
+    int cache_ret = cache_get_string(cache, "gpt-4o:e2e_hash", &cached_val);
     TEST_ASSERT(cache_ret != 1 || cached_val == NULL,
                 "Step 7: 首次查询缓存未命中");
 
     /* 写入缓存 */
-    llm_cache_put(cache, "gpt-4o:e2e_hash", mock_response_json);
+    cache_put_string(cache, "gpt-4o:e2e_hash", mock_response_json);
 
     /* 缓存命中 */
     cached_val = NULL;
-    cache_ret = llm_cache_get(cache, "gpt-4o:e2e_hash", &cached_val);
+    cache_ret = cache_get_string(cache, "gpt-4o:e2e_hash", &cached_val);
     TEST_ASSERT(cache_ret == 1 && cached_val != NULL,
                 "Step 7: 二次查询缓存命中");
     if (cached_val) {
@@ -759,7 +759,7 @@ static void test_int15_6_e2e_routing_pipeline(void)
         free(cached_val);
     }
 
-    llm_cache_destroy(cache);
+    cache_destroy(cache);
     provider_registry_destroy(reg);
     TEST_ASSERT(1, "Step 8: 端到端管线资源清理完成");
 }

@@ -30,7 +30,7 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/compat/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/network/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/ipc/include
@@ -234,7 +234,7 @@ if(TARGET svc_common)
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/platform/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache
     )
 
     # --whole-archive/--start-group 为 GNU ld 专有：macOS ld64 / MSVC 不识别，
@@ -304,7 +304,6 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/rpc/service_providers.c
     ${LLM_D_DIR}/src/rpc/service_request.c
     ${LLM_D_DIR}/src/accounting/service_metrics.c
-    ${LLM_D_DIR}/src/accounting/cache.c
     ${LLM_D_DIR}/src/accounting/semantic_cache.c
     ${LLM_D_DIR}/src/accounting/token_counter.c
     ${LLM_D_DIR}/src/rpc/response.c
@@ -354,7 +353,7 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${COMMONS_DIR}/utils/memory/include
     ${COMMONS_DIR}/utils/string/include
     ${COMMONS_DIR}/utils/sync/include
-    ${COMMONS_DIR}/utils/cache/include
+    ${COMMONS_DIR}/utils/cache
     ${COMMONS_DIR}/utils/compat/include
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
