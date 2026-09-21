@@ -295,19 +295,19 @@ set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
 set(LLM_IMPL_SOURCES
-    ${LLM_D_DIR}/src/service.c
+    ${LLM_D_DIR}/src/rpc/service.c
     ${LLM_D_DIR}/src/config/service_config.c
     ${LLM_D_DIR}/src/config/service_config_json.c
     ${LLM_D_DIR}/src/config/service_config_yaml.c
     ${LLM_D_DIR}/src/config/service_config_yaml_models.c
     ${LLM_D_DIR}/src/config/service_config_yaml_providers.c
     ${LLM_D_DIR}/src/config/service_config_yaml_pricing.c
-    ${LLM_D_DIR}/src/service_providers.c
-    ${LLM_D_DIR}/src/service_request.c
+    ${LLM_D_DIR}/src/rpc/service_providers.c
+    ${LLM_D_DIR}/src/rpc/service_request.c
     ${LLM_D_DIR}/src/accounting/service_metrics.c
     ${LLM_D_DIR}/src/accounting/cache.c
     ${LLM_D_DIR}/src/accounting/token_counter.c
-    ${LLM_D_DIR}/src/response.c
+    ${LLM_D_DIR}/src/rpc/response.c
     ${LLM_D_DIR}/src/accounting/cost_tracker.c
     ${LLM_D_DIR}/src/adapter/adapter.c
     ${LLM_D_DIR}/src/providers/core/registry.c
