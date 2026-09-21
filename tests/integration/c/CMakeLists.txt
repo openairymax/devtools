@@ -296,12 +296,12 @@ set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
 set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/service.c
-    ${LLM_D_DIR}/src/service_config.c
-    ${LLM_D_DIR}/src/service_config_json.c
-    ${LLM_D_DIR}/src/service_config_yaml.c
-    ${LLM_D_DIR}/src/service_config_yaml_models.c
-    ${LLM_D_DIR}/src/service_config_yaml_providers.c
-    ${LLM_D_DIR}/src/service_config_yaml_pricing.c
+    ${LLM_D_DIR}/src/config/service_config.c
+    ${LLM_D_DIR}/src/config/service_config_json.c
+    ${LLM_D_DIR}/src/config/service_config_yaml.c
+    ${LLM_D_DIR}/src/config/service_config_yaml_models.c
+    ${LLM_D_DIR}/src/config/service_config_yaml_providers.c
+    ${LLM_D_DIR}/src/config/service_config_yaml_pricing.c
     ${LLM_D_DIR}/src/service_providers.c
     ${LLM_D_DIR}/src/service_request.c
     ${LLM_D_DIR}/src/accounting/service_metrics.c
