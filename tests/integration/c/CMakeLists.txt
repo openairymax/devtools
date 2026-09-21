@@ -26,7 +26,7 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/market_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/config_unified/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/config_unified
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
@@ -298,7 +298,6 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/rpc/service.c
     ${LLM_D_DIR}/src/config/service_config.c
     ${LLM_D_DIR}/src/config/service_config_json.c
-    ${LLM_D_DIR}/src/config/service_config_yaml.c
     ${LLM_D_DIR}/src/config/service_config_yaml_models.c
     ${LLM_D_DIR}/src/config/service_config_yaml_providers.c
     ${LLM_D_DIR}/src/config/service_config_yaml_pricing.c
@@ -351,7 +350,7 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${COMMONS_DIR}/platform/include
     ${COMMONS_DIR}/utils/error/include
     ${COMMONS_DIR}/utils/logging/include
-    ${COMMONS_DIR}/utils/config_unified/include
+    ${COMMONS_DIR}/utils/config_unified
     ${COMMONS_DIR}/utils/memory/include
     ${COMMONS_DIR}/utils/string/include
     ${COMMONS_DIR}/utils/sync/include
