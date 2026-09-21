@@ -340,6 +340,12 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${LLM_D_DIR}/include
     ${LLM_D_DIR}/src
     ${LLM_D_DIR}/src/providers
+    # B16-S5 预置：五域归位后的头搜索路径（与 llm_d 主目标同步）
+    ${LLM_D_DIR}/src/bootstrap
+    ${LLM_D_DIR}/src/adapter
+    ${LLM_D_DIR}/src/rpc
+    ${LLM_D_DIR}/src/config
+    ${LLM_D_DIR}/src/accounting
     ${COMMONS_DIR}
     ${COMMONS_DIR}/platform/include
     ${COMMONS_DIR}/utils/error/include
