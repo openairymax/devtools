@@ -9,10 +9,12 @@
 # 通道：tag 含 -beta./-rc. → beta 通道；否则 stable。
 #   官方制品仓库：https://atomgit.com/openairymax/agentrt（用户指定）
 #   制品 URL:      https://atomgit.com/openairymax/agentrt/releases/download/<tag>/<file>
-#   安装/更新唯一事实源（B12，0.1.18 乙口径）：滚动 tag "latest" 的
-#   release 附件面，每次发布由阶段 4.6 强制刷新（V12.3 附件保鲜）：
+#   安装/更新唯一事实源（B12，0.1.18 乙口径）：releases/download/latest/
+#   是 atomgit 平台级「最新 release」别名（302 动态路由到最新 release 附件
+#   面，非 git tag），版本发布完成即自动指向新面；阶段 4.6 对其做入口面
+#   终验（别名指向 + 入口件可达，fail-closed）：
 #      .../releases/download/latest/{install.sh,install.ps1,airymaxrt,agentrt.asc,manifest.<channel>.json(.asc)}
-#   仓库代码树 latest/ 目录仅作同源归档快照（阶段 5 指针 commit），不再是
+#   仓库代码树 latest/ 目录仅作同源归档快照（阶段 5 commit），不再是
 #   客户端读取面——contents/raw 第二事实源已随 B12 废除。
 #
 # 用法：
@@ -530,8 +532,9 @@ align_release_body "$VERSION" "$RELEASE_BODY" "$PRERELEASE" || exit 1
 # 下载仍返回旧文件（tar.gz 新旧大小差即暴露，sha256/sig 恒长假绿）。因此
 # AIRY_FORCE_UPLOAD=1 的正确语义 = 先 DELETE 同名附件（全新 key 绑定）再 PUT。
 # 拉取现有附件 {name<TAB>id}（attach 有数字 id，source 源码包无 id）。
-# tag 参数化（CUR_TAG）：版本 tag 与滚动 latest tag（阶段 4.6）共用同一套
-# 上传/校验实现，禁止为 latest 另写第二份（SSoT）。
+# CUR_TAG 仅版本 tag：latest 下载面是平台「最新 release」别名（阶段 4.6
+# 终验），不作为上传目标——自建 latest tag/release 会劫持别名路由，把安装
+# 入口翻转到无 tarball 的新面（0.1.18 run5 排障实证），严禁。
 CUR_TAG=""
 EXISTING_ASSETS=""
 fetch_existing_assets() {
@@ -857,82 +860,90 @@ if [ -s "$UP_FAIL_LOG" ]; then
     exit 1
 fi
 
-# ─── 阶段 4.6：滚动 latest tag release 同步（B12 唯一事实源恒新面）────────
-# 客户端一键安装/自更新从 releases/download/latest/ 抓取入口附件，V12.3
-# 附件保鲜要求 latest 恒等于最新发布。版本 tag 附件全部上传校验通过后才
-# 同步 latest——这一步就是对社区的"指针切换"：latest 面任一附件校验失败
-# 即中止（fail-closed，阶段 5 指针 commit 不再执行），杜绝"代码树新、
-# 下载面旧"分叉；latest 同名附件强制先删后传（0.1.10 覆盖不可靠实证），
-# 内容逐字节一致者免重传（幂等重跑）。git tag "latest" 是 release 面存在
-# 前提：备好树时由树 HEAD 强刷补建；SKIP_LATEST 降级路径交由 release 端点
-# 自建 tag，失败即 fail-closed（无 tag 即无入口面，绝不静默放行）。
+# ─── 阶段 4.6：滚动 latest 入口面终验（B12 唯一事实源 = 平台别名）────────
+# releases/download/latest/ 是 atomgit 平台级「最新 release」别名（302 动态
+# 路由到最新 release 附件面，非 git tag——0.1.18 实证：releases/tags/latest
+# 404、ls-remote 无 refs/tags/latest、别名面与真实 tag 面同一 OBS 对象）。
+# 版本面附件全数上传校验通过（阶段 4.5）后，新 release 即自动成为别名目标；
+# 严禁自建 latest tag/release 去「同步」该面——那会劫持别名路由，把安装
+# 入口翻转到无 tarball 的新面（run5 排障实证的结构性风险）。本阶段只做
+# fail-closed 终验：
+#   1. stable 发布：GET /releases/latest 断言 tag_name == VERSION（有界
+#      重试覆盖平台索引延迟）；
+#   2. rc/beta 预发布：安装入口面恒守稳定版，断言别名 ≠ 本版本；
+#   3. 入口件匿名 GET 抽查（本次发布的安装器/启动器/公钥/manifest 全集）
+#      逐一 200 可达（附件域 HEAD 被 WAF 拒，用 GET 状态码）。
 if [ "$DRY_RUN" = "1" ]; then
-    log_info "DRY-RUN: 跳过滚动 latest tag 同步"
+    log_info "DRY-RUN: 跳过滚动 latest 入口面终验"
 else
-    log_info "同步滚动 latest tag release（安装/更新唯一事实源）…"
-    LATEST_NOTES="AgentRT 滚动安装入口（非版本发布；附件恒等于最新发布 ${VERSION}）
-
-Linux/macOS: curl -fsSL https://atomgit.com/${ATOMGIT_REPO}/releases/download/latest/install.sh | bash
-Windows:     irm https://atomgit.com/${ATOMGIT_REPO}/releases/download/latest/install.ps1 | iex"
-    if [ "$LATEST_READY" = "1" ] && \
-        ! git -C "$LATEST_DIR" ls-remote --tags origin 2>/dev/null | \
-            awk '$2=="refs/tags/latest"{f=1} END{exit !f}'; then
-        git -C "$LATEST_DIR" tag -f latest >/dev/null 2>&1 || \
-            { log_fail "本地 tag 'latest' 创建失败"; exit 1; }
-        if ! push_out="$(git -C "$LATEST_DIR" push -f origin refs/tags/latest 2>&1)"; then
-            printf '%s\n' "$push_out" | redact >&2
-            log_fail "tag 'latest' 推送失败（输出已脱敏）"
-            exit 1
+    log_info "终验滚动 latest 入口面（平台别名 → 最新 release）…"
+    resolve_alias_tag() {
+        curl -fsSL --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+            "${API}/latest" 2>/dev/null \
+            | python3 -c "import sys,json;print((json.load(sys.stdin) or {}).get('tag_name',''))" 2>/dev/null || true
+    }
+    ALIAS_TAG=""
+    ALIAS_TRY=0
+    while [ "$ALIAS_TRY" -lt "${ALIAS_VERIFY_RETRY:-8}" ]; do
+        ALIAS_TRY=$((ALIAS_TRY + 1))
+        ALIAS_TAG="$(resolve_alias_tag)"
+        if [ "$PRERELEASE" = "false" ]; then
+            [ "$ALIAS_TAG" = "$VERSION" ] && break
+        elif [ -n "$ALIAS_TAG" ] && [ "$ALIAS_TAG" != "$VERSION" ]; then
+            break
         fi
-        log_ok "滚动 tag 'latest' 已建立/强刷（指向 latest/ 发布树 HEAD）"
+        sleep 15
+    done
+    if [ "$PRERELEASE" = "false" ]; then
+        [ "$ALIAS_TAG" = "$VERSION" ] || \
+            { log_fail "latest 别名未指向 ${VERSION}（现指向: ${ALIAS_TAG:-无}），安装入口面不可信，中止发布"; exit 1; }
+    else
+        [ -n "$ALIAS_TAG" ] && [ "$ALIAS_TAG" != "$VERSION" ] || \
+            { log_fail "latest 别名异常（指向: ${ALIAS_TAG:-无}）：预发布不得翻转安装入口面，中止发布"; exit 1; }
+        log_ok "latest 别名恒守稳定版: ${ALIAS_TAG}（预发布 ${VERSION} 不翻转入口面）"
     fi
-    align_release_body "latest" "$LATEST_NOTES" "false" || \
-        { log_fail "latest Release 对齐失败：安装入口面不可用，中止发布"; exit 1; }
-    fetch_existing_assets "latest"
-    LATEST_FAIL=0
-    for f in "$INSTALLER" "$INSTALLER_PS1" "$LAUNCHER_ASSET" "$PUBKEY_ASSET" \
-             "${MANIFEST_ASSETS[@]}"; do
-        [ -e "$f" ] || continue
-        if ! AIRY_FORCE_UPLOAD=1 upload_asset "$f"; then
-            LATEST_FAIL=1
+    LATEST_SPOT=()
+    [ -n "$INSTALLER" ] && LATEST_SPOT+=("install.sh")
+    [ -n "$INSTALLER_PS1" ] && LATEST_SPOT+=("install.ps1")
+    [ -n "$PUBKEY_ASSET" ] && LATEST_SPOT+=("agentrt.asc")
+    [ -n "$LAUNCHER_ASSET" ] && LATEST_SPOT+=("airymaxrt")
+    for f in "${MANIFEST_ASSETS[@]}"; do LATEST_SPOT+=("$(basename "$f")"); done
+    LATEST_SPOT_FAIL=0
+    for n in "${LATEST_SPOT[@]}"; do
+        code="$(curl -skL --connect-timeout 20 --max-time 120 -o /dev/null -w '%{http_code}' \
+            "https://atomgit.com/${ATOMGIT_REPO}/releases/download/latest/${n}" 2>/dev/null || echo 000)"
+        if [ "$code" = "200" ]; then
+            log_ok "入口件可达: latest/${n}"
+        else
+            log_warn "入口件不可达: latest/${n}（HTTP ${code}）"
+            LATEST_SPOT_FAIL=1
         fi
     done
-    [ "$LATEST_FAIL" = "0" ] || { log_fail "latest 入口面附件同步未全数通过（重跑可续传），中止发布"; exit 1; }
-    log_ok "滚动 latest 面已同步（${VERSION} → releases/download/latest/）"
+    [ "$LATEST_SPOT_FAIL" = "0" ] || \
+        { log_fail "latest 入口面抽查未全数通过，中止发布"; exit 1; }
+    log_ok "滚动 latest 入口面已就绪（别名 → ${ALIAS_TAG}，入口件全 200）"
 fi
 
 # ─── 阶段 5：latest/ 代码树归档快照提交 ──────────────────────────────────
-# B12（乙口径）后客户端读取面是滚动 latest release 附件（阶段 4.6），代码树
-# latest/ 仅作同源归档快照 + 下轮发布的他通道 manifest 种子。顺序不可倒置：
-# 版本 tag 附件校验 → latest 面同步 → 树快照提交，客户端永不看到
-# "指针已新、附件未齐"。
+# B12（乙口径）后客户端读取面是滚动 latest 别名附件面（阶段 4.6 终验），
+# 代码树 latest/ 仅作同源归档快照 + 下轮发布的他通道 manifest 种子。顺序
+# 不可倒置：版本 tag 附件校验 → latest 入口面终验 → 树快照提交，客户端
+# 永不看到"指针已新、附件未齐"。仓库侧不留任何 latest git tag：下载面按
+# release tag_name 经平台别名解析，git tag 与其无关，自建反有劫持风险。
 if [ "$LATEST_READY" = "1" ]; then
     # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
     # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
     git -C "$LATEST_DIR" add -A -f latest/
-    LATEST_COMMITTED=0
     if git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
         commit -m "release: update manifest.${CHANNEL}.json for ${VERSION}" >/dev/null 2>&1; then
-        LATEST_COMMITTED=1
+        log_info "latest/ 归档快照已提交"
     else
         log_warn "latest/ 无变更或提交失败"
     fi
-    LATEST_PUSHED=0
     if git -C "$LATEST_DIR" push origin HEAD:main >/dev/null 2>&1; then
-        LATEST_PUSHED=1
+        log_info "latest/ 归档快照已推送 main"
     else
         log_warn "latest/ push 失败（可手动同步）"
-    fi
-    # 归档树前进后，latest tag 归位指向本轮 commit（阶段 4.6 建 tag 时本轮
-    # commit 尚不存在，只能借上一轮 HEAD；不归位则 clone -b latest 恒取
-    # 旧树）。下载面按 release tag_name 解析、与此无关，故仅 fail-soft。
-    if [ "$LATEST_COMMITTED" = "1" ] && [ "$LATEST_PUSHED" = "1" ]; then
-        if git -C "$LATEST_DIR" tag -f latest >/dev/null 2>&1 && \
-            git -C "$LATEST_DIR" push -f origin refs/tags/latest >/dev/null 2>&1; then
-            log_ok "滚动 tag 'latest' 已指向本轮归档树"
-        else
-            log_warn "latest tag 归位失败（不影响下载附件面，下轮发布重刷）"
-        fi
     fi
     # P23 根修：manifest commit 双端同步。历史缺陷（6186a5cd1 实证）：
     # 本阶段只 clone/push atomgit，GitHub main 永远收不到 manifest 更新
