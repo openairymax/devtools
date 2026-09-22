@@ -538,22 +538,25 @@ sock_is_listening() {
     return 1
 }
 
+# Unix socket 就绪统一原语：socket 文件存在是 bind 成功的直接证据；
+# ss 可用时进一步确认真实监听（防 stale socket 残留误判）。ss 缺失
+# （受限环境）时信任 socket 文件。所有就绪判定必须经此原语，严禁裸调
+# sock_is_listening——0.1.18 clean-room e2e 根因：ubuntu:20.04 洁净
+# 容器无 ss（iproute2 缺席），sup_start 裸调 sock_is_listening 恒返 1，
+# 就绪轮询全程假阴性 20s 超时 abort（supervisor_d 实际已 bind）。
+# 权衡：stale socket + 进程已死时误判运行中，可接受（误判路径均有日志）。
+sock_is_ready() {
+    local sock_path="$1"
+    [[ -S "$sock_path" ]] || return 1
+    command -v ss >/dev/null 2>&1 || return 0
+    sock_is_listening "$sock_path"
+}
+
 check_daemon_health_unix() {
     local name="$1"
     # daemon socket 名称不带 _d 后缀 (monit_d → monit.sock)
     local short_name="${name%_d}"
-    local sock_path="${AGENTRT_RUNTIME_DIR}/${short_name}.sock"
-
-    # socket 文件不存在 → 未 bind，不健康
-    [[ -S "$sock_path" ]] || return 1
-
-    # ss 可用时确认实际监听（防 stale socket 文件残留误判为健康）；
-    # ss 不可用（受限环境）时信任 socket 文件存在（bind 成功的直接证据）。
-    if command -v ss >/dev/null 2>&1; then
-        sock_is_listening "$sock_path"
-        return $?
-    fi
-    return 0
+    sock_is_ready "${AGENTRT_RUNTIME_DIR}/${short_name}.sock"
 }
 
 check_daemon_health_tcp() {
@@ -581,7 +584,9 @@ check_daemon_health_tcp() {
     fi
     if command -v ss &>/dev/null; then
         have_probe=1
-        ss -tln 2>/dev/null | grep -q ":${port} " && return 0
+        # 不用 grep -q：目标行靠前时 grep 提前退出使 ss 收 SIGPIPE，
+        # pipefail 下误判未监听（同 sock_is_listening 注释的历史根因）。
+        ss -tln 2>/dev/null | grep ":${port} " >/dev/null && return 0
     fi
     # 0.1.13 clean-room e2e：ubuntu:20.04 基容器无 nc/curl/ss（洁净前提 =
     # 无开发工具链）。TCP-only daemon（gateway_d 无 Unix socket）健康判定
@@ -717,6 +722,16 @@ sup_bin_link() {
     done
 }
 
+# 启动失败诊断：daemon 日志尾部经 stderr 输出（log_error 同通道，-s
+# 静默模式仍可见）。0.1.18 e2e 教训：supervisor_d 崩溃讯息只在日志文件
+# 里，CI 侧只见 20s 超时行，排障盲点。
+sup_dump_log() {
+    local f="$1"
+    [[ -f "$f" ]] || return 0
+    log_error "----- tail -30 ${f} -----"
+    tail -n 30 "$f" >&2 || true
+}
+
 # supervisor 专用启动（严禁复用 start_daemon：其 sh 包装写
 # <runtime>/supervisor.pid，与 supervisor 自身 pidfile 防重直接冲突，
 # supervisor 会判定已有实例运行而退出）。流程：sock 活跃 → 已运行跳过；
@@ -725,11 +740,12 @@ sup_start() {
     local sup_bin="${AGENTRT_BINDIR}/${SUP_BIN_NAME}"
     local sock
     sock="$(sup_sock_path)"
+    local sup_log="${AIRY_LOG_DIR}/${SUP_BIN_NAME}.log"
     if ((DRY_RUN)); then
         log_info "[DRY-RUN] Would start ${SUP_BIN_NAME} (declaration-driven)"
         return 0
     fi
-    if sock_is_listening "$sock"; then
+    if sock_is_ready "$sock"; then
         log_warn "${SUP_BIN_NAME} already running (${sock}), skipping"
         return 0
     fi
@@ -740,19 +756,19 @@ sup_start() {
         if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
             local w=0
             while (( w < SUP_READY_TIMEOUT_SEC )); do
-                sock_is_listening "$sock" && {
+                sock_is_ready "$sock" && {
                     log_warn "${SUP_BIN_NAME} (pid=$old_pid) ctrl now ready"
                     return 0
                 }
                 sleep 1
                 w=$((w + 1))
             done
-            log_error "${SUP_BIN_NAME} pid=$old_pid alive but ctrl not ready in ${SUP_READY_TIMEOUT_SEC}s"
+            log_error "${SUP_BIN_NAME} pid=$old_pid alive but ctrl not ready in ${SUP_READY_TIMEOUT_SEC}s (log=$sup_log)"
+            sup_dump_log "$sup_log"
             return 1
         fi
     fi
     mkdir -p "$AGENTRT_RUNTIME_DIR" "$AIRY_LOG_DIR"
-    local sup_log="${AIRY_LOG_DIR}/${SUP_BIN_NAME}.log"
     log_step "Starting ${SUP_BIN_NAME} (declaration-driven orchestration)..."
     if command -v setsid >/dev/null 2>&1; then
         setsid "$sup_bin" >>"$sup_log" 2>&1 &
@@ -761,7 +777,7 @@ sup_start() {
     fi
     local elapsed=0
     while (( elapsed < SUP_READY_TIMEOUT_SEC )); do
-        if sock_is_listening "$sock"; then
+        if sock_is_ready "$sock"; then
             log_info "${SUP_BIN_NAME} is ready (${elapsed}s, ctrl=${sock})"
             return 0
         fi
@@ -769,6 +785,7 @@ sup_start() {
         elapsed=$((elapsed + HEALTH_CHECK_INTERVAL_SEC))
     done
     log_error "${SUP_BIN_NAME} ctrl socket not ready after ${SUP_READY_TIMEOUT_SEC}s (log=$sup_log)"
+    sup_dump_log "$sup_log"
     return 1
 }
 
@@ -834,8 +851,10 @@ start_daemon() {
                 fi
                 log_warn "$name: port $tcp_port occupied but no valid pidfile (stale instance), reaping..."
                 local stale_pid
+                # || true：ss 缺失（127）或竞态下端口已无监听（grep 空匹配）
+                # 时管道非零，set -e 会误杀 bootstrap；空值走正常重启路径。
                 stale_pid="$(ss -tlnp 2>/dev/null | grep ":${tcp_port}[[:space:]]" \
-                    | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)"
+                    | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2 || true)"
                 if [[ -n "$stale_pid" ]] && kill -0 "$stale_pid" 2>/dev/null; then
                     kill "$stale_pid" 2>/dev/null || true
                     local _w=0
@@ -846,11 +865,12 @@ start_daemon() {
                 rm -f "${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"
             fi
         elif [[ -S "$sock_path" ]]; then
-            if sock_is_listening "$sock_path"; then
+            if sock_is_ready "$sock_path"; then
                 log_warn "$name already running (socket ${sock_path}), skipping"
                 return 0
             fi
-            # socket 文件残留但无监听 → 删除，避免 bind 失败
+            # ss 在场且确认无监听 → stale socket，删除避免 bind 失败
+            # （ss 缺失时 sock_is_ready 已放行，不会到达此处）
             rm -f "$sock_path"
             log_warn "$name: stale socket ${sock_path} removed"
         fi
@@ -1101,7 +1121,9 @@ daemon_is_alive() {
         pgrep -f "${AGENTRT_BINDIR}/${bin_name}" >/dev/null 2>&1 && return 0
         return 1
     fi
-    ps -eo comm= 2>/dev/null | grep -qx "${bin_name}" && return 0
+    # 不用 grep -q：comm 列表首行命中时 grep 提前退出使 ps 收 SIGPIPE，
+    # pipefail 下误判已死（触发 watchdog 重复拉起）
+    ps -eo comm= 2>/dev/null | grep -x "${bin_name}" >/dev/null && return 0
     return 1
 }
 
