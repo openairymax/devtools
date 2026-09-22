@@ -5,8 +5,11 @@
 # Copyright (C) 2025-2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
-# P1.23.3: 按 DAG 层级顺序启动所有 daemon，等待每个 daemon
-#          健康检查通过后再启动下一层。
+# 0.1.18: supervisor 声明调谐编排——先写 launch 声明（profile.env）并注入
+#         子进程继承环境，专用路径拉起 supervisor_d；CORE 5 daemon 由
+#         supervisor 调谐自动拉起、死亡指数退避复活，AUX 9 daemon 按需
+#         激活（activate），maths_d 保持直启域。同层并行、跨层等待健康
+#         检查通过的 DAG 语义不变。
 #
 # 用法:
 #   bash agentrt-bootstrap.sh [选项]         启动全部 daemon
@@ -386,10 +389,55 @@ declare -A DAEMON_BIN_NAME=(
     [gateway_d]="gateway_d"
 )
 
+# ==================== Supervisor 编排（0.1.18） ====================
+#
+# supervisor_d 声明调谐：bootstrap 写 launch 声明（$AIRY_HOME/config/
+# profile.env）并前置注入子进程继承环境后，经专用路径拉起 supervisor_d
+# （严禁复用 start_daemon：其 sh 包装写 <runtime>/supervisor.pid，与
+# supervisor 自身 pidfile 防重直接冲突，supervisor 会判定已有实例退出）。
+# CORE 由 supervisor 调谐自动拉起（死亡指数退避复活），AUX 经控制口按需
+# 激活，maths_d 保持直启域。supervisor_d 二进制缺失时整体回退直启模式
+# （五层 DAG 语义不变，模块化拔插）。
+
+SUP_BIN_NAME="supervisor_d"
+SUP_READY_TIMEOUT_SEC=20    # supervisor 控制口就绪截止
+SUP_STOP_GRACE_SEC=15       # shutdown_all（并行 TERM + KILL 兜底）总截止
+
+# CORE 名单 = supervisor 缺省表（decl.c sup_decl_defaults），顺序一致
+SUP_CORE_DAEMONS=("gateway_d" "llm_d" "think_d" "agent_d" "tool_d")
+
+# AUX 名单按 DAG 层序排列（激活时逐层进行，保留跨层依赖语义）
+SUP_AUX_DAEMONS=("monit_d" "notify_d" "cupolas_d" "sched_d" "channel_d"
+                 "mem_d" "hook_d" "a2a_d" "market_d")
+
+# 直启域：不在 supervisor 声明表内，保持 start_daemon 原路
+SUP_DIRECT_DAEMONS=("maths_d")
+
+sup_enabled() {
+    [[ -x "${AGENTRT_BINDIR}/${SUP_BIN_NAME}" ]]
+}
+
+sup_sock_path() {
+    echo "${AGENTRT_RUNTIME_DIR}/supervisor.sock"
+}
+
+# daemon 在 supervisor 声明表中的角色：core / aux；直启域输出空并返回 1
+sup_role_of() {
+    local name="$1" d
+    for d in "${SUP_CORE_DAEMONS[@]}"; do
+        [[ "$d" == "$name" ]] && { echo "core"; return 0; }
+    done
+    for d in "${SUP_AUX_DAEMONS[@]}"; do
+        [[ "$d" == "$name" ]] && { echo "aux"; return 0; }
+    done
+    return 1
+}
+
 # ==================== 运行时状态 ====================
 
 declare -A DAEMON_PIDS=()       # daemon_name -> PID
 FAILED_DAEMONS=()               # 启动失败的 daemon 列表
+declare -A ACTIVATE_FAILED=()   # supervisor 模式：激活失败的 AUX（等待阶段跳过）
 declare -A WD_RESTART_TIMES=()  # watchdog: daemon_name -> "ts,ts,..."（60s 滑动窗口）
 
 # ==================== 工具函数 ====================
@@ -585,6 +633,177 @@ wait_for_daemon() {
     return 1
 }
 
+# ==================== daemon 环境前置 ====================
+
+# daemon 环境前置（直启模式由 start_daemon 调用；supervisor 模式在拉起
+# supervisor 前对监管域全量调用——supervisor spawn 的子进程继承 supervisor
+# 环境，supervisor 启动后再 export 对子进程无效）。
+prepare_daemon_env() {
+    local name="$1"
+    if [[ "$name" == "agent_d" ]]; then
+        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "${AGENTRT_MODEL_CONFIG:-}" && -f "${AGENTRT_MODEL_CONFIG:-}" ]]; then
+            local _def_model
+            _def_model="$(sed -n 's/^[[:space:]]*model:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$AGENTRT_MODEL_CONFIG" | head -1 | tr -d '[:space:]')"
+            [[ -n "$_def_model" ]] && export AIRY_AGENT_MODEL="$_def_model"
+        fi
+        return 0
+    fi
+    if [[ "$name" == "llm_d" && -z "${DEEPSEEK_API_KEY:-}" && -f "$HOME/.bashrc" ]]; then
+        local key_line
+        # pipefail 下 grep 无匹配返回 1 会经管道传导为赋值失败（set -e 终止），
+        # 空匹配属正常路径，|| true 吞掉非致命状态。
+        key_line="$(grep -E '^[[:space:]]*export[[:space:]]+DEEPSEEK_API_KEY=' "$HOME/.bashrc" | head -1 || true)"
+        if [[ -n "$key_line" ]]; then
+            # shellcheck disable=SC2086
+            eval "$key_line" 2>/dev/null || true
+            if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
+                log_info "llm_d: DEEPSEEK_API_KEY loaded from ~/.bashrc"
+            fi
+        fi
+    fi
+    # 显式 return 0：非 agent_d/llm_d 时若以失败的 [[ ]] 测试收尾，set -e
+    # 会因函数隐式返回 1 终止脚本（供裸语句调用必须保证所有路径返回 0）。
+    return 0
+}
+
+# ==================== Supervisor 编排（0.1.18） ====================
+
+# profile.env 键值 upsert（awk 实现：BSD/GNU sed -i 不兼容，跨平台禁用）。
+# 已有键整行替换为 key="val"，无键则追加。
+upsert_profile_var() {
+    local file="$1" key="$2" val="$3"
+    if [[ -f "$file" ]] && grep -qE "^${key}=" "$file"; then
+        local tmp="${file}.tmp.$$"
+        awk -v k="$key" -v v="$val" '$0 ~ "^"k"=" { print k "=\"" v "\""; next } { print }' \
+            "$file" > "$tmp" && mv "$tmp" "$file"
+    else
+        printf '%s="%s"\n' "$key" "$val" >> "$file"
+    fi
+}
+
+# supervisor 声明调谐：写 $AIRY_HOME/config/profile.env（sup_decl_load 声明
+# 源）。CORE/AUX 名单两行 + 各 daemon ARGS 声明（未登记的声明被 decl.c
+# fail-closed 拒绝，故只写有值的键）。llm_d 用 model.yaml 路径，其余用
+# AGENTRT_CONFIG。
+sup_write_decl() {
+    local decl_dir="${AIRY_HOME}/config"
+    local decl_file="${decl_dir}/profile.env"
+    mkdir -p "$decl_dir"
+    upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_CORE" "${SUP_CORE_DAEMONS[*]}"
+    upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_AUX" "${SUP_AUX_DAEMONS[*]}"
+    local d args_key args_val
+    for d in "${SUP_CORE_DAEMONS[@]}" "${SUP_AUX_DAEMONS[@]}"; do
+        args_key="AIRYRT_LAUNCH_ARGS_${d}"
+        args_val=""
+        if [[ "$d" == "llm_d" && -n "${AGENTRT_MODEL_CONFIG:-}" ]]; then
+            args_val="--manager ${AGENTRT_MODEL_CONFIG}"
+        elif [[ -n "$AGENTRT_CONFIG" ]]; then
+            args_val="--manager ${AGENTRT_CONFIG}"
+        fi
+        [[ -n "$args_val" ]] && upsert_profile_var "$decl_file" "$args_key" "$args_val"
+    done
+    log_info "Launch declaration: ${decl_file}"
+}
+
+# supervisor 以 $AIRY_HOME/bin/<name> 固定解析子进程（decl.c add_proc），
+# -b 自定义二进制目录时用符号链接归位，保证监管域可达。
+sup_bin_link() {
+    local home_bin="${AIRY_HOME}/bin"
+    [[ "${AGENTRT_BINDIR}" == "${home_bin}" ]] && return 0
+    mkdir -p "$home_bin"
+    local d
+    for d in "${SUP_CORE_DAEMONS[@]}" "${SUP_AUX_DAEMONS[@]}"; do
+        [[ -x "${AGENTRT_BINDIR}/${d}" ]] && ln -sfn "${AGENTRT_BINDIR}/${d}" "${home_bin}/${d}"
+    done
+}
+
+# supervisor 专用启动（严禁复用 start_daemon：其 sh 包装写
+# <runtime>/supervisor.pid，与 supervisor 自身 pidfile 防重直接冲突，
+# supervisor 会判定已有实例运行而退出）。流程：sock 活跃 → 已运行跳过；
+# pidfile 活跃 → 给控制口就绪窗口；否则 setsid 拉起后轮询 supervisor.sock。
+sup_start() {
+    local sup_bin="${AGENTRT_BINDIR}/${SUP_BIN_NAME}"
+    local sock
+    sock="$(sup_sock_path)"
+    if ((DRY_RUN)); then
+        log_info "[DRY-RUN] Would start ${SUP_BIN_NAME} (declaration-driven)"
+        return 0
+    fi
+    if sock_is_listening "$sock"; then
+        log_warn "${SUP_BIN_NAME} already running (${sock}), skipping"
+        return 0
+    fi
+    local pid_file="${AGENTRT_RUNTIME_DIR}/supervisor.pid"
+    if [[ -f "$pid_file" ]]; then
+        local old_pid
+        old_pid="$(tr -d '[:space:]' < "$pid_file")"
+        if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+            local w=0
+            while (( w < SUP_READY_TIMEOUT_SEC )); do
+                sock_is_listening "$sock" && {
+                    log_warn "${SUP_BIN_NAME} (pid=$old_pid) ctrl now ready"
+                    return 0
+                }
+                sleep 1
+                w=$((w + 1))
+            done
+            log_error "${SUP_BIN_NAME} pid=$old_pid alive but ctrl not ready in ${SUP_READY_TIMEOUT_SEC}s"
+            return 1
+        fi
+    fi
+    mkdir -p "$AGENTRT_RUNTIME_DIR" "$AIRY_LOG_DIR"
+    local sup_log="${AIRY_LOG_DIR}/${SUP_BIN_NAME}.log"
+    log_step "Starting ${SUP_BIN_NAME} (declaration-driven orchestration)..."
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$sup_bin" >>"$sup_log" 2>&1 &
+    else
+        "$sup_bin" >>"$sup_log" 2>&1 &
+    fi
+    local elapsed=0
+    while (( elapsed < SUP_READY_TIMEOUT_SEC )); do
+        if sock_is_listening "$sock"; then
+            log_info "${SUP_BIN_NAME} is ready (${elapsed}s, ctrl=${sock})"
+            return 0
+        fi
+        sleep "$HEALTH_CHECK_INTERVAL_SEC"
+        elapsed=$((elapsed + HEALTH_CHECK_INTERVAL_SEC))
+    done
+    log_error "${SUP_BIN_NAME} ctrl socket not ready after ${SUP_READY_TIMEOUT_SEC}s (log=$sup_log)"
+    return 1
+}
+
+# AUX 激活（经 supervisor 控制口）。sup_activate 幂等：活进程直接返回 0，
+# FAILED 状态由此复位 fail_count。
+sup_activate_cli() {
+    "${AGENTRT_BINDIR}/${SUP_BIN_NAME}" activate "$1" >/dev/null 2>&1
+}
+
+# supervisor 停止：控制口 stop 优先（shutdown_all 级联 TERM 全部监管域
+# 子进程并自清 sock/pid），TERM 兜底，KILL 底线。
+sup_stop() {
+    ((DRY_RUN)) && return 0
+    local pid_file="${AGENTRT_RUNTIME_DIR}/supervisor.pid"
+    [[ -f "$pid_file" ]] || return 0
+    local pid
+    pid="$(tr -d '[:space:]' < "$pid_file")"
+    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+    log_step "Stopping ${SUP_BIN_NAME} (PID=$pid, cascading to managed daemons)..."
+    "${AGENTRT_BINDIR}/${SUP_BIN_NAME}" stop >/dev/null 2>&1 \
+        || kill -TERM "$pid" 2>/dev/null || true
+    local elapsed=0
+    while kill -0 "$pid" 2>/dev/null && [[ $elapsed -lt $SUP_STOP_GRACE_SEC ]]; do
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        log_warn "${SUP_BIN_NAME} exceeded ${SUP_STOP_GRACE_SEC}s, force killing..."
+        kill -9 "$pid" 2>/dev/null || true
+        rm -f "$(sup_sock_path)"
+    fi
+}
+
 # ==================== 启动/停止 ====================
 
 start_daemon() {
@@ -676,36 +895,8 @@ start_daemon() {
     # 确保 runtime 目录存在
     mkdir -p "$AGENTRT_RUNTIME_DIR"
 
-    # agent_d：模型名贯通——openlab 子进程 SDK 默认模型硬编码 gpt-4o-mini
-    # （DeepSeek provider 不认 → HTTP 400），注入 model.yaml 默认模型。
-    # AIRY_AGENT_MODEL 在 openlab LLMAgent 中优先级最高（强制单模型），
-    # 环境变量优先不覆盖。Agent SDK 包导入由脚本开头 AGENT_SDK_OK 检查保证，
-    # agent_d 子进程经标准包解析（pip install -e / wheel）定位，无需 PYTHONPATH。
-    if [[ "$name" == "agent_d" ]]; then
-        # AGENTRT_MODEL_CONFIG 可能未定义（干净环境无 model.yaml），
-        # set -u 下必须用 :- 保护（与 llm_d 分支 L636 同一纪律）。
-        if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "${AGENTRT_MODEL_CONFIG:-}" && -f "${AGENTRT_MODEL_CONFIG:-}" ]]; then
-            local _def_model
-            _def_model="$(sed -n 's/^[[:space:]]*model:[[:space:]]*"\{0,1\}\([^"#]*\)"\{0,1\}.*/\1/p' "$AGENTRT_MODEL_CONFIG" | head -1 | tr -d '[:space:]')"
-            [[ -n "$_def_model" ]] && export AIRY_AGENT_MODEL="$_def_model"
-        fi
-    fi
-
-    # 补载 API key：llm_d 依赖 DEEPSEEK_API_KEY/OPENAI_API_KEY 等环境变量
-    # （model.yaml 的 api_key_env 指定）。非交互 nohup 启动不 source ~/.bashrc
-    # （bashrc 对非交互 shell 有提前 return 保护），此处直接从 ~/.bashrc 提取
-    # export 行赋值，避免 401 invalid API key（历史 P1-3 邻近问题）。
-    if [[ "$name" == "llm_d" && -z "${DEEPSEEK_API_KEY:-}" && -f "$HOME/.bashrc" ]]; then
-        local key_line
-        key_line="$(grep -E '^[[:space:]]*export[[:space:]]+DEEPSEEK_API_KEY=' "$HOME/.bashrc" | head -1)"
-        if [[ -n "$key_line" ]]; then
-            # shellcheck disable=SC2086
-            eval "$key_line" 2>/dev/null || true
-            if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
-                log_info "llm_d: DEEPSEEK_API_KEY loaded from ~/.bashrc"
-            fi
-        fi
-    fi
+    # daemon 环境前置（模型名/API key 注入，单一实现与 supervisor 模式共用）
+    prepare_daemon_env "$name"
 
     # 启动 daemon（后台运行）
     #
@@ -773,42 +964,33 @@ stop_daemon() {
     unset DAEMON_PIDS[$name]
 }
 
-stop_all_daemons() {
-    log_step "Stopping all daemons (parallel SIGTERM + graceful window)..."
-    if ((DRY_RUN)); then
-        return 0
-    fi
+# 批量停止（并行 TERM → 统一宽限窗口 → KILL 兜底）。输入：daemon 名列表。
+# 逐 daemon 顺序等待会放大总停止时间，故三阶段批量处理：
+#   阶段一 逆序并行发 SIGTERM（不逐个等待）
+#   阶段二 统一等待优雅停止窗口（全部并行清理，总耗时 ≈ 单个窗口）
+#   阶段三 窗口超时仍未退出的进程强制清理
+stop_daemons_parallel() {
+    local -a names=("$@")
+    local idx name pid
 
-    # 阶段一：逆序向全部 daemon 并行发送 SIGTERM（不逐个等待）
-    for ((layer=${#ALL_LAYERS[@]}-1; layer>=0; layer--)); do
-        local layer_var="${ALL_LAYERS[$layer]}"
-        local -n daemons="$layer_var"
-        for ((i=${#daemons[@]}-1; i>=0; i--)); do
-            local name="${daemons[$i]}"
-            local pid
-            pid="$(get_daemon_pid "$name")"
-            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-                kill -TERM "$pid" 2>/dev/null || true
-                log_debug "  TERM → $name (PID=$pid)"
-            fi
-        done
+    for ((idx=${#names[@]}-1; idx>=0; idx--)); do
+        name="${names[$idx]}"
+        pid="$(get_daemon_pid "$name")"
+        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+            kill -TERM "$pid" 2>/dev/null || true
+            log_debug "  TERM → $name (PID=$pid)"
+        fi
     done
 
-    # 阶段二：统一等待优雅停止窗口（全部并行清理，总耗时 ≈ 单个窗口）
     local elapsed=0
     local any_alive=1
     while [[ $elapsed -lt $GRACEFUL_STOP_SEC ]]; do
         any_alive=0
-        for ((layer=${#ALL_LAYERS[@]}-1; layer>=0; layer--)); do
-            local layer_var2="${ALL_LAYERS[$layer]}"
-            local -n daemons2="$layer_var2"
-            for name2 in "${daemons2[@]}"; do
-                local pid2
-                pid2="$(get_daemon_pid "$name2")"
-                if [[ -n "$pid2" ]] && kill -0 "$pid2" 2>/dev/null; then
-                    any_alive=1
-                fi
-            done
+        for name in "${names[@]}"; do
+            pid="$(get_daemon_pid "$name")"
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                any_alive=1
+            fi
         done
         [[ $any_alive -eq 0 ]] && break
         sleep 1
@@ -817,19 +999,38 @@ stop_all_daemons() {
         elapsed=$((elapsed + 1))
     done
 
-    # 阶段三：窗口超时仍未退出的进程强制清理（KILL 兜底）
-    for ((layer=${#ALL_LAYERS[@]}-1; layer>=0; layer--)); do
-        local layer_var3="${ALL_LAYERS[$layer]}"
-        local -n daemons3="$layer_var3"
-        for name3 in "${daemons3[@]}"; do
-            local pid3
-            pid3="$(get_daemon_pid "$name3")"
-            if [[ -n "$pid3" ]] && kill -0 "$pid3" 2>/dev/null; then
-                log_warn "  $name3 exceeded graceful window, KILL (PID=$pid3)"
-                kill -9 "$pid3" 2>/dev/null || true
-            fi
-        done
+    for name in "${names[@]}"; do
+        pid="$(get_daemon_pid "$name")"
+        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+            log_warn "  $name exceeded graceful window, KILL (PID=$pid)"
+            kill -9 "$pid" 2>/dev/null || true
+        fi
     done
+}
+
+stop_all_daemons() {
+    log_step "Stopping all daemons (parallel SIGTERM + graceful window)..."
+    if ((DRY_RUN)); then
+        return 0
+    fi
+
+    # supervisor 模式：监管域由 sup_stop 级联收摊（shutdown_all 并行 TERM
+    # 全部子进程 + 宽限 + KILL 兜底，并自清 sock/pid），直启域残余并行补停。
+    # 监管域无 pidfile（PID 由 supervisor 内存表掌握），直接 TERM 找不到
+    # 目标——必须经控制口/级联路径停止。
+    if sup_enabled; then
+        sup_stop
+        stop_daemons_parallel "${SUP_DIRECT_DAEMONS[@]}"
+        return 0
+    fi
+
+    local -a all_names=()
+    local layer_var
+    for layer_var in "${ALL_LAYERS[@]}"; do
+        local -n daemons="$layer_var"
+        all_names+=("${daemons[@]}")
+    done
+    stop_daemons_parallel "${all_names[@]}"
 }
 
 # ==================== 状态查询 ====================
@@ -855,7 +1056,11 @@ show_status() {
                 fi
             elif check_daemon_health "$name"; then
                 # 外部已运行的健康 daemon（socket 存在，非本进程启动）：不误报 OFFLINE
-                log_info "$name: ONLINE (pre-existing)"
+                local tag="pre-existing"
+                if sup_enabled && sup_role_of "$name" >/dev/null 2>&1; then
+                    tag="managed by supervisor"
+                fi
+                log_info "$name: ONLINE ($tag)"
             else
                 log_error "$name: OFFLINE"
                 all_online=false
@@ -928,10 +1133,34 @@ wd_restart_allowed() {
     return 0
 }
 
-# 单轮巡检：按启动顺序检查全部 daemon，对死亡进程执行幂等重启
+# 重启/激活后短等待健康确认（≤5s），避免阻塞整轮巡检；未通过由下轮兜底
+wd_wait_health() {
+    local name="$1"
+    local waited=0
+    while (( waited < 5 )); do
+        if check_daemon_health "$name"; then
+            break
+        fi
+        sleep 1
+        ((waited++)) || true
+    done
+    if (( waited >= 5 )) && ! check_daemon_health "$name"; then
+        wd_log "WARN  ${name} restarted but health not confirmed within 5s"
+    else
+        local pid_info
+        pid_info="$(get_daemon_pid "$name")"
+        [[ -n "$pid_info" ]] && pid_info=" (pid=$pid_info)"
+        wd_log "OK    ${name} healthy again${pid_info}"
+    fi
+}
+
+# 单轮巡检：按启动顺序检查全部 daemon，对死亡进程执行幂等重启。
+# supervisor 监管域分流：CORE 死亡由 supervisor BACKOFF 自动复活
+# （bootstrap 双拉起会与退避重启竞争，跳过）；AUX 死亡（STOPPED，supervisor
+# 不自动复活）经控制口激活；直启域保持 start_daemon 原路。
 wd_check_all() {
     ((DRY_RUN)) && return 0
-    local layer_var name
+    local layer_var name role
 
     for layer_var in "${ALL_LAYERS[@]}"; do
         local -n daemons="$layer_var"
@@ -940,29 +1169,34 @@ wd_check_all() {
                 continue
             fi
 
+            role=""
+            if sup_enabled; then
+                role="$(sup_role_of "$name" 2>/dev/null || true)"
+            fi
+
+            if [[ "$role" == "core" ]]; then
+                continue
+            fi
+
             if ! wd_restart_allowed "$name"; then
                 wd_log "WARN  ${name} down but restart rate-limited (${WATCHDOG_RESTART_LIMIT}/${WATCHDOG_RESTART_WINDOW_SEC}s), skip this round"
                 continue
             fi
 
-            wd_log "RESTART ${name} detected down, restarting..."
-            if start_daemon "$name"; then
-                # 短等待健康确认（≤5s），避免阻塞整轮巡检；未通过由下轮巡检兜底
-                local waited=0
-                while (( waited < 5 )); do
-                    if check_daemon_health "$name"; then
-                        break
-                    fi
-                    sleep 1
-                    ((waited++)) || true
-                done
-                if (( waited >= 5 )) && ! check_daemon_health "$name"; then
-                    wd_log "WARN  ${name} restarted but health not confirmed within 5s"
+            if [[ "$role" == "aux" ]]; then
+                wd_log "RESTART ${name} detected down, activating via supervisor ctrl..."
+                if sup_activate_cli "$name"; then
+                    wd_wait_health "$name"
                 else
-                    wd_log "OK    ${name} restarted (pid=$(get_daemon_pid "$name"))"
+                    wd_log "FAIL  ${name} activate failed"
                 fi
             else
-                wd_log "FAIL  ${name} restart failed"
+                wd_log "RESTART ${name} detected down, restarting..."
+                if start_daemon "$name"; then
+                    wd_wait_health "$name"
+                else
+                    wd_log "FAIL  ${name} restart failed"
+                fi
             fi
         done
     done
@@ -1043,6 +1277,30 @@ main() {
         exit 1
     fi
 
+    # supervisor 编排前置：声明调谐 → 监管域环境前置（supervisor spawn 的
+    # 子进程继承 supervisor 环境，export 必须在拉起前完成）→ bin 归位 →
+    # 拉起 supervisor。supervisor 内部 reconcile 立即拉起全部 CORE；AUX
+    # 保持 STOPPED，由下方逐层循环按 DAG 层序经控制口激活（层间等待语义
+    # 保留）。supervisor_d 二进制缺失时 sup_enabled 为假，整体回退直启
+    # （模块化拔插，五层 DAG 语义不变）。
+    if sup_enabled; then
+        sup_write_decl
+        local sd
+        for sd in "${SUP_CORE_DAEMONS[@]}" "${SUP_AUX_DAEMONS[@]}"; do
+            prepare_daemon_env "$sd"
+        done
+        sup_bin_link
+        if ! sup_start; then
+            log_error "supervisor_d failed to start, aborting..."
+            stop_all_daemons
+            exit 1
+        fi
+        log_info "Orchestration: supervisor_d manages CORE(${#SUP_CORE_DAEMONS[@]}) + AUX(${#SUP_AUX_DAEMONS[@]})"
+    else
+        log_info "Orchestration: direct-start (supervisor_d not present)"
+    fi
+    echo ""
+
     # 逐层启动
     local layer_num=0
     local total_started=0
@@ -1052,9 +1310,28 @@ main() {
         local -n daemons="$layer_var"
         log_step "=== Layer $layer_num: ${daemons[*]} ==="
 
-        # 同层并行启动
+        # 同层启动（supervisor 模式分流：CORE 已由 reconcile 拉起、AUX 经
+        # 控制口激活，均不再 start_daemon；直启域保持原路）
         for name in "${daemons[@]}"; do
-            if start_daemon "$name"; then
+            local role=""
+            if sup_enabled; then
+                role="$(sup_role_of "$name" 2>/dev/null || true)"
+            fi
+            if [[ "$role" == "core" ]]; then
+                continue
+            elif [[ "$role" == "aux" ]]; then
+                if ((DRY_RUN)); then
+                    log_info "[DRY-RUN] Would activate $name via supervisor ctrl"
+                elif sup_activate_cli "$name"; then
+                    log_info "$name activated via supervisor ctrl"
+                else
+                    log_error "$name activate failed via supervisor ctrl"
+                    ACTIVATE_FAILED[$name]=1
+                    total_failed=$((total_failed + 1))
+                    continue
+                fi
+                total_started=$((total_started + 1))
+            elif start_daemon "$name"; then
                 total_started=$((total_started + 1))
             else
                 total_failed=$((total_failed + 1))
@@ -1064,7 +1341,17 @@ main() {
         # 等待同层所有 daemon 健康检查通过
         if ! ((DRY_RUN)); then
             for name in "${daemons[@]}"; do
+                # 直启域以 DAEMON_PIDS 为准；监管域无 pidfile（PID 由
+                # supervisor 内存表掌握），凡声明表成员均需健康确认
+                # （激活失败的 AUX 除外，避免对未启动进程空等超时）。
+                local need_wait=0
                 if [[ -n "${DAEMON_PIDS[$name]:-}" ]]; then
+                    need_wait=1
+                elif [[ -z "${ACTIVATE_FAILED[$name]:-}" ]] \
+                     && sup_enabled && sup_role_of "$name" >/dev/null 2>&1; then
+                    need_wait=1
+                fi
+                if ((need_wait)); then
                     if ! wait_for_daemon "$name"; then
                         log_error "$name failed health check, aborting..."
                         FAILED_DAEMONS+=("$name")
@@ -1087,6 +1374,11 @@ main() {
         exit 1
     fi
 
+    # supervisor 模式下 CORE 由 reconcile 拉起（未进上方循环），计入总数
+    # 以使收尾文案与系统实况一致。
+    if sup_enabled; then
+        total_started=$((total_started + ${#SUP_CORE_DAEMONS[@]}))
+    fi
     log_info "Bootstrap complete — all ${total_started} daemons started successfully"
 
     # Watchdog 自愈模式：全部拉起后进入巡检循环（前台常驻）
