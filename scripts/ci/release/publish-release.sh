@@ -95,6 +95,9 @@ fi
 RELEASE_BODY="${NOTES:-AgentRT ${VERSION}}"
 
 API="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
+# 删 Tag 端点（Gitee v5 兼容）：级联删除对应 Release。atomgit 无 release
+# DELETE 端点（/releases/{tag} 返回 405 实证），超窗清理必须走本端点。
+API_TAGS="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/tags"
 
 # atomgit API v5（Gitee 兼容，Base api.atomgit.com）：PRIVATE-TOKEN 认证。
 # release 对象无 id 字段，以 tag_name 存在性探测（幂等）：不存在则创建，
@@ -178,7 +181,9 @@ airy_overkept() {
     printf '%s\n' "$1" | python3 "${SCRIPT_DIR}/airy_release_prune.py" "$2" "$3"
 }
 
-# 超窗远端 Release 删除。删除端点为 Gitee 兼容形态（DELETE /releases/{tag}）；
+# 超窗远端 Release 删除。atomgit 无 release DELETE 端点（/releases/{tag}
+# 返回 405 实证），走删 Tag 端点级联删除 Release（Gitee v5 兼容形态，
+# v0.1.7 删除+级联消失已实证）；
 # fail-soft：无 token 或删除失败仅告警，不阻断发布主链路（下载链不受
 # 影响的旧版本多留一期无害，下期发布自动重试收敛）。
 airy_delete_remote() {
@@ -188,8 +193,8 @@ airy_delete_remote() {
         return 1
     fi
     if curl -fsS --connect-timeout 20 -X DELETE \
-        -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" "${API}/${tag}" >/dev/null 2>&1; then
-        log_ok "远端 Release 已删除（超窗）: ${tag}"
+        -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" "${API_TAGS}/${tag}" >/dev/null 2>&1; then
+        log_ok "远端 Release 已删除（超窗，经 Tag 级联）: ${tag}"
     else
         log_warn "远端 Release 删除失败（fail-soft，不阻断发布）: ${tag}"
         return 1
@@ -244,7 +249,7 @@ airy_prune_old() {
         [ -n "$t" ] || continue
         printf '%s\n' "$remote_tags" | grep -qxF "$t" || continue
         if [ "$DRY_RUN" = "1" ]; then
-            log_info "DRY-RUN: DELETE ${API}/${t}"
+            log_info "DRY-RUN: DELETE ${API_TAGS}/${t}"
         else
             airy_delete_remote "$t" || true
         fi
