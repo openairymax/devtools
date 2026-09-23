@@ -739,8 +739,12 @@ LAUNCHER_SRC="${AIRY_LAUNCHER_SRC:-${SCRIPT_DIR}/../../../../agent-workload/sdk/
 
 LATEST_DIR="$TMP/agentrt-latest"
 LATEST_READY=0
+# latest 入口面完整性标记（fail-closed）：launcher 源缺失 / 入口件上传失败 /
+# 显式 SKIP_LATEST 均置位，阻断把不可信的安装/更新唯一事实源发布出去。
+LATEST_FAIL=0
 if [ "${SKIP_LATEST:-0}" = "1" ]; then
-    log_warn "跳过 latest/ 发布树准备（SKIP_LATEST=1）：附件面将缺通道全集与启动器"
+    LATEST_FAIL=1
+    log_warn "跳过 latest/ 发布树准备（SKIP_LATEST=1，LATEST_FAIL=1）：附件面将缺通道全集与启动器"
 elif [ "$DRY_RUN" = "1" ]; then
     log_info "DRY-RUN: 跳过 latest/ 发布树准备"
 else
@@ -763,7 +767,9 @@ else
     if [ -f "$LAUNCHER_SRC" ]; then
         cp -f "$LAUNCHER_SRC" "$LATEST_DIR/latest/airymaxrt"
     else
-        log_warn "未找到更新器源: ${LAUNCHER_SRC}（二进制模式 update 自举将不可用）"
+        LATEST_FAIL=1
+        log_fail "未找到更新器源: ${LAUNCHER_SRC}（LATEST_FAIL=1：latest 附件面缺启动器，安装/更新自举不可用，中止发布）"
+        exit 1
     fi
     # 仅在可签名时执行：SKIP_SIGN/SKIP_GPG 下无有效签名，客户端 GPG 验签必然
     # 失败（误导为“签名被篡改”），宁缺不假签。
@@ -855,11 +861,17 @@ rm -f "$UP_FAIL_LOG"
 for f in "${ARTIFACTS[@]}" "${ARTIFACTS[@]/%/.sha256}" "${ARTIFACTS[@]/%/.sig}" \
          "$INSTALLER" "$INSTALLER_PS1" "${MANIFEST_ASSETS[@]}" "$PUBKEY_ASSET" "$LAUNCHER_ASSET"; do
     [ -e "$f" ] || continue
-    ( upload_asset "$f" || echo "$(basename "$f")" >> "$UP_FAIL_LOG" ) &
+    # AIRY_FORCE_UPLOAD=1 先删后传强刷：latest 下载面是平台「最新 release」
+    # 别名（302 → 本轮附件面），旧键残留会让别名面混入陈旧入口件。
+    ( AIRY_FORCE_UPLOAD=1 upload_asset "$f" || echo "$(basename "$f")" >> "$UP_FAIL_LOG" ) &
     while [ "$(jobs -rp | wc -l)" -ge "$UPLOAD_PAR" ]; do wait -n 2>/dev/null || break; done
 done
 wait 2>/dev/null || true
 if [ -s "$UP_FAIL_LOG" ]; then
+    if grep -qE '^(install\.sh|install\.ps1|airymaxrt|agentrt\.asc|manifest\.)' "$UP_FAIL_LOG"; then
+        LATEST_FAIL=1
+        log_fail "latest 入口件上传失败（LATEST_FAIL=1）：安装/更新唯一事实源附件面将不完整"
+    fi
     log_fail "存在上传失败附件（$(wc -l < "$UP_FAIL_LOG") 个），中止发布（修复后重跑可续传，已成功附件自动跳过）:"
     sed 's/^/  /' "$UP_FAIL_LOG" | head -10
     exit 1
