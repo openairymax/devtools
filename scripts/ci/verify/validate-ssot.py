@@ -18,7 +18,7 @@ import os
 import re
 import sys
 
-REGISTRY = "docs/AirymaxRT/50-engineering-standards/09-ssot-registry.md"
+REGISTRY = "docs/docs-workload/50-engineering-standards/09-ssot-registry.md"
 AGENTRT_TECH_START = 12  # TP-012 起为 agentrt 用户态技术点
 
 
