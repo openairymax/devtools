@@ -56,7 +56,7 @@ PUBLIC_ALLOWLIST=(
     plan_to_dag.h execution_review.h multi_agent_collaboration.h
     airy_artifact_validator.h memory.h agent_registry.h
     # 机制本体公共面（0.1.9 M3 实证外部消费）：
-    semantic_unit.h checkpoint_adapter.h memoryrovol_bridge.h tool_svc_adapter.h
+    checkpoint_adapter.h memoryrovol_bridge.h tool_svc_adapter.h
 )
 
 # ---------------------------------------------------------------------------

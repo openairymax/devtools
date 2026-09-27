@@ -332,6 +332,205 @@ gate_corekern_runtime() {
 }
 
 # ============================================================================
+# Gate 11: 函数名长度检查 (M3 0.1.9 §4.2 x-cutting-a)
+# 生产函数名 ≤ 20 字节；基线台账 fail-closed（基线外新增名即阻断）。
+# 退出码: 0=通过 1=新增超长名(阻断) 2=基线缺失(告警)
+# ============================================================================
+gate_name_length() {
+    section "Gate 11: Function Name Length (<= 20 bytes)"
+
+    local fn_script="${SCRIPT_DIR}/function-name-check.sh"
+    if [ -f "$fn_script" ]; then
+        log_info "Running function-name length check..."
+        local fn_out fn_rc=0
+        fn_out=$(bash "$fn_script" 2>&1) || fn_rc=$?
+        echo "$fn_out" | tail -12
+        if [ "$fn_rc" -eq 0 ]; then
+            check_gate "NameLength" 0
+        elif [ "$fn_rc" -eq 2 ]; then
+            log_warn "function-name check: environment error, manual review required"
+            check_gate "NameLength" 2
+        else
+            check_gate "NameLength" 1
+        fi
+    else
+        log_warn "function-name check script not found: ${fn_script}"
+        check_gate "NameLength" 2
+    fi
+}
+
+# ============================================================================
+# Gate 12: daemons LOC 上限检查 (V16.1, ceiling < 9000)
+# 口径 src/ + include/（排除 tests/）；超标仅允许带任务号的豁免，且只减不增。
+# 退出码: 0=通过 1=存在违例 2=daemons 树缺失(告警)
+# ============================================================================
+gate_loc_ceiling() {
+    section "Gate 12: LOC Ceiling Check (V16.1, < 9000)"
+
+    local loc_script="${SCRIPT_DIR}/loc-ceiling-check.sh"
+    if [ -f "$loc_script" ]; then
+        log_info "Running V16.1 LOC ceiling check..."
+        local loc_out loc_rc=0
+        loc_out=$(bash "$loc_script" 2>&1) || loc_rc=$?
+        echo "$loc_out" | tail -20
+        if [ "$loc_rc" -eq 0 ]; then
+            check_gate "LocCeiling" 0
+        elif [ "$loc_rc" -eq 2 ]; then
+            log_warn "loc-ceiling check: environment error, manual review required"
+            check_gate "LocCeiling" 2
+        else
+            check_gate "LocCeiling" 1
+        fi
+    else
+        log_warn "loc-ceiling check script not found: ${loc_script}"
+        check_gate "LocCeiling" 2
+    fi
+}
+
+# ============================================================================
+# Gate 13: 传播面与死信号检查 (V16.13)
+# PUBLIC/INTERFACE 段内 src 传播面 + daemons/ __attribute__((unused)) 计数，
+# 均走基线台账只减不增。
+# 退出码: 0=通过 1=存在违例 2=agentrt 树缺失(告警)
+# ============================================================================
+gate_propagation() {
+    section "Gate 13: Propagation & Dead-Signal Check (V16.13)"
+
+    local prop_script="${SCRIPT_DIR}/propagation-dead-signal-check.sh"
+    if [ -f "$prop_script" ]; then
+        log_info "Running V16.13 propagation & dead-signal check..."
+        local prop_out prop_rc=0
+        prop_out=$(bash "$prop_script" 2>&1) || prop_rc=$?
+        echo "$prop_out" | tail -20
+        if [ "$prop_rc" -eq 0 ]; then
+            check_gate "Propagation" 0
+        elif [ "$prop_rc" -eq 2 ]; then
+            log_warn "propagation check: environment error, manual review required"
+            check_gate "Propagation" 2
+        else
+            check_gate "Propagation" 1
+        fi
+    else
+        log_warn "propagation check script not found: ${prop_script}"
+        check_gate "Propagation" 2
+    fi
+}
+
+# ============================================================================
+# Gate 14: 同名头遮蔽检查 (V16.12)
+# 同 include 搜索路径内 basename 重复且内容互异 → SHADED（存量台账只减不增）。
+# 退出码: 0=通过 1=存在违例 2=agentrt 树缺失(告警)
+# ============================================================================
+gate_header_shadow() {
+    section "Gate 14: Header Shadow Check (V16.12)"
+
+    local shadow_script="${SCRIPT_DIR}/header-shadow-check.sh"
+    if [ -f "$shadow_script" ]; then
+        log_info "Running V16.12 header-shadow check..."
+        local shadow_out shadow_rc=0
+        shadow_out=$(bash "$shadow_script" 2>&1) || shadow_rc=$?
+        echo "$shadow_out" | tail -20
+        if [ "$shadow_rc" -eq 0 ]; then
+            check_gate "HeaderShadow" 0
+        elif [ "$shadow_rc" -eq 2 ]; then
+            log_warn "header-shadow check: environment error, manual review required"
+            check_gate "HeaderShadow" 2
+        else
+            check_gate "HeaderShadow" 1
+        fi
+    else
+        log_warn "header-shadow check script not found: ${shadow_script}"
+        check_gate "HeaderShadow" 2
+    fi
+}
+
+# ============================================================================
+# Gate 15: llm_d 适配注册检查 (V16.11)
+# A1 注册表存在 / A2 adapters/*.c 零直接 I/O / A3 表驱动完整性。
+# 退出码: 0=通过 1=存在违例 2=adapters 目录缺失(告警)
+# ============================================================================
+gate_adapter_registry() {
+    section "Gate 15: Adapter Registry Check (V16.11)"
+
+    local ad_script="${SCRIPT_DIR}/adapter-registry-check.sh"
+    if [ -f "$ad_script" ]; then
+        log_info "Running V16.11 adapter-registry check..."
+        local ad_out ad_rc=0
+        ad_out=$(bash "$ad_script" 2>&1) || ad_rc=$?
+        echo "$ad_out" | tail -20
+        if [ "$ad_rc" -eq 0 ]; then
+            check_gate "AdapterRegistry" 0
+        elif [ "$ad_rc" -eq 2 ]; then
+            log_warn "adapter-registry check: environment error, manual review required"
+            check_gate "AdapterRegistry" 2
+        else
+            check_gate "AdapterRegistry" 1
+        fi
+    else
+        log_warn "adapter-registry check script not found: ${ad_script}"
+        check_gate "AdapterRegistry" 2
+    fi
+}
+
+# ============================================================================
+# Gate 16: llm_d 样本形态检查 (V16.10)
+# 7 域成形 / src 顶层零裸文件 / include 仅 2 头 / 拆片入度 ≤5 /
+# 内层域反向边 = 0 / 装配域反向边入基线只减不增。
+# 退出码: 0=通过 1=存在违例 2=llm_d 树缺失(告警)
+# ============================================================================
+gate_sample_form() {
+    section "Gate 16: Sample Form Check (V16.10)"
+
+    local sf_script="${SCRIPT_DIR}/sample-form-check.sh"
+    if [ -f "$sf_script" ]; then
+        log_info "Running V16.10 sample-form check..."
+        local sf_out sf_rc=0
+        sf_out=$(bash "$sf_script" 2>&1) || sf_rc=$?
+        echo "$sf_out" | tail -20
+        if [ "$sf_rc" -eq 0 ]; then
+            check_gate "SampleForm" 0
+        elif [ "$sf_rc" -eq 2 ]; then
+            log_warn "sample-form check: environment error, manual review required"
+            check_gate "SampleForm" 2
+        else
+            check_gate "SampleForm" 1
+        fi
+    else
+        log_warn "sample-form check script not found: ${sf_script}"
+        check_gate "SampleForm" 2
+    fi
+}
+
+# ============================================================================
+# Gate 17: 版本一致性检查 (DT-12 SSoT, 0 硬编码)
+# VERSION 为唯一权威；C 侧 SSoT 头为漂移免疫 marker；源码/CMake/workflow
+# 内零发布号副本。
+# 退出码: 0=通过 1=存在违例 2=agentrt 树缺失(告警)
+# ============================================================================
+gate_version_consistency() {
+    section "Gate 17: Version Consistency Check (SSoT, zero-hardcode)"
+
+    local vc_script="${SCRIPT_DIR}/version-consistency-check.sh"
+    if [ -f "$vc_script" ]; then
+        log_info "Running version-consistency check..."
+        local vc_out vc_rc=0
+        vc_out=$(bash "$vc_script" 2>&1) || vc_rc=$?
+        echo "$vc_out" | tail -20
+        if [ "$vc_rc" -eq 0 ]; then
+            check_gate "VersionConsistency" 0
+        elif [ "$vc_rc" -eq 2 ]; then
+            log_warn "version-consistency check: environment error, manual review required"
+            check_gate "VersionConsistency" 2
+        else
+            check_gate "VersionConsistency" 1
+        fi
+    else
+        log_warn "version-consistency check script not found: ${vc_script}"
+        check_gate "VersionConsistency" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -340,6 +539,13 @@ main() {
     local skip_cross_repo=false
     local skip_complexity=false
     local skip_corekern_runtime=false
+    local skip_name_length=false
+    local skip_loc_ceiling=false
+    local skip_propagation=false
+    local skip_header_shadow=false
+    local skip_adapter_registry=false
+    local skip_sample_form=false
+    local skip_version_consistency=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -364,12 +570,40 @@ main() {
                 skip_corekern_runtime=true
                 shift
                 ;;
+            --skip-name-length)
+                skip_name_length=true
+                shift
+                ;;
+            --skip-loc-ceiling)
+                skip_loc_ceiling=true
+                shift
+                ;;
+            --skip-propagation)
+                skip_propagation=true
+                shift
+                ;;
+            --skip-header-shadow)
+                skip_header_shadow=true
+                shift
+                ;;
+            --skip-adapter-registry)
+                skip_adapter_registry=true
+                shift
+                ;;
+            --skip-sample-form)
+                skip_sample_form=true
+                shift
+                ;;
+            --skip-version-consistency)
+                skip_version_consistency=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -382,6 +616,13 @@ main() {
                 echo "  8. Header Duplication Check (IRON-6 re-export)"
                 echo "  9. ABI Frozen Check (coreloopthree)"
                 echo "  10. corekern Runtime Check (WS-8 8.4.2)"
+                echo "  11. Function Name Length Check (M3, <= 20 bytes)"
+                echo "  12. LOC Ceiling Check (V16.1, daemons < 9000)"
+                echo "  13. Propagation & Dead-Signal Check (V16.13)"
+                echo "  14. Header Shadow Check (V16.12)"
+                echo "  15. Adapter Registry Check (V16.11, llm_d)"
+                echo "  16. Sample Form Check (V16.10, llm_d)"
+                echo "  17. Version Consistency Check (DT-12 SSoT, zero-hardcode)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -389,6 +630,13 @@ main() {
                 echo "  --skip-cross-repo     Skip cross-repo verification"
                 echo "  --skip-complexity     Skip complexity check"
                 echo "  --skip-corekern-runtime  Skip corekern runtime evidence check"
+                echo "  --skip-name-length    Skip function name length check"
+                echo "  --skip-loc-ceiling    Skip daemons LOC ceiling check"
+                echo "  --skip-propagation    Skip propagation & dead-signal check"
+                echo "  --skip-header-shadow  Skip header shadow check"
+                echo "  --skip-adapter-registry  Skip llm_d adapter registry check"
+                echo "  --skip-sample-form    Skip llm_d sample form check"
+                echo "  --skip-version-consistency  Skip version consistency check (SSoT)"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -414,6 +662,13 @@ main() {
         gate_header_duplication
         gate_abi_frozen
         $skip_corekern_runtime || gate_corekern_runtime
+        $skip_name_length || gate_name_length
+        $skip_loc_ceiling || gate_loc_ceiling
+        $skip_propagation || gate_propagation
+        $skip_header_shadow || gate_header_shadow
+        $skip_adapter_registry || gate_adapter_registry
+        $skip_sample_form || gate_sample_form
+        $skip_version_consistency || gate_version_consistency
     fi
 
     # 输出结果
