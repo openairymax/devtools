@@ -22,7 +22,7 @@
 #include "airy_rt.h"
 #include "mem.h"
 #include "task.h"
-#include "ipc.h"
+#include "kern_ipc.h"
 #include "error.h"
 #include "memory_compat.h"   /* Task #38: AIRY_MEMSET 定义 (BAN-154 安全宏) */
 #include "airy_time.h"
