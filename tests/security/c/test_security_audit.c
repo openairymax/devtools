@@ -23,7 +23,7 @@
 #include "agentrt.h"
 #include "mem.h"
 #include "task.h"
-#include "ipc.h"
+#include "kern_ipc.h"
 #include "error.h"
 #include "airy_time.h"
 #include "observability.h"
