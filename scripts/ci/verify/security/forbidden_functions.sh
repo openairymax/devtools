@@ -591,12 +591,10 @@ check_ban_175_180() {
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'metacognition' \
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
-    grep -rq 'semantic_unit' \
-        --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     if [[ $dt_contracts -ge 4 ]]; then
-        log_ok "BAN-175: Dual thinking system contracts defined ($dt_contracts/5 modules)"
+        log_ok "BAN-175: Dual thinking system contracts defined ($dt_contracts/4 modules)"
     else
-        log_err "BAN-175: Only $dt_contracts/5 dual thinking modules found"
+        log_err "BAN-175: Only $dt_contracts/4 dual thinking modules found"
         ((contract_issues++)) || true
     fi
 

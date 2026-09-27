@@ -21,7 +21,6 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "memory_compat.h"
 #include "memoryrovol_bridge.h"
 #include "memoryrovol.h"
 #include "airy_types.h"
