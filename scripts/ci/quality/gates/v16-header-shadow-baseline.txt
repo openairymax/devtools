@@ -1,10 +1,8 @@
 cache.h|daemons/mem_d/include/cache.h|daemons/tool_d/src/cache.h
-circuit_breaker.h|commons/utils/ipc/circuit_breaker.h|cupolas/src/circuit_breaker.h
-compat.h|commons/utils/compat/compat.h|daemons/common/include/compat.h
 error.h|commons/include/airymax/error.h|commons/utils/error/error.h
 gateway.h|gateway/include/gateway.h|gateway/src/gateway/gateway.h
 mempool.h|atoms/corekern/include/mempool.h|cupolas/src/mempool.h
-platform.h|commons/platform/include/platform.h|cupolas/src/platform/platform.h|daemons/common/include/platform.h
+platform.h|commons/platform/include/platform.h|cupolas/src/platform/platform.h
 platform_base.h|commons/platform/include/platform_base.h|cupolas/src/platform/platform_base.h
 platform_internal.h|commons/platform/src/platform_internal.h|cupolas/src/platform/platform_internal.h
 platform_misc.h|commons/platform/include/platform_misc.h|cupolas/src/platform/platform_misc.h
