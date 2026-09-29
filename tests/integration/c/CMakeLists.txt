@@ -303,7 +303,7 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/config/service_config_yaml_pricing.c
     ${LLM_D_DIR}/src/rpc/service_providers.c
     ${LLM_D_DIR}/src/rpc/service_request.c
-    ${LLM_D_DIR}/src/accounting/service_metrics.c
+    ${LLM_D_DIR}/src/accounting/metrics.c
     ${LLM_D_DIR}/src/accounting/semantic_cache.c
     ${LLM_D_DIR}/src/accounting/token_counter.c
     ${LLM_D_DIR}/src/rpc/response.c
