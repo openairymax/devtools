@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #include "memory_compat.h"
-#include "safety_guard_bridge.h"
+#include "approval/safety_guard_bridge.h"
 #include "daemon_security.h"
 #include "airy_types.h"
 
