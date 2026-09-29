@@ -326,11 +326,11 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/adapters/local.c
     # B16-S3 c7：适配器装配 SSoT（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/adapters/adapter_table.c
-    ${LLM_D_DIR}/src/router/llm_router.c
-    ${LLM_D_DIR}/src/router/cost_aware_router.c
-    ${LLM_D_DIR}/src/router/round_robin_router.c
-    ${LLM_D_DIR}/src/router/least_latency_router.c
-    ${LLM_D_DIR}/src/router/quality_first_router.c
+    ${LLM_D_DIR}/src/router/core/llm_router.c
+    ${LLM_D_DIR}/src/router/strategy/cost_aware_router.c
+    ${LLM_D_DIR}/src/router/strategy/round_robin_router.c
+    ${LLM_D_DIR}/src/router/strategy/least_latency_router.c
+    ${LLM_D_DIR}/src/router/strategy/quality_first_router.c
 )
 
 add_executable(test_llm_d_routing test_llm_d_routing.c ${LLM_IMPL_SOURCES})
