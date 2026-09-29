@@ -20,6 +20,8 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/memory/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/tool_d/include
+    # R3 (0.1.19): 审批域头内聚 src/approval/，C-L05 契约测试经域路径直连
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/tool_d/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/monit_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/gateway_d/include
