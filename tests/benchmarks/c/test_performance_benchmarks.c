@@ -33,7 +33,7 @@
 /* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
-#include "config_manager.h"
+#include "config_unified.h"
 #include "method_dispatcher.h"
 #include "alert_manager.h"
 
@@ -228,24 +228,28 @@ static void test_benchmark_task(void)
 
 /* --- BM-03: 配置读写基准 --- */
 
+static config_context_t *g_bm_cfg = NULL;
+
 static void bm_config_set(void* arg)
 {
     static int key_counter = 0;
     char key[64], val[64];
     snprintf(key, sizeof(key), "bm.key.%d", key_counter++);
     snprintf(val, sizeof(val), "value_%d", key_counter);
-    cm_set(key, val, "benchmark");
+    config_context_set(g_bm_cfg, key, config_value_create_string(val));
 }
 
 static void bm_config_get(void* arg)
 {
-    const char* v = cm_get("bm.cache_key", "default");
+    const config_value_t *cv = config_context_get(g_bm_cfg, "bm.cache_key");
+    const char* v = cv ? config_value_get_string(cv, "default") : "default";
     (void)v;
 }
 
 static void bm_config_get_int(void* arg)
 {
-    int64_t v = cm_get_int("bm.int_key", 0);
+    const config_value_t *cv = config_context_get(g_bm_cfg, "bm.int_key");
+    int32_t v = cv ? config_value_get_int(cv, 0) : 0;
     (void)v;
 }
 
@@ -257,9 +261,9 @@ static void test_benchmark_config(void)
     printf("  %-30s-+-%-14s-+-%-14s-+-%-14s-+-%-14s\n",
            "------------------------------", "--------------", "--------------", "--------------", "--------------");
 
-    cm_init(NULL);
-    cm_set("bm.cache_key", "cached_value", "bm");
-    cm_set("bm.int_key", "42", "bm");
+    g_bm_cfg = config_context_create("benchmark");
+    config_context_set(g_bm_cfg, "bm.cache_key", config_value_create_string("cached_value"));
+    config_context_set(g_bm_cfg, "bm.int_key", config_value_create_string("42"));
 
     benchmark_result_t r;
 
@@ -272,7 +276,8 @@ static void test_benchmark_config(void)
     benchmark_run("config_get_int()", bm_config_get_int, NULL, 50000, &r);
     print_result(&r);
 
-    cm_shutdown();
+    config_context_destroy(g_bm_cfg);
+    g_bm_cfg = NULL;
 }
 
 /* --- BM-04: 熔断器操作基准 --- */
