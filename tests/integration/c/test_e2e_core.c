@@ -32,7 +32,7 @@
 /* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
-#include "config_manager.h"
+#include "config_unified.h"
 #include "method_dispatcher.h"
 #include "alert_manager.h"
 
@@ -135,16 +135,19 @@ static void e2e_scenario_2_config_driven_service(void)
 {
     printf("\n--- [E2E-02] 配置驱动服务创建与生命周期 ---\n");
 
-    cm_init(NULL);
-    cm_set("service.name", "e2e_test_service", "e2e");
-    cm_set("service.version", "1.0.0", "e2e");
-    cm_set("service.max_concurrent", "8", "e2e");
-    cm_set("service.timeout_ms", "3000", "e2e");
+    config_context_t *cfg = config_context_create("e2e");
+    config_context_set(cfg, "service.name", config_value_create_string("e2e_test_service"));
+    config_context_set(cfg, "service.version", config_value_create_string("1.0.0"));
+    config_context_set(cfg, "service.max_concurrent", config_value_create_string("8"));
+    config_context_set(cfg, "service.timeout_ms", config_value_create_string("3000"));
     TEST_ASSERT(1, "Step 1: 配置加载完成");
 
-    const char* name = cm_get("service.name", "default");
-    int64_t max_conc = cm_get_int("service.max_concurrent", 0);
-    int64_t timeout = cm_get_int("service.timeout_ms", 0);
+    const config_value_t *cv = config_context_get(cfg, "service.name");
+    const char* name = cv ? config_value_get_string(cv, "default") : "default";
+    cv = config_context_get(cfg, "service.max_concurrent");
+    int32_t max_conc = cv ? config_value_get_int(cv, 0) : 0;
+    cv = config_context_get(cfg, "service.timeout_ms");
+    int32_t timeout = cv ? config_value_get_int(cv, 0) : 0;
     TEST_ASSERT(name != NULL && strcmp(name, "e2e_test_service") == 0,
                 "Step 2: 配置读取正确");
     TEST_ASSERT_EQ(max_conc, 8, "Step 2: max_concurrent=8");
@@ -191,7 +194,7 @@ static void e2e_scenario_2_config_driven_service(void)
     am_shutdown();
     /* 依赖manager统一清理，避免double free */
     cb_manager_destroy(cb_mgr);
-    cm_shutdown();
+    config_context_destroy(cfg);
     TEST_ASSERT(1, "Step 8: 恢复与清理完成");
 }
 
@@ -307,7 +310,7 @@ static void e2e_scenario_5_fault_recovery(void)
 {
     printf("\n--- [E2E-05] 异常恢复链路 ---\n");
 
-    cm_init(NULL);
+    config_context_t *frcfg = config_context_create("fault_recovery");
     cb_manager_t cb_mgr = cb_manager_create();
     am_init(NULL);
     TEST_ASSERT(1, "Step 1: 管理组件初始化完成");
@@ -348,7 +351,7 @@ static void e2e_scenario_5_fault_recovery(void)
 
     cb_manager_destroy(cb_mgr);
     am_shutdown();
-    cm_shutdown();
+    config_context_destroy(frcfg);
     TEST_ASSERT(1, "Step 8: 完整异常恢复链路验证通过");
 }
 
@@ -520,7 +523,7 @@ static void e2e_scenario_9_stress_integration(void)
 {
     printf("\n--- [E2E-09] 压力集成测试 ---\n");
 
-    cm_init(NULL);
+    config_context_t *cfg = config_context_create("stress");
     cb_manager_t cb_mgr = cb_manager_create();
 
     #define STRESS_OPS 100
@@ -530,14 +533,15 @@ static void e2e_scenario_9_stress_integration(void)
     for (int i = 0; i < STRESS_OPS; i++) {
         snprintf(key_buf, sizeof(key_buf), "stress.key.%d", i);
         snprintf(val_buf, sizeof(val_buf), "value_%d", i);
-        cm_set(key_buf, val_buf, "stress");
+        config_context_set(cfg, key_buf, config_value_create_string(val_buf));
     }
     TEST_ASSERT(1, "Step 1: 高频写入100个配置项");
 
     int read_ok = 0;
     for (int i = 0; i < STRESS_OPS; i++) {
         snprintf(key_buf, sizeof(key_buf), "stress.key.%d", i);
-        const char* v = cm_get(key_buf, NULL);
+        const config_value_t *cv = config_context_get(cfg, key_buf);
+        const char* v = cv ? config_value_get_string(cv, NULL) : NULL;
         if (v && strncmp(v, "value_", 6) == 0) read_ok++;
     }
     TEST_ASSERT(read_ok == STRESS_OPS, "Step 2: 高频读取100%命中");
@@ -564,7 +568,7 @@ static void e2e_scenario_9_stress_integration(void)
     TEST_ASSERT(1, "Step 4: 10个breaker各记录20次成功");
 
     cb_manager_destroy(cb_mgr);
-    cm_shutdown();
+    config_context_destroy(cfg);
     TEST_ASSERT(1, "Step 5: 压力集成清理完成");
 }
 
@@ -586,14 +590,14 @@ static void e2e_scenario_10_idempotency(void)
         };
         airy_observability_init(&ocfg);
 
-        cm_init(NULL);
+        config_context_t *cfg = config_context_create("idempotency");
         am_init(NULL);
 
         void* ptr = airy_mem_alloc(256);
         if (ptr) airy_mem_free(ptr);
 
         am_shutdown();
-        cm_shutdown();
+        config_context_destroy(cfg);
         airy_observability_shutdown();
         airy_ipc_cleanup();
         airy_task_cleanup();
@@ -672,32 +676,36 @@ static void e2e_scenario_12_config_hot_reload(void)
 {
     printf("\n--- [E2E-12] 配置热更新与动态重配置 ---\n");
 
-    cm_init(NULL);
+    config_context_t *cfg = config_context_create("hotreload");
     TEST_ASSERT(1, "Step 1: 配置管理器初始化完成");
 
-    cm_set("dynamic.host", "node-1.local", "hotreload");
-    cm_set("dynamic.port", "9090", "hotreload");
-    cm_set("dynamic.workers", "4", "hotreload");
+    config_context_set(cfg, "dynamic.host", config_value_create_string("node-1.local"));
+    config_context_set(cfg, "dynamic.port", config_value_create_string("9090"));
+    config_context_set(cfg, "dynamic.workers", config_value_create_string("4"));
     TEST_ASSERT(1, "Step 2: 初始配置写入完成");
 
-    const char* host = cm_get("dynamic.host", "");
+    const config_value_t *cv = config_context_get(cfg, "dynamic.host");
+    const char* host = cv ? config_value_get_string(cv, "") : "";
     TEST_ASSERT(host != NULL && strcmp(host, "node-1.local") == 0,
                 "Step 3: 初始值读取正确");
 
-    cm_set("dynamic.host", "node-2.local", "hotreload");
-    cm_set("dynamic.port", "9091", "hotreload");
-    cm_set("dynamic.workers", "8", "hotreload");
+    config_context_set(cfg, "dynamic.host", config_value_create_string("node-2.local"));
+    config_context_set(cfg, "dynamic.port", config_value_create_string("9091"));
+    config_context_set(cfg, "dynamic.workers", config_value_create_string("8"));
     TEST_ASSERT(1, "Step 4: 热更新写入完成");
 
-    host = cm_get("dynamic.host", "");
-    int64_t port = cm_get_int("dynamic.port", 0);
-    int64_t workers = cm_get_int("dynamic.workers", 0);
+    cv = config_context_get(cfg, "dynamic.host");
+    host = cv ? config_value_get_string(cv, "") : "";
+    cv = config_context_get(cfg, "dynamic.port");
+    int32_t port = cv ? config_value_get_int(cv, 0) : 0;
+    cv = config_context_get(cfg, "dynamic.workers");
+    int32_t workers = cv ? config_value_get_int(cv, 0) : 0;
     TEST_ASSERT(host != NULL && strcmp(host, "node-2.local") == 0,
                 "Step 5: 热更新后host正确");
     TEST_ASSERT_EQ(port, 9091, "Step 5: 热更新后port=9091");
     TEST_ASSERT_EQ(workers, 8, "Step 5: 热更新后workers=8");
 
-    cm_shutdown();
+    config_context_destroy(cfg);
     TEST_ASSERT(1, "Step 6: 配置管理器关闭完成");
 }
 

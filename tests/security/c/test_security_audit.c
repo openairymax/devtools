@@ -31,7 +31,7 @@
 /* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
-#include "config_manager.h"
+#include "config_unified.h"
 #include "method_dispatcher.h"
 #include "alert_manager.h"
 
@@ -91,15 +91,15 @@ static void sec_audit_stub_functions(void)
     int stub_count = 0;
 
     /* 检查各模块init函数是否返回成功 */
-    int cm_ret = cm_init(NULL);
-    if (cm_ret != 0 && cm_ret != -1) {
+    config_context_t *cm_ctx = config_context_create("sec_audit");
+    if (cm_ctx == NULL) {
         stub_count++;
         SECURITY_FAIL("cm_init可能为桩函数实现");
     } else {
         SECURITY_PASS();
         printf("cm_init非桩函数（有实际实现）\n");
     }
-    cm_shutdown();
+    config_context_destroy(cm_ctx);
 
     int am_ret = am_init(NULL);
     if (am_ret != 0 && am_ret != -1) {
@@ -182,32 +182,34 @@ static void sec_audit_input_validation(void)
 {
     printf("\n--- [SEC-011] 输入验证安全审计 ---\n");
 
-    cm_init(NULL);
+    config_context_t *cfg = config_context_create("sec011");
 
     /* 测试1: 超长键名 */
     char long_key[4096];
     AIRY_MEMSET(long_key, 'A', sizeof(long_key) - 1);
     long_key[sizeof(long_key) - 1] = '\0';
 
-    int r1 = cm_set(long_key, "value", "test");
+    int r1 = (int)config_context_set(cfg, long_key, config_value_create_string("value"));
     TEST_ASSERT(r1 == 0 || r1 != 0,
                 "SEC-011-T1: 超长键名安全处理");
 
     /* 测试2: 特殊字符键名 */
-    int r2 = cm_set("key/with/slashes", "val1", "test");
-    int r3 = cm_set("key.with.dots", "val2", "test");
-    int r4 = cm_set("key-with-dashes", "val3", "test");
+    int r2 = (int)config_context_set(cfg, "key/with/slashes", config_value_create_string("val1"));
+    int r3 = (int)config_context_set(cfg, "key.with.dots", config_value_create_string("val2"));
+    int r4 = (int)config_context_set(cfg, "key-with-dashes", config_value_create_string("val3"));
     TEST_ASSERT(r2 == 0 || r3 == 0 || r4 == 0,
                 "SEC-011-T2: 特殊字符键名安全处理");
 
     /* 测试3: 空值处理 */
-    int r5 = cm_set("empty.val", "", "test");
-    const char* v5 = cm_get("empty.val", "default");
+    int r5 = (int)config_context_set(cfg, "empty.val", config_value_create_string(""));
+    const config_value_t *cv5 = config_context_get(cfg, "empty.val");
+    const char* v5 = cv5 ? config_value_get_string(cv5, "default") : "default";
     TEST_ASSERT(v5 != NULL,
                 "SEC-011-T3: 空值设置和获取正确");
 
     /* 测试4: NULL参数处理 */
-    const char* v_null = cm_get(NULL, "fallback");
+    const config_value_t *cvn = config_context_get(cfg, NULL);
+    const char* v_null = cvn ? config_value_get_string(cvn, "fallback") : "fallback";
     TEST_ASSERT(v_null != NULL && strcmp(v_null, "fallback") == 0,
                 "SEC-011-T4: NULL键名安全处理（返回默认值）");
 
@@ -216,8 +218,9 @@ static void sec_audit_input_validation(void)
     AIRY_MEMSET(long_val, 'B', sizeof(long_val) - 1);
     long_val[sizeof(long_val) - 1] = '\0';
 
-    int r6 = cm_set("long.val", long_val, "test");
-    const char* v6 = cm_get("long.val", NULL);
+    int r6 = (int)config_context_set(cfg, "long.val", config_value_create_string(long_val));
+    const config_value_t *cv6 = config_context_get(cfg, "long.val");
+    const char* v6 = cv6 ? config_value_get_string(cv6, NULL) : NULL;
     if (v6) {
         TEST_ASSERT(strlen(v6) > 0,
                     "SEC-011-T5: 超长值存储可获取（可能有截断限制）");
@@ -226,7 +229,7 @@ static void sec_audit_input_validation(void)
                     "SEC-011-T5: 超长值被安全拒绝（配置管理器限制）");
     }
 
-    cm_shutdown();
+    config_context_destroy(cfg);
 }
 
 /* ======================================================================== */
@@ -311,9 +314,12 @@ static void sec_audit_banned_patterns(void)
     if (p1) airy_mem_free(p1);
 
     /* BAN-02: (void)param 忽略检查 - 验证各API处理参数 */
-    const char* v = cm_get("nonexistent.key", NULL);
+    config_context_t *ban_ctx = config_context_create("ban02");
+    const config_value_t *cvb = config_context_get(ban_ctx, "nonexistent.key");
+    const char* v = cvb ? config_value_get_string(cvb, NULL) : NULL;
     TEST_ASSERT(v == NULL || v != NULL,
                 "BAN-02: API正确处理参数（非静默忽略）");
+    config_context_destroy(ban_ctx);
 
     /* BAN-03: 空函数体检查 - 验证函数有实际逻辑 */
     cb_manager_t mgr = cb_manager_create();
@@ -327,10 +333,10 @@ static void sec_audit_banned_patterns(void)
     airy_ipc_cleanup();
 
     /* BAN-05: 硬编码路径检查 - 通过配置测试验证 */
-    cm_init(NULL);
-    int ret = cm_set("dynamic.path", "/dynamic/path", "test");
+    config_context_t *ban5_ctx = config_context_create("ban05");
+    int ret = (int)config_context_set(ban5_ctx, "dynamic.path", config_value_create_string("/dynamic/path"));
     TEST_ASSERT_EQ(ret, 0, "BAN-05: 路径动态可配置");
-    cm_shutdown();
+    config_context_destroy(ban5_ctx);
 
     /* BAN-06: magic number检查 - 通过常量测试验证 */
     cb_config_t cfg = cb_create_default_config();
@@ -360,8 +366,11 @@ static void sec_audit_banned_patterns(void)
 
     /* BAN-10: 未初始化变量使用 */
     int init_val = -1;
-    int64_t v_int = cm_get_int("nonexistent.int", init_val);
+    config_context_t *ban10_ctx = config_context_create("ban10");
+    const config_value_t *cv10 = config_context_get(ban10_ctx, "nonexistent.int");
+    int32_t v_int = cv10 ? config_value_get_int(cv10, init_val) : init_val;
     TEST_ASSERT_EQ(v_int, init_val, "BAN-10: 默认值正确初始化");
+    config_context_destroy(ban10_ctx);
 }
 
 /* ======================================================================== */

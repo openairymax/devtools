@@ -37,7 +37,7 @@
 /* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
-#include "config_manager.h"
+#include "config_unified.h"
 #include "method_dispatcher.h"
 #include "alert_manager.h"
 
@@ -518,37 +518,42 @@ static void pt_config_paths(void)
 {
     printf("\n--- [PT-11] 配置路径处理 ---\n");
 
-    cm_init(NULL);
+    config_context_t *cfg = config_context_create("path_compat");
 
     /* Unix风格路径 */
-    cm_set("unix.path", AIRY_TMP_DIR "/config.json", "pt");
-    const char* upath = cm_get("unix.path", NULL);
+    config_context_set(cfg, "unix.path", config_value_create_string(AIRY_TMP_DIR "/config.json"));
+    const config_value_t *cuv = config_context_get(cfg, "unix.path");
+    const char* upath = cuv ? config_value_get_string(cuv, NULL) : NULL;
     TEST_ASSERT(upath != NULL && upath[0] == '/',
                 "Unix绝对路径存储正确");
 
     /* 相对路径 */
-    cm_set("rel.path", "./config/settings.yaml", "pt");
-    const char* rpath = cm_get("rel.path", NULL);
+    config_context_set(cfg, "rel.path", config_value_create_string("./config/settings.yaml"));
+    const config_value_t *crv = config_context_get(cfg, "rel.path");
+    const char* rpath = crv ? config_value_get_string(crv, NULL) : NULL;
     TEST_ASSERT(rpath != NULL && rpath[0] == '.',
                 "相对路径存储正确");
 
     /* Windows风格路径（在Unix上应正常存储为字符串）*/
-    cm_set("win.path", "C:\\Program Files\\AgentRT\\config.ini", "pt");
-    const char* wpath = cm_get("win.path", NULL);
+    config_context_set(cfg, "win.path", config_value_create_string("C:\\Program Files\\AgentRT\\config.ini"));
+    const config_value_t *cwv = config_context_get(cfg, "win.path");
+    const char* wpath = cwv ? config_value_get_string(cwv, NULL) : NULL;
     TEST_ASSERT(wpath != NULL, "Windows路径作为字符串可存储");
 
     /* 含空格路径 */
-    cm_set("space.path", "/opt/Agent OS/data/file.txt", "pt");
-    const char* spath = cm_get("space.path", NULL);
+    config_context_set(cfg, "space.path", config_value_create_string("/opt/Agent OS/data/file.txt"));
+    const config_value_t *csv = config_context_get(cfg, "space.path");
+    const char* spath = csv ? config_value_get_string(csv, NULL) : NULL;
     TEST_ASSERT(spath != NULL, "含空格路径可存储");
 
     /* 特殊字符键名 */
-    cm_set("key.with-dashes_and.dots", "value", "pt");
-    const char* sval = cm_get("key.with-dashes_and.dots", NULL);
+    config_context_set(cfg, "key.with-dashes_and.dots", config_value_create_string("value"));
+    const config_value_t *ckv = config_context_get(cfg, "key.with-dashes_and.dots");
+    const char* sval = ckv ? config_value_get_string(ckv, NULL) : NULL;
     TEST_ASSERT(sval != NULL && strcmp(sval, "value") == 0,
                 "特殊字符键名可读写");
 
-    cm_shutdown();
+    config_context_destroy(cfg);
 }
 
 /* ======================================================================== */
@@ -573,7 +578,7 @@ static void pt_full_init_chain(void)
         int obs_ret = airy_observability_init(&obs_cfg);
         TEST_ASSERT(obs_ret == AIRY_SUCCESS, "observability_init成功");
 
-        cm_init(NULL);
+        config_context_t *cfg = config_context_create("pt_idempotency");
         am_init(NULL);
 
         /* 功能验证 */
@@ -582,7 +587,7 @@ static void pt_full_init_chain(void)
         if (p) airy_mem_free(p);
 
         am_shutdown();
-        cm_shutdown();
+        config_context_destroy(cfg);
         airy_observability_shutdown();
         airy_ipc_cleanup();
         airy_task_cleanup();

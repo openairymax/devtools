@@ -28,7 +28,7 @@
 /* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
-#include "config_manager.h"
+#include "config_unified.h"
 #include "method_dispatcher.h"
 #include "alert_manager.h"
 
@@ -83,13 +83,14 @@ static void sec_init_functions_real(void)
 {
     printf("\n--- [SEC-017-T1] 核心Init函数实际实现验证 ---\n");
 
-    /* cm_init: 必须能存储和检索数据 */
-    cm_init(NULL);
-    cm_set("sec017.test.key", "real_value", "sec");
-    const char* v = cm_get("sec017.test.key", NULL);
+    /* config_context: 必须能存储和检索数据 */
+    config_context_t *cfg17 = config_context_create("sec017");
+    config_context_set(cfg17, "sec017.test.key", config_value_create_string("real_value"));
+    const config_value_t *cv17 = config_context_get(cfg17, "sec017.test.key");
+    const char* v = cv17 ? config_value_get_string(cv17, NULL) : NULL;
     TEST_ASSERT(v != NULL && strcmp(v, "real_value") == 0,
-                "cm_init: 实际可读写数据（非桩）");
-    cm_shutdown();
+                "config_context: 实际可读写数据（非桩）");
+    config_context_destroy(cfg17);
 
     /* am_init: 必须能触发告警 */
     am_init(NULL);
@@ -275,13 +276,15 @@ static void sec_ban01_return_placeholder(void)
     }
 
     /* config manager: get不存在的键返回默认值，不是固定值 */
-    cm_init(NULL);
-    const char* d1 = cm_get("nonexistent.A", "default_A");
-    const char* d2 = cm_get("nonexistent.B", "default_B");
+    config_context_t *cfgd = config_context_create("sec017_defaults");
+    const config_value_t *cvd1 = config_context_get(cfgd, "nonexistent.A");
+    const char* d1 = cvd1 ? config_value_get_string(cvd1, "default_A") : "default_A";
+    const config_value_t *cvd2 = config_context_get(cfgd, "nonexistent.B");
+    const char* d2 = cvd2 ? config_value_get_string(cvd2, "default_B") : "default_B";
     TEST_ASSERT(d1 != NULL && d2 != NULL &&
                 strcmp(d1, "default_A") == 0 && strcmp(d2, "default_B") == 0,
                 "cm_get: 根据参数返回不同默认值（非固定占位）");
-    cm_shutdown();
+    config_context_destroy(cfgd);
 
     /* method dispatcher: 注册不同方法后dispatch到不同handler */
     g_handler_a_calls = 0;
