@@ -307,11 +307,13 @@ done
 # 生成、包内不含，旧检查 grep 'bin/airymaxrt' 永远不命中形同虚设）。
 # 改为 fail-closed：关键二进制缺任一即中止；包内脚本做语法预检。
 # 0.1.13 补全（2026-09-06）：此前 REQUIRED_BIN 只列 8 项，漏 7 个 daemon
-# （market_d/monit_d/notify_d/channel_d/a2a_d/cupolas_d/maths_d/hook_d）——
-# 漏件门禁形同虚设，正是"总是缺东西"的一手原因。现列全 15 daemon 服务 +
+# （market_d/monit_d/notify_d/channel_d/a2a_d/cupolas_d/maths_d）——
+# 漏件门禁形同虚设，正是"总是缺东西"的一手原因。现列全 14 daemon 服务 +
 # airy_cli + bootstrap；并对全部发布包断言"完整能力"（TUI/config/Python
 # 运行时），任一缺失即中止，杜绝半成品出库。
-REQUIRED_BIN="airy_cli agentrt-bootstrap.sh gateway_d llm_d think_d sched_d tool_d mem_d agent_d market_d monit_d notify_d channel_d a2a_d cupolas_d maths_d hook_d"
+# 0.1.19 R7：hook_d 并入 notify_d（整编 15→14），hook 面为 notify_d 第二
+# listener，故从清单退役；notify_d 已在列，改由它承载 hook 面发布断言。
+REQUIRED_BIN="airy_cli agentrt-bootstrap.sh gateway_d llm_d think_d sched_d tool_d mem_d agent_d market_d monit_d notify_d channel_d a2a_d cupolas_d maths_d"
 # 完整能力清单（tar.gz 与 zip 通用；Windows 侧二进制带 .exe 后缀，匹配
 # 逻辑对 "bin/$b" 与 "bin/$b.exe" 双态容忍）。config/* 由 lf-package 统一
 # 注入，lib/{airymax_agents,airymax_agents_rs,orchestration,agentrt} 由

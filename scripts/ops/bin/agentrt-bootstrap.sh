@@ -7,9 +7,11 @@
 #
 # 0.1.18: supervisor 声明调谐编排——先写 launch 声明（profile.env）并注入
 #         子进程继承环境，专用路径拉起 supervisor_d；CORE 5 daemon 由
-#         supervisor 调谐自动拉起、死亡指数退避复活，AUX 9 daemon 按需
+#         supervisor 调谐自动拉起、死亡指数退避复活，AUX 8 daemon 按需
 #         激活（activate），maths_d 保持直启域。同层并行、跨层等待健康
 #         检查通过的 DAG 语义不变。
+# 0.1.19 R7: hook_d 并入 notify_d（daemon 整编 15→14），hook 面由 notify_d
+#         第二 listener 承接，本编排的 hook_d 条目随之退役。
 #
 # 用法:
 #   bash agentrt-bootstrap.sh [选项]         启动全部 daemon
@@ -326,7 +328,8 @@ fi
 # ==================== DAG 定义 ====================
 #
 # 5 层启动 DAG（本文件为 daemon 启动编排的单一真相源；0.1.9 M4 整编
-# 18→15：observe_d/info_d→monit_d、plugin_d→tool_d）。
+# 18→15：observe_d/info_d→monit_d、plugin_d→tool_d；0.1.19 R7 整编
+# 15→14：hook_d→notify_d）。
 # 同层内可并行启动，跨层必须等待前层健康检查通过。
 # 扩展：agent_d（执行体）、mem_d（记忆）、a2a_d（多智能体）并入 Layer 1~2。
 #
@@ -340,7 +343,7 @@ DAEMON_LAYER_1=("sched_d" "channel_d" "mem_d")
 # Layer 2: Agent 服务（think_d：双思考 GCCP+GRAD，gateway 经 think.sock 调用；
 #           maths_d：数学外挂计算，gateway/CLI 经 maths.sock 调用。
 #           0.1.9 M4：plugin_d 并入 tool_d，插件 dlopen 执行域随迁）
-DAEMON_LAYER_2=("llm_d" "think_d" "tool_d" "hook_d" "agent_d" "a2a_d" "maths_d")
+DAEMON_LAYER_2=("llm_d" "think_d" "tool_d" "agent_d" "a2a_d" "maths_d")
 
 # Layer 3: 业务服务
 DAEMON_LAYER_3=("market_d")
@@ -354,7 +357,7 @@ ALL_LAYERS=("DAEMON_LAYER_0" "DAEMON_LAYER_1" "DAEMON_LAYER_2" "DAEMON_LAYER_3" 
 declare -A DAEMON_HEALTH_TIMEOUT=(
     [monit_d]=15    [notify_d]=15    [cupolas_d]=20
     [sched_d]=20    [channel_d]=20   [mem_d]=20
-    [llm_d]=30      [think_d]=30     [tool_d]=30     [hook_d]=20
+    [llm_d]=30      [think_d]=30     [tool_d]=30
     [agent_d]=30    [a2a_d]=20
     [maths_d]=20
     [market_d]=30
@@ -381,7 +384,6 @@ declare -A DAEMON_BIN_NAME=(
     [llm_d]="llm_d"
     [think_d]="think_d"
     [tool_d]="tool_d"
-    [hook_d]="hook_d"
     [agent_d]="agent_d"
     [a2a_d]="a2a_d"
     [maths_d]="maths_d"
@@ -408,7 +410,7 @@ SUP_CORE_DAEMONS=("gateway_d" "llm_d" "think_d" "agent_d" "tool_d")
 
 # AUX 名单按 DAG 层序排列（激活时逐层进行，保留跨层依赖语义）
 SUP_AUX_DAEMONS=("monit_d" "notify_d" "cupolas_d" "sched_d" "channel_d"
-                 "mem_d" "hook_d" "a2a_d" "market_d")
+                 "mem_d" "a2a_d" "market_d")
 
 # 直启域：不在 supervisor 声明表内，保持 start_daemon 原路
 SUP_DIRECT_DAEMONS=("maths_d")
@@ -467,7 +469,7 @@ Options:
 Startup DAG:
   Layer 0: monit_d, notify_d, cupolas_d
   Layer 1: sched_d, channel_d, mem_d
-  Layer 2: llm_d, think_d, tool_d, hook_d, agent_d, a2a_d, maths_d
+  Layer 2: llm_d, think_d, tool_d, agent_d, a2a_d, maths_d
   Layer 3: market_d
   Layer 4: gateway_d
 

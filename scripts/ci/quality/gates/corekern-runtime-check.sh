@@ -4,7 +4,7 @@
 #
 # 堵 0.1.15 架构改进方案 §7.3 结构性口径漏洞：运行时达标不接受
 # "库在构建内/头文件在位"，只接受运行时调用链证据——逐个真实拉起
-# 生产进程（15 daemon + airy_cli），从其启动输出取证：
+# 生产进程（14 daemon + airy_cli），从其启动输出取证：
 #   a) daemon 进程内调用证据  "corekern core initialized"
 #      （main.c 中 airy_init()==AIRY_SUCCESS 分支在本进程真实走到）
 #   b) daemon corekern 链路证据  "core_init: [OK] AgentRT core initialized successfully"
@@ -43,8 +43,11 @@ log_ok()    { echo -e "${GREEN}[CKRT-OK]${NC}   $*"; }
 log_warn()  { echo -e "${YELLOW}[CKRT-WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[CKRT-ERR]${NC}  $*" >&2; }
 
-# 生产进程清单：15 daemon（<build>/bin/）+ airy_cli（<build>/tools/airy_cli/）
-DAEMON_LIST=(a2a_d agent_d channel_d cupolas_d gateway_d hook_d llm_d
+# 生产进程清单：corekern 运行时达标的 daemon（<build>/bin/）+ airy_cli
+# （<build>/tools/airy_cli/）。0.1.19 R7 整编 hook_d → notify_d（15→14），
+# 故 roster 为下列 14 项；supervisor_d 是零项目库链接的集群监管者
+# （V13.5，无 airy_init 初始化链），不属本门证据契约，不入列。
+DAEMON_LIST=(a2a_d agent_d channel_d cupolas_d gateway_d llm_d
              market_d maths_d mem_d monit_d notify_d sched_d think_d tool_d)
 
 EVIDENCE_CALL='corekern core initialized'
@@ -125,7 +128,7 @@ usage() {
     cat <<'EOF'
 Usage: corekern-runtime-check.sh [--build-dir DIR] [--timeout SEC]
 
-Probes every production process (15 daemons + airy_cli) of a build tree
+Probes every production process (14 daemons + airy_cli) of a build tree
 and requires runtime boot evidence from its startup output: daemons must
 show the corekern call-chain (plus, for CLI, the gateway client-mode
 boot line, since 0.1.16 B2 withdrew the in-process microkernel).
