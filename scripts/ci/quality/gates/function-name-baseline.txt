@@ -1068,7 +1068,6 @@ config_service_create
 config_service_get_status
 config_source_create_args
 config_source_create_base
-config_source_create_defaults
 config_source_create_encrypted
 config_source_create_env
 config_source_create_file
