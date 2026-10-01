@@ -12,9 +12,11 @@ Usage:
 """
 
 import argparse
+import csv
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field, asdict
@@ -294,11 +296,52 @@ class CppAnalyzer(BaseLanguageAnalyzer):
                     logging.debug("解析 cppcheck 输出行失败: %s", e)
     
     def _calculate_complexity_metrics(self, directory: Path):
-        """计算复杂度指标（简化版）"""
-        # 这里可以集成 lizard 等工具
-        # 暂时设置占位值
-        self.metrics["estimated_complexity"] = 2.5
-        self.metrics["duplication_rate"] = 4.2
+        """实测复杂度与重复率指标；工具不可用时如实标记，不编造数值。"""
+        self.metrics["estimated_complexity"] = self._measure_ccn(directory)
+        self.metrics["duplication_rate"] = self._measure_dup(directory)
+
+    @staticmethod
+    def _measure_ccn(directory: Path):
+        """以 lizard --csv 实测平均圈复杂度；无工具/无样本返回 'unavailable'。"""
+        if shutil.which("lizard") is None:
+            return "unavailable"
+        try:
+            result = subprocess.run(
+                ["lizard", "--csv", str(directory)],
+                capture_output=True, text=True, timeout=900)
+        except (OSError, subprocess.SubprocessError) as e:
+            logging.warning("lizard 执行失败: %s", e)
+            return "unavailable"
+        total = 0
+        count = 0
+        for row in csv.reader(result.stdout.splitlines()):
+            if len(row) < 2:
+                continue
+            try:
+                total += int(row[1])
+                count += 1
+            except ValueError:
+                continue
+        return round(total / count, 2) if count else "unavailable"
+
+    @staticmethod
+    def _measure_dup(directory: Path):
+        """复用 G26 克隆检测器实测重复率（%）；无样本/失败返回 'unavailable'。"""
+        detector = Path(__file__).resolve().parent / "clone_detect.py"
+        if not detector.is_file():
+            return "unavailable"
+        try:
+            result = subprocess.run(
+                [sys.executable, str(detector), "--root", str(directory),
+                 "--json-only"],
+                capture_output=True, text=True, timeout=900)
+            payload = json.loads(result.stdout)
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
+            logging.warning("clone_detect 执行失败: %s", e)
+            return "unavailable"
+        if not payload.get("total_lines"):
+            return "unavailable"
+        return payload.get("overall_rate", "unavailable")
     
     def _generate_summary(self) -> Dict[str, Any]:
         """生成摘要"""

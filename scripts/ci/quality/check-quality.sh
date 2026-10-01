@@ -1,200 +1,63 @@
 #!/bin/bash
+# AgentRT 代码质量检查入口（薄封装）
+#
+# 立意：门禁的唯一实现在 gates/ 下——G25 圈复杂度门禁 complexity-check.sh、
+#   G26 重复率门禁 clone-check.sh；阈值统一取自 thresholds.conf（唯一权威源）。
+#   本脚本不再自行实现任何检查（旧版内联 5.0/3.5/10 阈值、且调用了 jscpd/lizard
+#   并不存在的 --manager 选项），仅顺序调用二者并汇总退出码，消除双轨口径漂移。
+# 用法: check-quality.sh
+# 退出码: 0 = 全部通过；2 = 存在告警（无阻断）；1 = 存在阻断；3 = 环境错误
+set -uo pipefail
 
-# AgentRT 代码质量检查脚本
-# 用于在提交前检查代码重复率和圈复杂度
-# 使用方法: ./scripts/code-quality/check-quality.sh [目录路径]
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CX_GATE="${SCRIPT_DIR}/gates/complexity-check.sh"
+DUP_GATE="${SCRIPT_DIR}/gates/clone-check.sh"
 
-set -e
+COLOR_RED='\033[0;31m'
+COLOR_GREEN='\033[0;32m'
+COLOR_CYAN='\033[0;36m'
+COLOR_YELLOW='\033[0;33m'
+COLOR_RESET='\033[0m'
 
-# 颜色定义
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+log_info() { echo -e "${COLOR_CYAN}[INFO]${COLOR_RESET}  $*"; }
+log_ok()   { echo -e "${COLOR_GREEN}[OK]${COLOR_RESET}    $*"; }
+log_warn() { echo -e "${COLOR_YELLOW}[WARN]${COLOR_RESET}  $*"; }
+log_err()  { echo -e "${COLOR_RED}[ERR]${COLOR_RESET}   $*"; }
+section()  { echo -e "\n${COLOR_CYAN}═══ $1 ═══${COLOR_RESET}"; }
 
-# 阈值配置（与 CI 一致）
-DUPLICATE_THRESHOLD=5.0     # 重复率阈值（%）
-AVG_COMPLEXITY_THRESHOLD=3.5 # 平均圈复杂度阈值
-SINGLE_COMPLEXITY_THRESHOLD=10 # 单个函数圈复杂度阈值
+main() {
+    local missing=0
+    [ -f "$CX_GATE" ]  || { log_err "missing gate: ${CX_GATE}"; missing=1; }
+    [ -f "$DUP_GATE" ] || { log_err "missing gate: ${DUP_GATE}"; missing=1; }
+    [ "$missing" -eq 0 ] || return 3
 
-# 默认检查目录
-CHECK_DIR="${1:-.}"
+    local cx_rc=0 dup_rc=0
 
-# 工具检查函数
-check_tool() {
-    local tool_name="$1"
-    local install_cmd="$2"
+    section "G25 complexity (thresholds from thresholds.conf)"
+    bash "$CX_GATE" || cx_rc=$?
 
-    if ! command -v "$tool_name" &> /dev/null; then
-        echo -e "${YELLOW}警告: $tool_name 未安装${NC}"
-        echo "安装命令: $install_cmd"
-        return 1
+    section "G26 duplication (target/ceiling from thresholds.conf)"
+    bash "$DUP_GATE" || dup_rc=$?
+
+    section "Quality check summary"
+    log_info "complexity gate rc=${cx_rc}, duplication gate rc=${dup_rc}"
+
+    local rc=0
+    if [ "$cx_rc" -eq 3 ] || [ "$dup_rc" -eq 3 ]; then
+        rc=3
+    elif [ "$cx_rc" -eq 1 ] || [ "$dup_rc" -eq 1 ]; then
+        rc=1
+    elif [ "$cx_rc" -eq 2 ] || [ "$dup_rc" -eq 2 ]; then
+        rc=2
     fi
-    return 0
+
+    case "$rc" in
+        0) log_ok "quality checks passed" ;;
+        2) log_warn "quality checks passed with warnings" ;;
+        3) log_err "quality checks: environment error" ;;
+        *) log_err "quality checks failed" ;;
+    esac
+    return "$rc"
 }
 
-# 检查工具是否可用
-echo -e "${BLUE}=== 检查工具可用性 ===${NC}"
-
-JSCPD_AVAILABLE=0
-LIZARD_AVAILABLE=0
-
-if check_tool "jscpd" "npm install -g jscpd"; then
-    JSCPD_AVAILABLE=1
-    echo -e "${GREEN}✓ jscpd 已安装${NC}"
-else
-    echo -e "${YELLOW}✗ jscpd 未安装，跳过重复检测${NC}"
-fi
-
-if check_tool "lizard" "pip install lizard"; then
-    LIZARD_AVAILABLE=1
-    echo -e "${GREEN}✓ lizard 已安装${NC}"
-else
-    echo -e "${YELLOW}✗ lizard 未安装，跳过圈复杂度分析${NC}"
-fi
-
-echo ""
-
-# 创建报告目录
-REPORT_DIR="$CHECK_DIR/reports"
-mkdir -p "$REPORT_DIR"
-
-# 1. 重复代码检测
-if [ $JSCPD_AVAILABLE -eq 1 ]; then
-    echo -e "${BLUE}=== 运行重复代码检测 (jscpd) ===${NC}"
-
-    # 检查配置文件
-    JSCPD_CONFIG="$CHECK_DIR/.jscpd.json"
-    if [ ! -f "$JSCPD_CONFIG" ]; then
-        JSCPD_CONFIG="../../.jscpd.json"
-        if [ ! -f "$JSCPD_CONFIG" ]; then
-            echo -e "${YELLOW}警告: 未找到 .jscpd.json 配置文件，使用默认阈值${NC}"
-            JSCPD_CONFIG=""
-        fi
-    fi
-
-    # 运行 jscpd
-    if [ -n "$JSCPD_CONFIG" ]; then
-        jscpd --manager "$JSCPD_CONFIG" --output "$REPORT_DIR/jscpd-report" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/jscpd.txt"
-    else
-        jscpd --threshold "$DUPLICATE_THRESHOLD" --format c,cpp,h,hpp --gitignore --output "$REPORT_DIR/jscpd-report" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/jscpd.txt"
-    fi
-
-    # 解析结果
-    if grep -q "Found.*duplicated lines" "$REPORT_DIR/jscpd.txt"; then
-        DUPLICATE_PERCENT=$(grep -o "Found.*duplicated lines" "$REPORT_DIR/jscpd.txt" | grep -o '[0-9]*\.[0-9]*%' || echo "0%")
-        DUPLICATE_VALUE=$(echo "$DUPLICATE_PERCENT" | sed 's/%//')
-
-        echo "重复率: ${DUPLICATE_PERCENT}"
-
-        # 检查阈值
-        if (( $(echo "$DUPLICATE_VALUE > $DUPLICATE_THRESHOLD" | bc -l) )); then
-            echo -e "${RED}错误: 重复率 ${DUPLICATE_PERCENT} 超过阈值 ${DUPLICATE_THRESHOLD}%${NC}"
-            FAILED=1
-        else
-            echo -e "${GREEN}✓ 重复率在阈值内${NC}"
-        fi
-    else
-        echo -e "${GREEN}✓ 未检测到重复代码${NC}"
-    fi
-else
-    echo -e "${YELLOW}跳过重复检测 (jscpd 未安装)${NC}"
-fi
-
-echo ""
-
-# 2. 圈复杂度分析
-if [ $LIZARD_AVAILABLE -eq 1 ]; then
-    echo -e "${BLUE}=== 运行圈复杂度分析 (lizard) ===${NC}"
-
-    # 检查配置文件
-    LIZARD_CONFIG="$CHECK_DIR/.lizardrc"
-    if [ ! -f "$LIZARD_CONFIG" ]; then
-        LIZARD_CONFIG="../../.lizardrc"
-        if [ ! -f "$LIZARD_CONFIG" ]; then
-            echo -e "${YELLOW}警告: 未找到 .lizardrc 配置文件，使用默认阈值${NC}"
-            LIZARD_CONFIG=""
-        fi
-    fi
-
-    # 运行 lizard
-    if [ -n "$LIZARD_CONFIG" ]; then
-        lizard --manager "$LIZARD_CONFIG" --output_file "$REPORT_DIR/lizard-report.html" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/lizard.txt"
-    else
-        lizard --CCN "$SINGLE_COMPLEXITY_THRESHOLD" --length 50 --arguments 6 --output_file "$REPORT_DIR/lizard-report.html" "$CHECK_DIR" 2>&1 | tee "$REPORT_DIR/lizard.txt"
-    fi
-
-    # 解析结果
-    if grep -q "Average cyclomatic complexity" "$REPORT_DIR/lizard.txt"; then
-        AVG_CCN=$(grep "Average cyclomatic complexity" "$REPORT_DIR/lizard.txt" | grep -o '[0-9]*\.[0-9]*' || echo "0")
-
-        echo "平均圈复杂度: ${AVG_CCN}"
-
-        # 检查平均圈复杂度阈值
-        if (( $(echo "$AVG_CCN > $AVG_COMPLEXITY_THRESHOLD" | bc -l) )); then
-            echo -e "${RED}错误: 平均圈复杂度 ${AVG_CCN} 超过阈值 ${AVG_COMPLEXITY_THRESHOLD}${NC}"
-            FAILED=1
-        else
-            echo -e "${GREEN}✓ 平均圈复杂度在阈值内${NC}"
-        fi
-
-        # 检查高复杂度函数
-        if grep -q ".* exceeds " "$REPORT_DIR/lizard.txt"; then
-            HIGH_COMPLEXITY_COUNT=$(grep -c ".* exceeds " "$REPORT_DIR/lizard.txt" || echo "0")
-            echo "高复杂度函数数量: ${HIGH_COMPLEXITY_COUNT}"
-
-            if [ "$HIGH_COMPLEXITY_COUNT" -gt 0 ]; then
-                echo -e "${YELLOW}! 警告: 发现 ${HIGH_COMPLEXITY_COUNT} 个函数超过复杂度阈值${NC}"
-                echo "高复杂度函数列表:"
-                grep ".* exceeds " "$REPORT_DIR/lizard.txt" | head -10
-
-                if [ "$HIGH_COMPLEXITY_COUNT" -gt 10 ]; then
-                    echo "... 更多函数请查看完整报告: $REPORT_DIR/lizard.txt"
-                fi
-            fi
-        fi
-    else
-        echo -e "${GREEN}✓ 圈复杂度分析完成${NC}"
-    fi
-else
-    echo -e "${YELLOW}跳过圈复杂度分析 (lizard 未安装)${NC}"
-fi
-
-echo ""
-
-# 总结
-echo -e "${BLUE}=== 质量检查总结 ===${NC}"
-
-if [ $JSCPD_AVAILABLE -eq 1 ] && [ $LIZARD_AVAILABLE -eq 1 ]; then
-    if [ -n "${FAILED+set}" ]; then
-        echo -e "${RED}✗ 质量检查未通过${NC}"
-        echo "详情请查看报告文件:"
-        echo "  - $REPORT_DIR/jscpd.txt (重复检测)"
-        echo "  - $REPORT_DIR/lizard.txt (圈复杂度)"
-        echo "  - $REPORT_DIR/jscpd-report/ (重复检测HTML报告)"
-        echo "  - $REPORT_DIR/lizard-report.html (圈复杂度HTML报告)"
-        exit 1
-    else
-        echo -e "${GREEN}✓ 所有质量检查通过${NC}"
-        echo "报告文件:"
-        echo "  - $REPORT_DIR/jscpd.txt (重复检测)"
-        echo "  - $REPORT_DIR/lizard.txt (圈复杂度)"
-        echo "  - $REPORT_DIR/jscpd-report/ (重复检测HTML报告)"
-        echo "  - $REPORT_DIR/lizard-report.html (圈复杂度HTML报告)"
-        exit 0
-    fi
-else
-    echo -e "${YELLOW}! 部分检查未运行，请安装缺失的工具${NC}"
-
-    if [ $JSCPD_AVAILABLE -eq 0 ]; then
-        echo "需要安装: npm install -g jscpd"
-    fi
-
-    if [ $LIZARD_AVAILABLE -eq 0 ]; then
-        echo "需要安装: pip install lizard"
-    fi
-
-    echo "安装后重新运行此脚本"
-    exit 0
-fi
+main "$@"

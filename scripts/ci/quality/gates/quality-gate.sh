@@ -10,6 +10,12 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT_SRC="${PROJECT_ROOT}/agent-workload/agentrt"
 SCRIPTS_ROOT="${PROJECT_ROOT}/tools/scripts"
 
+# 质量阈值唯一权威源（SSoT）：复杂度/重复率等策略数据统一由此读取
+if [ -f "${SCRIPT_DIR}/../thresholds.conf" ]; then
+    # shellcheck source=../thresholds.conf
+    source "${SCRIPT_DIR}/../thresholds.conf"
+fi
+
 # ============================================================================
 # 颜色输出
 # ============================================================================
@@ -201,7 +207,7 @@ gate_cross_repo() {
 # Gate 6: 圈复杂度检查 (P0.19.6)
 # ============================================================================
 gate_complexity() {
-    section "Gate 6: Complexity Check (P0.19.6, lizard v1.23.0)"
+    section "Gate 6: Complexity Check (lizard, thresholds from thresholds.conf)"
 
     local complexity_script="${SCRIPT_DIR}/complexity-check.sh"
     if [ -x "$complexity_script" ]; then
@@ -214,10 +220,10 @@ gate_complexity() {
         else
             local cx_exit=$?
             if [ $cx_exit -eq 2 ]; then
-                log_warn "Complexity check: new WARN-level functions found (CCN ${CCN_PASS:-15}-${CCN_WARN:-25})"
+                log_warn "Complexity check: new WARN-level functions found (CCN ${CCN_FN_PASS:-15}-${CCN_FN_WARN:-25})"
                 check_gate "Complexity" 2
             else
-                log_err "Complexity check: new FAIL/BLOCK-level functions found (CCN > ${CCN_WARN:-25})"
+                log_err "Complexity check: new FAIL/BLOCK-level functions found (CCN > ${CCN_FN_WARN:-25})"
                 check_gate "Complexity" 1
             fi
         fi
@@ -616,6 +622,70 @@ gate_file_length() {
 }
 
 # ============================================================================
+# Gate 21: G26 重复率门禁（方案 §6.3：3% ~ 5%，归一化行窗口口径）
+# 自建克隆检测器（无外部依赖，三端可移植）；阈值取自 thresholds.conf。
+# 退出码: 0=通过 1=超基线(新增重复，阻断) 2=高于目标(告警) 3=环境错误
+# ============================================================================
+gate_clone() {
+    section "Gate 21: Clone/Duplication Check (G26, target <3%, ceiling 5%)"
+
+    local cl_script="${SCRIPT_DIR}/clone-check.sh"
+    if [ -f "$cl_script" ]; then
+        log_info "Running G26 clone/duplication check..."
+        local cl_out cl_rc=0
+        cl_out=$(bash "$cl_script" 2>&1) || cl_rc=$?
+        echo "$cl_out" | tail -20
+        if [ "$cl_rc" -eq 0 ]; then
+            check_gate "Clone" 0
+        elif [ "$cl_rc" -eq 2 ]; then
+            log_warn "clone check: rate above target but within baseline"
+            check_gate "Clone" 2
+        elif [ "$cl_rc" -eq 3 ]; then
+            log_warn "clone check: environment error, manual review required"
+            check_gate "Clone" 2
+        else
+            check_gate "Clone" 1
+        fi
+    else
+        log_warn "clone check script not found: ${cl_script}"
+        check_gate "Clone" 2
+    fi
+}
+
+# ============================================================================
+# Gate 22: G5 端口坐标唯一性 + 三面一致性门禁（台账 §四.2 / §五）
+# 受辖带 2026-2100：机制面源码禁落带端口字面量（禁双轨）；部署/配置面落带
+# 字面量必须登记于 SSoT（airy_defaults.h）；符号引用必须解析到登记表。
+# 棘轮基线 port-coord-baseline.txt，只降不升。
+# 退出码: 0=通过 1=超基线(新增违例，阻断) 2=高于水位(告警) 3=环境错误
+# ============================================================================
+gate_port_coord() {
+    section "Gate 22: Port Coordinate Uniqueness Check (G5, band 2026-2100)"
+
+    local pc_script="${SCRIPT_DIR}/port-coord-check.sh"
+    if [ -f "$pc_script" ]; then
+        log_info "Running G5 port coordinate check..."
+        local pc_out pc_rc=0
+        pc_out=$(bash "$pc_script" 2>&1) || pc_rc=$?
+        echo "$pc_out" | tail -20
+        if [ "$pc_rc" -eq 0 ]; then
+            check_gate "PortCoord" 0
+        elif [ "$pc_rc" -eq 2 ]; then
+            log_warn "port coord check: violations within baseline (ratchet held)"
+            check_gate "PortCoord" 2
+        elif [ "$pc_rc" -eq 3 ]; then
+            log_warn "port coord check: environment error, manual review required"
+            check_gate "PortCoord" 2
+        else
+            check_gate "PortCoord" 1
+        fi
+    else
+        log_warn "port coord check script not found: ${pc_script}"
+        check_gate "PortCoord" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -634,6 +704,8 @@ main() {
     local skip_loc_budget=false
     local skip_stub_scan=false
     local skip_file_length=false
+    local skip_clone=false
+    local skip_port_coord=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -698,12 +770,20 @@ main() {
                 skip_file_length=true
                 shift
                 ;;
+            --skip-clone)
+                skip_clone=true
+                shift
+                ;;
+            --skip-port-coord)
+                skip_port_coord=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -726,6 +806,8 @@ main() {
                 echo "  18. LOC Budget Check (G2, milestone ladder)"
                 echo "  19. Stub Scan Check (G6, zero-tolerance)"
                 echo "  20. File Length Check (G24, <= 800 lines/file)"
+                echo "  21. Clone/Duplication Check (G26, target <3%, ceiling 5%)"
+                echo "  22. Port Coordinate Uniqueness Check (G5, band 2026-2100)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -743,6 +825,8 @@ main() {
                 echo "  --skip-loc-budget     Skip G2 LOC budget (milestone ladder) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
                 echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
+                echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
+                echo "  --skip-port-coord     Skip G5 port coordinate uniqueness (band 2026-2100) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -778,6 +862,8 @@ main() {
         $skip_loc_budget || gate_loc_budget
         $skip_stub_scan || gate_stub_scan
         $skip_file_length || gate_file_length
+        $skip_clone || gate_clone
+        $skip_port_coord || gate_port_coord
     fi
 
     # 输出结果
