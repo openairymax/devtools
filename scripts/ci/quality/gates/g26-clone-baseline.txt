@@ -1,2 +1,4 @@
-# 0.1.19 G26 clone baseline (overall dup rate, %)
-3.2386
+# 0.1.19 G26 clone baseline (dup_lines, absolute ratchet)
+# 口径变更（§73）：rate 棘轮误伤删除类消解批次，改 dup_lines 绝对值棘轮。
+# 7413 = §73 批次（config_unified 三分余项 + coreloopthree 死件）消解后实测。
+7413

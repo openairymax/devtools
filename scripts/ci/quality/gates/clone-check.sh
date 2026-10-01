@@ -5,11 +5,14 @@
 #   tests/ 与 third_party/；归一化（剥离注释、压空白、丢空行）后以连续
 #   DUP_WINDOW 行窗口做 SHA-1 指纹，出现 ≥ 2 次即克隆组，副本行计入重复行。
 # 判据（阈值一律取自 thresholds.conf —— 唯一权威源，本文件不内联字面量）：
+#   dup_lines > 基线           → FAIL（新增重复，fail-closed 阻断）
+#   rate > DUP_TARGET          → WARN（高于阶梯目标，棘轮持平）
 #   rate ≤ DUP_TARGET          → PASS（达成阶梯目标）
-#   DUP_TARGET < rate ≤ 基线   → WARN（高于目标但未越过既有债务水位）
-#   rate > 基线                → FAIL（新增重复，fail-closed 阻断）
-# 基线：g26-clone-baseline.txt，首行数值为当前重复率水位（既有债务）；
+# 基线：g26-clone-baseline.txt，首行数值为 dup_lines（归一化重复行绝对值）；
 #   每批次收敛后以 --update-baseline 下压，只降不升。
+# 口径依据：删除独特死码使分母收缩、rate 被动抬升而重复债务不变——以 rate
+#   为棘轮量会误伤删除类消解批次（L4/L5 主线即删除冗余），故棘轮量取重复
+#   行绝对值 dup_lines；rate 保留为阶梯目标与展示指标。
 # 用法: clone-check.sh [--update-baseline]
 # 退出码: 0 = 通过；2 = 警告（高于目标，未超基线）；1 = 超基线（新增重复）；
 #         3 = 环境错误（树/基线/检测器缺失）
@@ -64,11 +67,16 @@ RATE="$(printf '%s' "$JSON" | python3 -c \
     log_err "failed to parse clone detector output"
     exit 3
 }
+DUP_LINES="$(printf '%s' "$JSON" | python3 -c \
+    'import json,sys; print(json.load(sys.stdin)["dup_lines"])')" || {
+    log_err "failed to parse clone detector output"
+    exit 3
+}
 
 if [ "$UPDATE_BASELINE" -eq 1 ]; then
-    printf '# 0.1.19 G26 clone baseline (overall dup rate, %%)\n%s\n' \
-        "$RATE" > "$BASELINE"
-    log_info "基线已更新：${RATE}%（g26-clone-baseline.txt）"
+    printf '# 0.1.19 G26 clone baseline (dup_lines, absolute ratchet)\n%s\n' \
+        "$DUP_LINES" > "$BASELINE"
+    log_info "基线已更新：dup_lines=${DUP_LINES}（g26-clone-baseline.txt）"
     exit 0
 fi
 
@@ -76,26 +84,26 @@ if [ ! -f "$BASELINE" ]; then
     log_err "baseline not found: ${BASELINE} (run --update-baseline to seed)"
     exit 3
 fi
-BASE_RATE="$(grep -v '^#' "$BASELINE" | grep -v '^[[:space:]]*$' \
-             | head -n1 | tr -d '[:space:]')"
-if ! printf '%s' "$BASE_RATE" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
-    log_err "invalid baseline value: '${BASE_RATE}'"
+BASE_DUP="$(grep -v '^#' "$BASELINE" | grep -v '^[[:space:]]*$' \
+            | head -n1 | tr -d '[:space:]')"
+if ! printf '%s' "$BASE_DUP" | grep -qE '^[0-9]+$'; then
+    log_err "invalid baseline value: '${BASE_DUP}'"
     exit 3
 fi
 
-section "0.1.19 G26 clone gate (target<${DUP_TARGET}%, baseline<=${BASE_RATE}%)"
+section "0.1.19 G26 clone gate (target<${DUP_TARGET}%, baseline<=${BASE_DUP} dup_lines)"
 printf '%s\n' "$JSON"
 
 over() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
 
-if over "$RATE" "$BASE_RATE"; then
-    log_err "重复率 ${RATE}% 超基线 ${BASE_RATE}%（新增重复，fail-closed 阻断）"
+if [ "$DUP_LINES" -gt "$BASE_DUP" ]; then
+    log_err "重复行 ${DUP_LINES} 超基线 ${BASE_DUP}（新增重复，fail-closed 阻断）"
     log_err "0.1.19 G26 clone gate FAILED"
     exit 1
 fi
 
 if over "$RATE" "$DUP_TARGET"; then
-    log_warn "重复率 ${RATE}% 高于目标 ${DUP_TARGET}%，未超基线 ${BASE_RATE}%（棘轮持平）"
+    log_warn "重复率 ${RATE}% 高于目标 ${DUP_TARGET}%，dup_lines ${DUP_LINES} 未超基线 ${BASE_DUP}（棘轮持平）"
     log_warn "0.1.19 G26 clone gate WARN"
     exit 2
 fi
