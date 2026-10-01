@@ -1,18 +1,27 @@
 #!/bin/bash
-# V16.10 (0.1.18 plan §12.16.3.4 S6): llm_d 样本形态门禁
+# llm_d 形态样本门禁（0.1.19 gen5 五件套装配）
 #
-# 断言（0.1.18-架构改进方案.md:1958）：
+# 权威依据：
+#   0.1.19-架构文档.md §4.3 五件套（.manifest / main.c / svc.c / modules/ / 唯一私有头）
+#   0.1.19-架构文档.md §5.4 结构规约六条
+#   0.1.19-L1-SSoT收敛台账.md §33/§34 落点裁定：
+#     src/ 顶层裸文件 6 → 3：main.c(生成) / svc.c(手写) / <户>_internal.h(唯一私有头)，
+#     均属五件套固定落点，先留 src/ 根、不 churn 生成器；7 领域源全部入子域。
+#
+# 断言：
 #   A1  7 域成形：src/{bootstrap,adapter,rpc,config,accounting,providers,router} 全为目录
-#   A2  src/ 顶层裸文件数 = 0
-#   A3  include/ 仅 2 头（白名单集合断言，防换名漂移）
-#   A4  llm_service_internal.h 拆片后每片入度 ≤ 5
-#   A5  内层域（providers/router/accounting/config）对发布头 include 边 = 0（S2 判据，FATAL）
+#   A2  src/ 顶层裸文件 = 五件套固定落点 {main.c, svc.c} + 恰 1 个唯一私有头 *_internal.h
+#   A3  include/ 头集 = 2 发布头 + 1 生成头（白名单集合断言，防换名漂移）
+#   A4  唯一私有头及各域 internal.h 拆片后每片入度 ≤ 5
+#   A5  内层域（providers/router/accounting/config）对发布头 include 边 = 0（FATAL）
 #   A6  装配域（bootstrap/adapter）对发布头残余边入基线只减不增（ops 装配现实，收敛驱动）
 #
 # 基线：v16-sample-baseline.txt（A6 台账）；--update-baseline 重建。
 # 用法: sample-form-check.sh [--update-baseline]
-# 退出码: 0 = 通过；1 = 存在违例
+# 退出码: 0 = 通过；1 = 存在违例；2 = 环境错误
 set -euo pipefail
+# 判据与宿主 locale 无关：排序/集合比较统一走字节序
+export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
@@ -54,21 +63,34 @@ for d in bootstrap adapter rpc config accounting providers router; do
     fi
 done
 
-# ── A2: src/ 顶层裸文件 = 0 ──────────────────────────────────
-section "A2: no bare files at src/ top level"
-bare=$(find "${LLM_D}/src" -maxdepth 1 -type f | wc -l)
-if [ "$bare" -eq 0 ]; then
-    log_ok "src/ top-level bare files = 0"
+# ── A2: src/ 顶层裸文件 = 五件套固定落点 ─────────────────────
+section "A2: src/ top-level bare files = five-piece landing points"
+bare_bad=0
+priv_heads=0
+while IFS= read -r f; do
+    base="${f##*/}"
+    case "$base" in
+        main.c|svc.c) ;;
+        *_internal.h) priv_heads=$((priv_heads + 1)) ;;
+        *)  log_err "unexpected bare file at src/ top level: src/${base}"
+            log_err "    allowed: main.c, svc.c, one *_internal.h"
+            bare_bad=$((bare_bad + 1)) ;;
+    esac
+done < <(find "${LLM_D}/src" -maxdepth 1 -type f | sort)
+if [ "$priv_heads" -ne 1 ]; then
+    log_err "src/ top-level private headers = ${priv_heads}, must be exactly 1"
+    bare_bad=$((bare_bad + 1))
+fi
+if [ "$bare_bad" -eq 0 ]; then
+    log_ok "src/ top-level = {main.c, svc.c} + 1 private head"
 else
-    log_err "src/ top-level bare files = ${bare} (must be 0)"
-    find "${LLM_D}/src" -maxdepth 1 -type f | sed 's/^/    /'
     VIOLATIONS=$((VIOLATIONS + 1))
 fi
 
-# ── A3: include/ 仅 2 头（白名单） ────────────────────────────
-section "A3: include/ exactly two published headers"
-expected_headers="llm_service.h daemon_llm_ops_bootstrap.h"
-actual_headers=$(cd "${LLM_D}/include" && ls *.h 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')
+# ── A3: include/ 头集 = 2 发布头 + 1 生成头 ──────────────────
+section "A3: include/ header set (2 published + 1 generated)"
+expected_headers="llm_service.h daemon_llm_ops_bootstrap.h svc_llm_d.h"
+actual_headers=$( ( cd "${LLM_D}/include" && ls *.h 2>/dev/null ) | sort | tr '\n' ' ' | sed 's/ $//' || true )
 expected_sorted=$(echo "$expected_headers" | tr ' ' '\n' | sort | tr '\n' ' ' | sed 's/ $//')
 if [ "$actual_headers" = "$expected_sorted" ]; then
     log_ok "include/ = { ${actual_headers} }"
@@ -83,7 +105,7 @@ MAX_FANIN=5
 while IFS= read -r hdr; do
     rel="${hdr#"${LLM_D}/src/"}"
     cnt=$(grep -rl --include='*.c' --include='*.h' "#include \"${rel}\"" \
-        "${LLM_D}/src" "${LLM_D}/tests" 2>/dev/null | wc -l)
+        "${LLM_D}/src" "${LLM_D}/tests" 2>/dev/null | wc -l || true)
     if [ "$cnt" -le "$MAX_FANIN" ]; then
         log_ok "${rel}: fan-in ${cnt} <= ${MAX_FANIN}"
     else
@@ -95,7 +117,7 @@ done < <(find "${LLM_D}/src" -name '*internal*.h' | sort)
 # ── A5 + A6: 发布头反向边 ────────────────────────────────────
 section "A5/A6: published-header reverse edges"
 declare -a A6_ENTRIES=()
-for hdr in $(cd "${LLM_D}/include" && ls *.h 2>/dev/null); do
+for hdr in $( ( cd "${LLM_D}/include" && ls *.h 2>/dev/null ) || true ); do
     # 内层域：硬断言零边（S2 判据）
     for d in providers router accounting config; do
         hits=$(grep -rl "include \"${hdr}\"\|include <${hdr}>" \
