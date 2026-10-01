@@ -162,7 +162,9 @@ GWP=""
 if [ -s "$AH/run/gateway.port" ]; then
     GWP="$(sed -n '1s/[^0-9]//gp' "$AH/run/gateway.port" | head -1)"
 fi
-GWP="${GWP:-8080}"
+# fallback 取 SSoT agentrt/commons/include/airy_defaults.h 的
+# AIRY_PORT_GATEWAY_HTTP；正常路径优先读运行期 run/gateway.port。
+GWP="${GWP:-2027}"
 if (exec 3<>"/dev/tcp/127.0.0.1/$GWP") 2>/dev/null; then
     info "gateway online（127.0.0.1:$GWP）"
 else

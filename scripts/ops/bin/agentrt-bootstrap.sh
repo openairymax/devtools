@@ -364,12 +364,14 @@ declare -A DAEMON_HEALTH_TIMEOUT=(
     [gateway_d]=30
 )
 
-# daemon 默认端口 (0 = Unix Socket)
-# 注意: tool_d 仅监听 Unix Socket，历史遗留的 8082 TCP 端口映射会导致
-# 健康检查 nc -z 8082 挂起（连接被 DROP 而非 REFUSE）后才回退 socket
-# 检查，使 tool_d 每次启动延迟 30s+。已移除，仅保留真实 TCP 端口。
+# daemon 默认 TCP 端口 (0 = Unix Socket)。取值须与 SSoT
+# agentrt/commons/include/airy_defaults.h 的 AIRY_PORT_* 登记表一致
+# （gateway_d = AIRY_PORT_GATEWAY_HTTP = 2027），禁止复刻端口字面量。
+# 注意: tool_d 仅监听 Unix Socket，历史遗留的 TCP 端口映射会使健康检查
+# nc -z 挂起（连接被 DROP 而非 REFUSE）后才回退 socket，每次启动延迟
+# 30s+，已移除。
 declare -A DAEMON_PORT=(
-    [gateway_d]=8080
+    [gateway_d]=2027
 )
 
 # daemon 二进制名称映射 (daemon_name -> binary_name)
@@ -572,7 +574,7 @@ check_daemon_health_tcp() {
     fi
 
     # TCP 端口检查。nc 必须带 -w 超时：本机防火墙对未监听端口可能 DROP
-    # 而非 REFUSE（历史根因：无超时 nc 在 8080 空闲时挂起 30s+，bootstrap
+    # 而非 REFUSE（历史根因：无超时 nc 在 2027 空闲时挂起 30s+，bootstrap
     # 卡在 Layer 4 gateway 健康检查，导致 gateway 启动极慢或失败，系统
     # 表现为"启动不稳定"）。
     local have_probe=0
@@ -832,7 +834,7 @@ start_daemon() {
 
     # 单实例锁：daemon 已运行则跳过启动（历史 P2-2：重复启动导致
     # EVENT-DRIVER STOP / accept 异常）。判定方式按监听类型分：
-    #   - TCP daemon（gateway_d 监听 HTTP 8080）：检查端口已被监听。
+    #   - TCP daemon（gateway_d 监听 HTTP 2027）：检查端口已被监听。
     #     gateway 不建 Unix socket，仅按 socket 文件判断会让每次 bootstrap
     #     都重复启动一个 bind 失败的失效实例，残留多个半死 gateway_d。
     #   - 其余 daemon：检查 <runtime>/<name>.sock 存活监听。
@@ -844,7 +846,7 @@ start_daemon() {
             if check_daemon_health_tcp "$name"; then
                 # 端口被监听但 pidfile 无效（stale：旧实例正在退出/残留半死
                 # 进程）时不可直接跳过——否则旧实例退出后该 daemon 永久缺失
-                # （历史竞态：gateway_d 被跳过 → 8080 无监听 → 对话全断）。
+                # （历史竞态：gateway_d 被跳过 → 2027 无监听 → 对话全断）。
                 local _pid_ok
                 _pid_ok="$(get_daemon_pid "$name")"
                 if [[ -n "$_pid_ok" ]]; then
