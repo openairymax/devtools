@@ -182,10 +182,10 @@ run_ctest() {
     fi
 
     if [[ "$test_exit_code" -eq 0 ]]; then
-        ((TOTAL_PASSED += passed))
+        TOTAL_PASSED=$((TOTAL_PASSED + passed))
         log_ok "CTest passed ($passed tests)"
     else
-        ((TOTAL_FAILED += failed))
+        TOTAL_FAILED=$((TOTAL_FAILED + failed))
         FAILED_TESTS+=("ctest")
         log_fail "CTest failed ($failed test(s))"
 
@@ -271,10 +271,10 @@ run_pytest() {
     local py_errors=$(echo "$pytest_output" | grep -oP '\d+ error' | grep -oP '\d+' || echo "0")
     local py_skipped=$(echo "$pytest_output" | grep -oP '\d+ skipped' | grep -oP '\d+' || echo "0")
 
-    ((TOTAL_PASSED += py_passed))
-    ((TOTAL_FAILED += py_failed))
-    ((TOTAL_ERRORS += py_errors))
-    ((TOTAL_SKIPPED += py_skipped))
+    TOTAL_PASSED=$((TOTAL_PASSED + py_passed))
+    TOTAL_FAILED=$((TOTAL_FAILED + py_failed))
+    TOTAL_ERRORS=$((TOTAL_ERRORS + py_errors))
+    TOTAL_SKIPPED=$((TOTAL_SKIPPED + py_skipped))
 
     if [[ "$py_failed" -gt 0 ]] || [[ "$py_errors" -gt 0 ]]; then
         FAILED_TESTS+=("pytest")

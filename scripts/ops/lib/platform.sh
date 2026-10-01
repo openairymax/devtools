@@ -3,11 +3,7 @@
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentRT 平台检测和环境工具模块
 # 遵循 AgentRT 架构设计原则：跨平台一致性原则 (E-4)
-
-###############################################################################
-# 来源此脚本
-###############################################################################
-set -e
+# 库模块不设置 shell 选项，严格模式由 common.sh 统一负责
 
 ###############################################################################
 # 平台定义
@@ -186,15 +182,17 @@ airy_linux_distro_detect() {
     fi
 
     if [[ -f /etc/os-release ]]; then
-        _AGENTRT_DISTRO=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
-        _AGENTRT_DISTRO_VERSION=$(grep "^VERSION_ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
+        _AGENTRT_DISTRO=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"' || true)
+        _AGENTRT_DISTRO_VERSION=$(grep "^VERSION_ID=" /etc/os-release | cut -d= -f2 | tr -d '"' || true)
     elif [[ -f /etc/lsb-release ]]; then
-        _AGENTRT_DISTRO=$(grep "^DISTRIB_ID=" /etc/lsb-release | cut -d= -f2)
-        _AGENTRT_DISTRO_VERSION=$(grep "^DISTRIB_RELEASE=" /etc/lsb-release | cut -d= -f2)
+        _AGENTRT_DISTRO=$(grep "^DISTRIB_ID=" /etc/lsb-release | cut -d= -f2 || true)
+        _AGENTRT_DISTRO_VERSION=$(grep "^DISTRIB_RELEASE=" /etc/lsb-release | cut -d= -f2 || true)
     else
-        _AGENTRT_DISTRO="unknown"
+        _AGENTRT_DISTRO=""
         _AGENTRT_DISTRO_VERSION=""
     fi
+
+    _AGENTRT_DISTRO="${_AGENTRT_DISTRO:-unknown}"
 
     echo "$_AGENTRT_DISTRO"
 }

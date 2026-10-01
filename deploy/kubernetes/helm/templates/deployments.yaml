@@ -58,11 +58,6 @@ Generated from values.yaml using _helpers.tpl macros
 {{- end }}
 
 {{/* ===== 扩展 daemon ===== */}}
-{{- if .Values.hook_d.enabled }}
-{{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "hook-d" "image" .Values.hook_d.image "service" .Values.hook_d.service "replicaCount" .Values.hook_d.replicaCount "resources" .Values.hook_d.resources "livenessProbe" (dict "initialDelaySeconds" 10 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 5 "periodSeconds" 5) "securityContext" .Values.hook_d.securityContext)) }}
----
-{{- end }}
-
 {{- if .Values.notify_d.enabled }}
 {{- include "agentrt.daemon.deployment" (merge (dict) (dict "$" . "name" "notify-d" "image" .Values.notify_d.image "service" .Values.notify_d.service "replicaCount" .Values.notify_d.replicaCount "resources" .Values.notify_d.resources "livenessProbe" (dict "initialDelaySeconds" 10 "periodSeconds" 10) "readinessProbe" (dict "initialDelaySeconds" 5 "periodSeconds" 5) "securityContext" .Values.notify_d.securityContext)) }}
 ---

@@ -6,12 +6,12 @@
 Description=AgentRT Full Service Stack
 After=agentrt-monit.service agentrt-notify.service
 After=agentrt-sched.service agentrt-channel.service
-After=agentrt-llm.service agentrt-tool.service agentrt-hook.service
+After=agentrt-llm.service agentrt-tool.service
 After=agentrt-market.service
 After=agentrt-gateway.service
 Wants=agentrt-monit.service agentrt-notify.service
 Wants=agentrt-sched.service agentrt-channel.service
-Wants=agentrt-llm.service agentrt-tool.service agentrt-hook.service
+Wants=agentrt-llm.service agentrt-tool.service
 Wants=agentrt-market.service
 Wants=agentrt-gateway.service
 

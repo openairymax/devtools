@@ -15,7 +15,7 @@
 #   Layer 2 (核心原子): coreloopthree, taskflow, memory
 #   Layer 3 (基础 daemon): channel_d, monit_d（吸收 info/observe）
 #   Layer 4 (业务 daemon): llm_d, tool_d（吸收 plugin）, market_d, sched_d
-#   Layer 5 (扩展 daemon): hook_d, notify_d
+#   Layer 5 (扩展 daemon): notify_d（吸收 hook，R7）
 #   Layer 6 (网关层):    gateway_d
 
 version: '3.8'
@@ -330,32 +330,6 @@ services:
   # Layer 5: 扩展 daemon 服务
   # ========================================================================
 
-  hook_d:
-    <<: *common-daemon
-    container_name: agentrt-test-hook
-    hostname: hook-d
-    ports:
-      - "${TEST_HOOK_PORT:-19301}:9301"
-    environment:
-      AGENTRT_SERVICE_NAME: hook_d
-      AGENTRT_SERVICE_PORT: "9301"
-      AGENTRT_COREKERN_HOST: corekern
-      AGENTRT_CORELOOPTHREE_HOST: coreloopthree
-      AGENTRT_CHANNEL_HOST: channel-d
-    depends_on:
-      corekern:
-        condition: service_healthy
-      coreloopthree:
-        condition: service_healthy
-      channel_d:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9301/healthz"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
   notify_d:
     <<: *common-daemon
     container_name: agentrt-test-notify
@@ -457,7 +431,7 @@ services:
         echo ""
         echo "=== Health Check Results ==="
         for svc in gateway-d:8080 llm-d:9201 tool-d:9202 market-d:9203 \
-                   sched-d:9204 hook-d:9301 \
+                   sched-d:9204 \
                    notify-d:9304 channel-d:9101 monit-d:9102 \
                    corekern:9001 coreloopthree:9002 taskflow:9003 memory:9004; do
           host="$${svc%%:*}"

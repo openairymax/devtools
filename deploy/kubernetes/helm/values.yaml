@@ -386,38 +386,6 @@ sched_d:
 # ===========================================================================
 # 扩展 daemon 服务
 # ===========================================================================
-hook_d:
-  enabled: true
-  replicaCount: 1
-  image:
-    repository: spharx/agentrt-hook
-    tag: "0.1.1"
-  service:
-    port: 9301
-    type: ClusterIP
-  resources:
-    requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-  livenessProbe:
-    httpGet:
-      path: /healthz
-      port: 9301
-    initialDelaySeconds: 10
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /healthz
-      port: 9301
-    initialDelaySeconds: 5
-    periodSeconds: 5
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-
 notify_d:
   enabled: true
   replicaCount: 1

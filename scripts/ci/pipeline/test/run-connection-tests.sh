@@ -89,7 +89,7 @@ setup_environment() {
         redis postgres corekern coreloopthree taskflow memory \
         channel_d monit_d \
         llm_d tool_d market_d sched_d \
-        hook_d notify_d \
+        notify_d \
         gateway_d 2>&1 | tail -5
 
     # 等待所有服务健康
@@ -98,7 +98,7 @@ setup_environment() {
 
     # 快速健康检查
     local unhealthy=0
-    for svc in gateway_d llm_d tool_d market_d sched_d hook_d \
+    for svc in gateway_d llm_d tool_d market_d sched_d \
                notify_d channel_d monit_d \
                corekern coreloopthree taskflow memory; do
         container="agentrt-test-${svc//_/-}"
@@ -328,7 +328,7 @@ run_connection_test() {
                 local sd_pass=true
                 for svc_port in "${TEST_LLM_PORT:-19201}" "${TEST_TOOL_PORT:-19202}" \
                                 "${TEST_MARKET_PORT:-19203}" "${TEST_SCHED_PORT:-19204}" \
-                                "${TEST_HOOK_PORT:-19301}" "${TEST_PLUGIN_PORT:-19302}" \
+                                "${TEST_NOTIFY_PORT:-19304}" \
                                 "${TEST_CHANNEL_PORT:-19101}" "${TEST_MONIT_PORT:-19102}"; do
                     if ! curl -s --max-time 3 "http://localhost:${svc_port}/healthz" 2>/dev/null | grep -qE "ok|healthy|200"; then
                         sd_pass=false

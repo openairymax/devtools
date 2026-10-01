@@ -31,8 +31,8 @@ deploy/
 │   └── helm/                      #   Helm Chart（values/values-prod + 模板）
 │       └── README.md              #   Kubernetes 部署详细文档
 ├── systemd/                       # systemd 服务编排
-│   ├── agentrt.target             #   聚合目标（一键启停 12 个 daemon 服务）
-│   ├── agentrt-*.service          #   12 个 daemon 的 systemd 单元文件
+│   ├── agentrt.target             #   聚合目标（一键启停 8 个 daemon 服务）
+│   ├── agentrt-*.service          #   8 个 daemon 的 systemd 单元文件
 │   └── README.md                  #   systemd 部署详细文档
 └── README.md                      # 本文件
 ```

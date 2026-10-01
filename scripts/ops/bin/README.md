@@ -27,13 +27,13 @@ bin/
 
 ### agentrt-bootstrap.sh — 一键启动（唯一启动编排入口）
 
-按 DAG 层级顺序启动所有 daemon，每层健康检查通过后才进入下一层。0.1.9 M4 整编后共 5 层 15 个 daemon（稳态）：
+按 DAG 层级顺序启动所有 daemon，每层健康检查通过后才进入下一层。0.1.9 M4 整编、0.1.19 R7 并户后共 5 层 14 个 daemon（稳态）：
 
 | 层级 | daemon |
 |------|--------|
-| Layer 0 基础设施 | monit_d（M4 吸收 observe/info）, notify_d, cupolas_d |
+| Layer 0 基础设施 | monit_d（M4 吸收 observe/info）, notify_d（R7 吸收 hook）, cupolas_d |
 | Layer 1 核心服务 | sched_d, channel_d, mem_d |
-| Layer 2 Agent 服务 | llm_d, think_d, tool_d（M4 吸收 plugin）, hook_d, agent_d, a2a_d, maths_d |
+| Layer 2 Agent 服务 | llm_d, think_d, tool_d（M4 吸收 plugin）, agent_d, a2a_d, maths_d |
 | Layer 3 业务服务 | market_d |
 | Layer 4 网关 | gateway_d |
 

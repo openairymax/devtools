@@ -633,7 +633,7 @@ wait_for_daemon() {
             return 0
         fi
         sleep "$HEALTH_CHECK_INTERVAL_SEC"
-        ((elapsed += HEALTH_CHECK_INTERVAL_SEC))
+        elapsed=$((elapsed + HEALTH_CHECK_INTERVAL_SEC))
     done
 
     log_error "$name health check FAILED after ${timeout}s"
@@ -861,7 +861,7 @@ start_daemon() {
                     kill "$stale_pid" 2>/dev/null || true
                     local _w=0
                     while check_daemon_health_tcp "$name" && [[ $_w -lt 10 ]]; do
-                        sleep 1; ((_w++))
+                        sleep 1; _w=$((_w + 1))
                     done
                 fi
                 rm -f "${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"

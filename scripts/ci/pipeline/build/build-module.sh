@@ -11,7 +11,6 @@ set -euo pipefail
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
-LIB_DIR="${SCRIPT_DIR}/../../library"
 
 ###############################################################################
 # 颜色和日志
@@ -301,7 +300,7 @@ main() {
 
     for module in $modules; do
         if build_module "$module"; then
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
             failed_modules+=("$module")
         fi

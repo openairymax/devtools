@@ -7,7 +7,7 @@
 #   corekern, coreloopthree, taskflow, memory,
 #   channel_d, monit_d（吸收 info/observe，M4）,
 #   llm_d, tool_d（吸收 plugin，M4）, market_d, sched_d,
-#   hook_d, notify_d,
+#   notify_d（吸收 hook，R7）,
 #   gateway_d
 
 set -euo pipefail
@@ -62,9 +62,6 @@ case "${SERVICE_NAME}" in
     sched_d)
         BINARY="agentrt-sched_d"
         ;;
-    hook_d)
-        BINARY="agentrt-hook_d"
-        ;;
     notify_d)
         BINARY="agentrt-notify_d"
         ;;
@@ -73,7 +70,7 @@ case "${SERVICE_NAME}" in
         ;;
     *)
         echo "ERROR: Unknown service name: ${SERVICE_NAME}" >&2
-        echo "Supported: corekern, coreloopthree, taskflow, memory, channel_d, monit_d, llm_d, tool_d, market_d, sched_d, hook_d, notify_d, gateway_d" >&2
+        echo "Supported: corekern, coreloopthree, taskflow, memory, channel_d, monit_d, llm_d, tool_d, market_d, sched_d, notify_d, gateway_d" >&2
         exit 1
         ;;
 esac

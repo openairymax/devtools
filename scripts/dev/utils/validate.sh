@@ -28,21 +28,21 @@ print_check() {
     case $status in
         "PASS")
             echo -e "${GREEN}✓${NC} $name"
-            ((CHECKS_PASSED++))
+            CHECKS_PASSED=$((CHECKS_PASSED + 1))
             ;;
         "FAIL")
             echo -e "${RED}✗${NC} $name"
             if [ -n "$message" ]; then
                 echo -e "  ${RED}→${NC} $message"
             fi
-            ((CHECKS_FAILED++))
+            CHECKS_FAILED=$((CHECKS_FAILED + 1))
             ;;
         "WARN")
             echo -e "${YELLOW}⚠${NC} $name"
             if [ -n "$message" ]; then
                 echo -e "  ${YELLOW}→${NC} $message"
             fi
-            ((CHECKS_WARNING++))
+            CHECKS_WARNING=$((CHECKS_WARNING + 1))
             ;;
     esac
 }

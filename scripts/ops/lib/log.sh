@@ -13,6 +13,7 @@ declare -r COLOR_YELLOW='\033[1;33m'
 declare -r COLOR_BLUE='\033[0;34m'
 declare -r COLOR_CYAN='\033[0;36m'
 declare -r COLOR_MAGENTA='\033[0;35m'
+declare -r COLOR_DIM='\033[2m'
 declare -r COLOR_NC='\033[0m'
 
 ###############################################################################
@@ -89,21 +90,21 @@ airy_log_info() {
 }
 
 airy_log_warn() {
-    ((_AGENTRT_SCRIPT_WARNINGS++))
+    _AGENTRT_SCRIPT_WARNINGS=$((_AGENTRT_SCRIPT_WARNINGS + 1))
     if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_WARN ]]; then
         _agentrt_log_write $LOG_LEVEL_WARN "$1"
     fi
 }
 
 airy_log_error() {
-    ((_AGENTRT_SCRIPT_ERRORS++))
+    _AGENTRT_SCRIPT_ERRORS=$((_AGENTRT_SCRIPT_ERRORS + 1))
     if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_ERROR ]]; then
         _agentrt_log_write $LOG_LEVEL_ERROR "$1"
     fi
 }
 
 airy_log_fatal() {
-    ((_AGENTRT_SCRIPT_ERRORS++))
+    _AGENTRT_SCRIPT_ERRORS=$((_AGENTRT_SCRIPT_ERRORS + 1))
     _agentrt_log_write $LOG_LEVEL_FATAL "$1"
     airy_exit 1
 }

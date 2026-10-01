@@ -40,7 +40,7 @@ TEST_FAILURES=()
 # Print test start
 test_start() {
     local test_name="$1"
-    ((TESTS_RUN++))
+    TESTS_RUN=$((TESTS_RUN + 1))
     if [[ "$AGENTRT_TEST_VERBOSE" == "1" ]]; then
         echo -e "${COLOR_DIM}[RUN]${COLOR_NC} $test_name"
     fi
@@ -49,7 +49,7 @@ test_start() {
 # Print test passed
 test_pass() {
     local test_name="$1"
-    ((TESTS_PASSED++))
+    TESTS_PASSED=$((TESTS_PASSED + 1))
     if [[ "$AGENTRT_TEST_VERBOSE" == "1" ]]; then
         echo -e "${COLOR_GREEN}[PASS]${COLOR_NC} $test_name"
     fi
@@ -59,7 +59,7 @@ test_pass() {
 test_fail() {
     local test_name="$1"
     local message="${2:-}"
-    ((TESTS_FAILED++))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
     TEST_FAILURES+=("[$test_name] $message")
     echo -e "${COLOR_RED}[FAIL]${COLOR_NC} $test_name"
     if [[ -n "$message" ]]; then
@@ -71,7 +71,7 @@ test_fail() {
 test_skip() {
     local test_name="$1"
     local reason="${2:-}"
-    ((TESTS_SKIPPED++))
+    TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
     echo -e "${COLOR_YELLOW}[SKIP]${COLOR_NC} $test_name"
     if [[ -n "$reason" ]]; then
         echo -e "    ${COLOR_YELLOW}Reason: $reason${COLOR_NC}"
