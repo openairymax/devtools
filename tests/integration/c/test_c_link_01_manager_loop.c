@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "memory_compat.h"
@@ -129,9 +130,21 @@ static void test_error_invalid_yaml(void) {
         .format = "yaml"
     };
     config_source_t *source = config_source_create_memory(&mem_opts);
+
+    /* 回归断言：未闭合的流式序列（'['）曾令解析器陷入零进展死循环，
+     * 每轮循环无界地分配节点直至耗尽内存（OOM），从而拖垮整个 WSL 实例。
+     * 这里以墙钟时间上界保证解析在有限时间内返回——一旦死循环回归，
+     * 该断言会失败，而不是把整机内存吃光。 */
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
     config_error_t err = config_source_load(source, ctx);
-    /* 宽容策略：不要求返回错误码，只要求不崩溃 */
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    double elapsed = (double)(t1.tv_sec - t0.tv_sec) +
+                     (double)(t1.tv_nsec - t0.tv_nsec) / 1e9;
+    /* 宽容策略：不要求返回错误码，只要求不崩溃且快速返回 */
     (void)err;
+    CHECK(elapsed < 5.0, "malformed flow sequence must not hang the parser");
 
     if (source) config_source_destroy(source);
     config_context_destroy(ctx);
