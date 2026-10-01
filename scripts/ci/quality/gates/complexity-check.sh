@@ -204,9 +204,11 @@ scan_incremental() {
 
     log_info "基础引用: ${base_ref}"
     log_info "增量检测变更文件:"
-    echo "$changed_abs" | while IFS= read -r f; do
-        [ -n "$f" ] && echo "  ${f#$PROJECT_ROOT/}"
-    done
+    while IFS= read -r f; do
+        if [ -n "$f" ]; then
+            echo "  ${f#$PROJECT_ROOT/}"
+        fi
+    done <<< "$changed_abs"
 
     local warn_count=0
     local fail_count=0
