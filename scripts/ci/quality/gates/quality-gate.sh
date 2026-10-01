@@ -719,6 +719,40 @@ gate_policy_payload() {
 }
 
 # ============================================================================
+# Gate 24: G21/G23 层界单向 + 跨进程零符号引用门禁（方案 §6.3 / 架构文档 §7.1）
+# 两条不变量：层界单向（不出现反向依赖，G21）；跨进程唯一通道 = IPC / syscall
+# （零进程内符号引用，G23）。判据 = 链接图断言（白名单面）+ 相对 include 反
+# 向边（代码面）；SSoT 输入为 agentrt/link-whitelist.txt（构建期 linkgate 同源）。
+# 棘轮基线 layer-baseline.txt，只降不升。
+# 退出码: 0=通过 1=硬违例或超基线(阻断) 2=高于水位(告警) 3=环境错误
+# ============================================================================
+gate_layer() {
+    section "Gate 24: Layer Boundary Check (G21/G23, one-way + zero cross-process symbol)"
+
+    local lb_script="${SCRIPT_DIR}/layer-check.sh"
+    if [ -f "$lb_script" ]; then
+        log_info "Running G21/G23 layer boundary check..."
+        local lb_out lb_rc=0
+        lb_out=$(bash "$lb_script" 2>&1) || lb_rc=$?
+        echo "$lb_out" | tail -25
+        if [ "$lb_rc" -eq 0 ]; then
+            check_gate "LayerBoundary" 0
+        elif [ "$lb_rc" -eq 2 ]; then
+            log_warn "layer boundary check: violations within baseline (ratchet held)"
+            check_gate "LayerBoundary" 2
+        elif [ "$lb_rc" -eq 3 ]; then
+            log_warn "layer boundary check: environment error, manual review required"
+            check_gate "LayerBoundary" 2
+        else
+            check_gate "LayerBoundary" 1
+        fi
+    else
+        log_warn "layer boundary check script not found: ${lb_script}"
+        check_gate "LayerBoundary" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -740,6 +774,7 @@ main() {
     local skip_clone=false
     local skip_port_coord=false
     local skip_policy_payload=false
+    local skip_layer=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -816,12 +851,16 @@ main() {
                 skip_policy_payload=true
                 shift
                 ;;
+            --skip-layer)
+                skip_layer=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -847,6 +886,7 @@ main() {
                 echo "  21. Clone/Duplication Check (G26, target <3%, ceiling 5%)"
                 echo "  22. Port Coordinate Uniqueness Check (G5, band 2026-2100)"
                 echo "  23. Policy Payload Check (G18/G19, mechanism-core zero vendor names)"
+                echo "  24. Layer Boundary Check (G21/G23, one-way + zero cross-process symbol)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -867,6 +907,7 @@ main() {
                 echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
                 echo "  --skip-port-coord     Skip G5 port coordinate uniqueness (band 2026-2100) check"
                 echo "  --skip-policy-payload  Skip G18/G19 policy payload (mechanism-core zero vendor names) check"
+                echo "  --skip-layer          Skip G21/G23 layer boundary (one-way + zero cross-process symbol) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -905,6 +946,7 @@ main() {
         $skip_clone || gate_clone
         $skip_port_coord || gate_port_coord
         $skip_policy_payload || gate_policy_payload
+        $skip_layer || gate_layer
     fi
 
     # 输出结果
