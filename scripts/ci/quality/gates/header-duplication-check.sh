@@ -9,7 +9,13 @@
 #   R3  同名 .c 禁止：daemons/common/src 与 commons 不得出现同名实现文件
 #   R4  字节级拷贝禁止：域内任意两头内容不得完全相同
 # 零基线 fail-closed：现状即全量通过，任何新增违例直接失败。
+#
+# 排序域固定为字节序（LC_ALL=C）：sort 与 comm 的排序规则取决于
+# LC_COLLATE，两者对同一 locale 的解析可能不一致（如 LANG 指向的
+# locale 未安装时回退路径不同），comm 会以 "not in sorted order" 误判
+# 失败。门禁判据必须与宿主 locale 无关，故在脚本入口钉死 C 序。
 set -euo pipefail
+export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 脚本位于 tools/scripts/ci/quality/gates/ — 需向上 5 级到达伞仓根
@@ -70,8 +76,10 @@ check_reexport() {
 
         # 双写声明检测：非 '#' 起始的列零 typedef / extern（排除 extern "C"）
         # / 函数原型（以 ';' 结尾且不含 '{'，参数表内无分号与花括号）
+        # 首两个分支专捕「关键字即列零」的声明（typedef foo_t; / extern int a;）
+        # —— 原式 ^[a-zA-Z_].*\bKW\b 要求关键字前至少一字符，会漏判列零关键字。
         local dup_hits
-        dup_hits=$(grep -nE '^[a-zA-Z_].*\btypedef\b|^[a-zA-Z_].*\bextern\b|^[a-zA-Z_][a-zA-Z0-9_ ,*]*\([^;{}]*\)[[:space:]]*;[[:space:]]*$' "${dh}" | grep -v 'extern "C"' || true)
+        dup_hits=$(grep -nE '^typedef[[:space:]]|^extern[[:space:]]|^[a-zA-Z_].*\btypedef\b|^[a-zA-Z_].*\bextern\b|^[a-zA-Z_][a-zA-Z0-9_ ,*]*\([^;{}]*\)[[:space:]]*;[[:space:]]*$' "${dh}" | grep -v 'extern "C"' || true)
         if [ -n "${dup_hits}" ]; then
             log_err "R1: ${name} 存在双写声明（应仅保留转发/别名宏/helper）:"
             echo "${dup_hits}" | head -5 | while IFS= read -r l; do log_err "      ${l}"; done
@@ -97,8 +105,10 @@ check_guard_uniqueness() {
     tmp_guards=$(mktemp)
     find "${COMMONS_DIR}" "${DAEMONS_DIR}" -name '*.h' -not -path '*third_party*' | sort | \
         while IFS= read -r f; do
-            g=$(grep -m1 '^#ifndef' "${f}" 2>/dev/null | awk '{print $2}')
-            [ -n "${g}" ] && echo "${g}|${f#${PROJECT_ROOT}/}"
+            g=$(grep -m1 '^#ifndef' "${f}" 2>/dev/null | awk '{print $2}' || true)
+            if [ -n "${g}" ]; then
+                echo "${g}|${f#${PROJECT_ROOT}/}"
+            fi
         done > "${tmp_guards}"
 
     local dups bad=0
