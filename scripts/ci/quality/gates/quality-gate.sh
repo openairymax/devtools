@@ -686,6 +686,39 @@ gate_port_coord() {
 }
 
 # ============================================================================
+# Gate 23: G18/G19 机制核策略载荷零容忍门禁（台账 §62 / 方案 §2.6、§6.3）
+# 纲领「机制与策略极致分离」：机制核生产码剥离注释后不得出现厂商名 / 产品名，
+# 厂商差异一律由生态层以 ops / .manifest 注入（策略数据化）。名表 SSoT 为
+# policy-payload-names.txt；棘轮基线 policy-payload-baseline.txt，只降不升。
+# 退出码: 0=通过 1=超基线(新增策略载荷，阻断) 2=高于水位(告警) 3=环境错误
+# ============================================================================
+gate_policy_payload() {
+    section "Gate 23: Policy Payload Check (G18/G19, mechanism-core zero vendor names)"
+
+    local pp_script="${SCRIPT_DIR}/policy-payload-check.sh"
+    if [ -f "$pp_script" ]; then
+        log_info "Running G18/G19 policy payload check..."
+        local pp_out pp_rc=0
+        pp_out=$(bash "$pp_script" 2>&1) || pp_rc=$?
+        echo "$pp_out" | tail -25
+        if [ "$pp_rc" -eq 0 ]; then
+            check_gate "PolicyPayload" 0
+        elif [ "$pp_rc" -eq 2 ]; then
+            log_warn "policy payload check: violations within baseline (ratchet held)"
+            check_gate "PolicyPayload" 2
+        elif [ "$pp_rc" -eq 3 ]; then
+            log_warn "policy payload check: environment error, manual review required"
+            check_gate "PolicyPayload" 2
+        else
+            check_gate "PolicyPayload" 1
+        fi
+    else
+        log_warn "policy payload check script not found: ${pp_script}"
+        check_gate "PolicyPayload" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -706,6 +739,7 @@ main() {
     local skip_file_length=false
     local skip_clone=false
     local skip_port_coord=false
+    local skip_policy_payload=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -778,12 +812,16 @@ main() {
                 skip_port_coord=true
                 shift
                 ;;
+            --skip-policy-payload)
+                skip_policy_payload=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -808,6 +846,7 @@ main() {
                 echo "  20. File Length Check (G24, <= 800 lines/file)"
                 echo "  21. Clone/Duplication Check (G26, target <3%, ceiling 5%)"
                 echo "  22. Port Coordinate Uniqueness Check (G5, band 2026-2100)"
+                echo "  23. Policy Payload Check (G18/G19, mechanism-core zero vendor names)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -827,6 +866,7 @@ main() {
                 echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
                 echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
                 echo "  --skip-port-coord     Skip G5 port coordinate uniqueness (band 2026-2100) check"
+                echo "  --skip-policy-payload  Skip G18/G19 policy payload (mechanism-core zero vendor names) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -864,6 +904,7 @@ main() {
         $skip_file_length || gate_file_length
         $skip_clone || gate_clone
         $skip_port_coord || gate_port_coord
+        $skip_policy_payload || gate_policy_payload
     fi
 
     # 输出结果

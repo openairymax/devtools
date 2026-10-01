@@ -1,0 +1,58 @@
+# 0.1.19 G19 策略载荷名表（SSoT）—— 机制核禁入的厂商名 / 产品名
+#
+# 用途：G19 静态断言（policy-payload-check.sh）的唯一数据源。纲领"机制与策略
+#   极致分离"要求机制核零策略载荷：厂商名、产品名一律不得出现在机制核生产码
+#   中，而应由生态层以 ops / .manifest 注入。新增厂商或产品，先登记于此文件
+#   再实现适配——此即"策略数据化"本身（G18）。
+#
+# 判据：机制核生产码（剥离 C/C++ 注释后）出现表内任一名，大小写不敏感、以
+#   非字母数字字符为边界（故 `PROTO_CLAUDE`、`openai_compat` 均命中，而
+#   `myopenai` 不命中），即计一次违例，由 policy-payload-baseline.txt 棘轮
+#   约束：存量水位只减不增，新增即 fail-closed。
+#
+# 豁免（非机制核，不计违例）：tests/ 与 third_party/（非生产码）；
+#   protocols/{integrations,frameworks,standards}/（§4 明示的厂商/标准适配面，
+#   即 L8 迁出对象，本就不是机制核）。
+#
+# 口径说明：仅收录厂商名 / 产品名（策略载荷）；开放标准名（JSON-RPC / MCP /
+#   A2A 等）不在其列——机制核实现开放标准属机制职责，不构成策略载荷。
+
+# ── 海外厂商 / 模型族 ────────────────────────────────────────────
+openai
+anthropic
+claude
+gemini
+deepseek
+llama
+mistral
+grok
+cohere
+perplexity
+xai
+
+# ── 国内厂商 / 模型族 ────────────────────────────────────────────
+qwen
+tongyi
+kimi
+moonshot
+zhipu
+glm
+chatglm
+baidu
+ernie
+wenxin
+alibaba
+dashscope
+doubao
+minimax
+stepfun
+baichuan
+hunyuan
+
+# ── Airymax 生态内产品 / 集成代号 ────────────────────────────────
+jiuwen
+openjiuwen
+claw
+openclaw
+agntcy
+chinaeco
