@@ -531,6 +531,63 @@ gate_version_consistency() {
 }
 
 # ============================================================================
+# Gate 18: 体积硬门禁 + 里程碑阶梯 (G2 ★, 方案 §0.2)
+# agentrt 八模块 *.c+*.h（排除 tests/）+ cmake/ 计数；实测须 ≤ 当前 pin
+# 里程碑上限，超出即停线整改。--advance 在达标时推进 pin。
+# 退出码: 0=通过 1=超出当前上限 2=树/基线缺失(告警)
+# ============================================================================
+gate_loc_budget() {
+    section "Gate 18: LOC Budget Check (G2, milestone ladder)"
+
+    local lb_script="${SCRIPT_DIR}/loc-budget-check.sh"
+    if [ -f "$lb_script" ]; then
+        log_info "Running G2 LOC budget check..."
+        local lb_out lb_rc=0
+        lb_out=$(bash "$lb_script" 2>&1) || lb_rc=$?
+        echo "$lb_out" | tail -20
+        if [ "$lb_rc" -eq 0 ]; then
+            check_gate "LocBudget" 0
+        elif [ "$lb_rc" -eq 2 ]; then
+            log_warn "loc-budget check: environment error, manual review required"
+            check_gate "LocBudget" 2
+        else
+            check_gate "LocBudget" 1
+        fi
+    else
+        log_warn "loc-budget check script not found: ${lb_script}"
+        check_gate "LocBudget" 2
+    fi
+}
+
+# ============================================================================
+# Gate 19: G6 禁桩检查
+# 生产码零未竟标记（TODO/FIXME/XXX/HACK/STUB、#if 0），零容忍无基线放宽。
+# 退出码: 0=通过 1=存在桩标记 2=环境错误(告警)
+# ============================================================================
+gate_stub_scan() {
+    section "Gate 19: Stub Scan Check (G6, zero-tolerance)"
+
+    local sb_script="${SCRIPT_DIR}/stub-scan-check.sh"
+    if [ -f "$sb_script" ]; then
+        log_info "Running G6 stub scan check..."
+        local sb_out sb_rc=0
+        sb_out=$(bash "$sb_script" 2>&1) || sb_rc=$?
+        echo "$sb_out" | tail -20
+        if [ "$sb_rc" -eq 0 ]; then
+            check_gate "StubScan" 0
+        elif [ "$sb_rc" -eq 2 ]; then
+            log_warn "stub scan check: environment error, manual review required"
+            check_gate "StubScan" 2
+        else
+            check_gate "StubScan" 1
+        fi
+    else
+        log_warn "stub scan check script not found: ${sb_script}"
+        check_gate "StubScan" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -546,6 +603,8 @@ main() {
     local skip_adapter_registry=false
     local skip_sample_form=false
     local skip_version_consistency=false
+    local skip_loc_budget=false
+    local skip_stub_scan=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -598,12 +657,20 @@ main() {
                 skip_version_consistency=true
                 shift
                 ;;
+            --skip-loc-budget)
+                skip_loc_budget=true
+                shift
+                ;;
+            --skip-stub-scan)
+                skip_stub_scan=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -623,6 +690,8 @@ main() {
                 echo "  15. Adapter Registry Check (V16.11, llm_d)"
                 echo "  16. Sample Form Check (V16.10, llm_d)"
                 echo "  17. Version Consistency Check (DT-12 SSoT, zero-hardcode)"
+                echo "  18. LOC Budget Check (G2, milestone ladder)"
+                echo "  19. Stub Scan Check (G6, zero-tolerance)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -637,6 +706,8 @@ main() {
                 echo "  --skip-adapter-registry  Skip llm_d adapter registry check"
                 echo "  --skip-sample-form    Skip llm_d sample form check"
                 echo "  --skip-version-consistency  Skip version consistency check (SSoT)"
+                echo "  --skip-loc-budget     Skip G2 LOC budget (milestone ladder) check"
+                echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -669,6 +740,8 @@ main() {
         $skip_adapter_registry || gate_adapter_registry
         $skip_sample_form || gate_sample_form
         $skip_version_consistency || gate_version_consistency
+        $skip_loc_budget || gate_loc_budget
+        $skip_stub_scan || gate_stub_scan
     fi
 
     # 输出结果
