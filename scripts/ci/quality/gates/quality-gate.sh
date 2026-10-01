@@ -753,6 +753,40 @@ gate_layer() {
 }
 
 # ============================================================================
+# Gate 25: G13 负载扇出门禁（方案 §4.4 拆并三裁决 / 台账 §0.5 · §62）
+# 两条不变量：拆后 load ≤ 5（件内部头 src 面扇入）；并后 fan 不增（目标对
+# 项目内库的去重扇出）。判据 = 静态链接图 + 头引用分析；SSoT 输入为
+# agentrt/link-whitelist.txt（与构建期 linkgate 同源）。阈值 FANIN_MAX 取自
+# thresholds.conf，棘轮基线 fanout-baseline.txt 只降不升。
+# 退出码: 0=通过 1=硬违例或超基线(阻断) 2=高于水位(告警) 3=环境错误
+# ============================================================================
+gate_fanout() {
+    section "Gate 25: Fan-out Check (G13, load <= 5 + fan ratchet)"
+
+    local fo_script="${SCRIPT_DIR}/fanout-check.sh"
+    if [ -f "$fo_script" ]; then
+        log_info "Running G13 load/fan-out check..."
+        local fo_out fo_rc=0
+        fo_out=$(bash "$fo_script" 2>&1) || fo_rc=$?
+        echo "$fo_out" | tail -25
+        if [ "$fo_rc" -eq 0 ]; then
+            check_gate "FanOut" 0
+        elif [ "$fo_rc" -eq 2 ]; then
+            log_warn "fan-out check: violations within baseline (ratchet held)"
+            check_gate "FanOut" 2
+        elif [ "$fo_rc" -eq 3 ]; then
+            log_warn "fan-out check: environment error, manual review required"
+            check_gate "FanOut" 2
+        else
+            check_gate "FanOut" 1
+        fi
+    else
+        log_warn "fan-out check script not found: ${fo_script}"
+        check_gate "FanOut" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -775,6 +809,7 @@ main() {
     local skip_port_coord=false
     local skip_policy_payload=false
     local skip_layer=false
+    local skip_fanout=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -855,12 +890,16 @@ main() {
                 skip_layer=true
                 shift
                 ;;
+            --skip-fanout)
+                skip_fanout=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -887,6 +926,7 @@ main() {
                 echo "  22. Port Coordinate Uniqueness Check (G5, band 2026-2100)"
                 echo "  23. Policy Payload Check (G18/G19, mechanism-core zero vendor names)"
                 echo "  24. Layer Boundary Check (G21/G23, one-way + zero cross-process symbol)"
+                echo "  25. Fan-out Check (G13, header load <= 5 + target fan ratchet)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -908,6 +948,7 @@ main() {
                 echo "  --skip-port-coord     Skip G5 port coordinate uniqueness (band 2026-2100) check"
                 echo "  --skip-policy-payload  Skip G18/G19 policy payload (mechanism-core zero vendor names) check"
                 echo "  --skip-layer          Skip G21/G23 layer boundary (one-way + zero cross-process symbol) check"
+                echo "  --skip-fanout         Skip G13 fan-out (header load <= 5 + target fan ratchet) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -947,6 +988,7 @@ main() {
         $skip_port_coord || gate_port_coord
         $skip_policy_payload || gate_policy_payload
         $skip_layer || gate_layer
+        $skip_fanout || gate_fanout
     fi
 
     # 输出结果
