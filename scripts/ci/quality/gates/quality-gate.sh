@@ -588,6 +588,34 @@ gate_stub_scan() {
 }
 
 # ============================================================================
+# Gate 20: G24 文件行数硬门禁（≤ 800 行/文件，基线棘轮）
+# 生产码单文件超限须入基线；基线外新增超限文件即 fail-closed。
+# 退出码: 0=通过 1=存在基线外超限文件 2=环境错误(告警)
+# ============================================================================
+gate_file_length() {
+    section "Gate 20: File Length Check (G24, <= 800 lines/file)"
+
+    local fl_script="${SCRIPT_DIR}/file-length-check.sh"
+    if [ -f "$fl_script" ]; then
+        log_info "Running G24 file-length check..."
+        local fl_out fl_rc=0
+        fl_out=$(bash "$fl_script" 2>&1) || fl_rc=$?
+        echo "$fl_out" | tail -20
+        if [ "$fl_rc" -eq 0 ]; then
+            check_gate "FileLength" 0
+        elif [ "$fl_rc" -eq 2 ]; then
+            log_warn "file-length check: environment error, manual review required"
+            check_gate "FileLength" 2
+        else
+            check_gate "FileLength" 1
+        fi
+    else
+        log_warn "file-length check script not found: ${fl_script}"
+        check_gate "FileLength" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -605,6 +633,7 @@ main() {
     local skip_version_consistency=false
     local skip_loc_budget=false
     local skip_stub_scan=false
+    local skip_file_length=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -665,12 +694,16 @@ main() {
                 skip_stub_scan=true
                 shift
                 ;;
+            --skip-file-length)
+                skip_file_length=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -692,6 +725,7 @@ main() {
                 echo "  17. Version Consistency Check (DT-12 SSoT, zero-hardcode)"
                 echo "  18. LOC Budget Check (G2, milestone ladder)"
                 echo "  19. Stub Scan Check (G6, zero-tolerance)"
+                echo "  20. File Length Check (G24, <= 800 lines/file)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -708,6 +742,7 @@ main() {
                 echo "  --skip-version-consistency  Skip version consistency check (SSoT)"
                 echo "  --skip-loc-budget     Skip G2 LOC budget (milestone ladder) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
+                echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -742,6 +777,7 @@ main() {
         $skip_version_consistency || gate_version_consistency
         $skip_loc_budget || gate_loc_budget
         $skip_stub_scan || gate_stub_scan
+        $skip_file_length || gate_file_length
     fi
 
     # 输出结果
