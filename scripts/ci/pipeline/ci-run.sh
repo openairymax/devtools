@@ -12,7 +12,6 @@ set -euo pipefail
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
-LIB_DIR="${SCRIPT_DIR}/../library"
 CI_DIR="${SCRIPT_DIR}"
 
 ###############################################################################
@@ -53,15 +52,6 @@ CI_BUILD_DIR="${AGENTRT_BUILD_DIR:-${HOME}/.airymaxrt-build/AgentRT-build}"
 # 时间统计
 declare -A PHASE_TIMINGS
 PHASE_START_TIME=""
-
-###############################################################################
-# 加载库函数
-###############################################################################
-load_libraries() {
-    if [[ -f "${LIB_DIR}/common.sh" ]]; then
-        source "${LIB_DIR}/common.sh" 2>/dev/null || true
-    fi
-}
 
 ###############################################################################
 # 计时工具
@@ -307,10 +297,10 @@ quality_checks_fallback() {
         while IFS= read -r -d '' file; do
             [[ $fmt_count -ge 50 ]] && break
             if ! clang-format --dry-run --Werror "$file" &>/dev/null; then
-                ((format_issues++))
+                format_issues=$((format_issues + 1))
                 log_warn "Format issue: $file"
             fi
-            ((fmt_count++)) || true
+            fmt_count=$((fmt_count + 1))
         done < <(find "${PROJECT_ROOT}/agentrt" \( -name "*.c" -o -name "*.h" \) \
             ! -path "*/tests/*" -print0 2>/dev/null)
 
@@ -329,10 +319,10 @@ quality_checks_fallback() {
         while IFS= read -r -d '' file; do
             [[ $py_count -ge 100 ]] && break
             if ! python3 -m py_compile "$file" 2>/dev/null; then
-                ((py_errors++))
+                py_errors=$((py_errors + 1))
                 log_warn "Syntax error: $file"
             fi
-            ((py_count++)) || true
+            py_count=$((py_count + 1))
         done < <(find "${PROJECT_ROOT}" -name "*.py" \
             ! -path "*/__pycache__/*" ! -path "*/.git/*" \
             ! -path "*/node_modules/*" ! -path "*/venv/*" \
@@ -351,7 +341,7 @@ quality_checks_fallback() {
         local sh_errors=0
         while IFS= read -r -d '' file; do
             if ! bash -n "$file" 2>/dev/null; then
-                ((sh_errors++))
+                sh_errors=$((sh_errors + 1))
                 log_warn "Shell syntax error: $file"
             fi
         done < <(find "${PROJECT_ROOT}/scripts" -name "*.sh" -print0 2>/dev/null)

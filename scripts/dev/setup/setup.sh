@@ -1,6 +1,6 @@
 #!/bin/bash
 # AgentRT Setup Script
-# Uses library/ for shared utilities
+# Uses ops/lib/ for shared utilities
 
 set -e
 

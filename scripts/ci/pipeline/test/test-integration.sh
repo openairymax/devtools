@@ -83,7 +83,7 @@ do_up() {
     docker compose -f "${COMPOSE_FILE}" up -d llm_d tool_d market_d sched_d
 
     log_info "Starting extension daemon services..."
-    docker compose -f "${COMPOSE_FILE}" up -d hook_d notify_d
+    docker compose -f "${COMPOSE_FILE}" up -d notify_d
 
     log_info "Starting gateway service..."
     docker compose -f "${COMPOSE_FILE}" up -d gateway_d
@@ -93,25 +93,24 @@ do_up() {
     # 健康检查
     local failures=0
 
-    verify_service "redis"      "localhost" "${TEST_REDIS_PORT:-16379}" 10 2 || ((failures++))
-    verify_service "postgres"   "localhost" "${TEST_POSTGRES_PORT:-15432}" 10 2 || ((failures++))
-    verify_service "corekern"   "localhost" "${TEST_COREKERN_PORT:-19001}" 20 2 || ((failures++))
-    verify_service "coreloopthree" "localhost" "${TEST_CL3_PORT:-19002}" 20 2 || ((failures++))
-    verify_service "taskflow"   "localhost" "${TEST_TASKFLOW_PORT:-19003}" 15 2 || ((failures++))
-    verify_service "memory"     "localhost" "${TEST_MEMORY_PORT:-19004}" 15 2 || ((failures++))
-    verify_service "channel_d"  "localhost" "${TEST_CHANNEL_PORT:-19101}" 15 2 || ((failures++))
-    verify_service "monit_d"    "localhost" "${TEST_MONIT_PORT:-19102}" 15 2 || ((failures++))
-    verify_service "llm_d"      "localhost" "${TEST_LLM_PORT:-19201}" 20 2 || ((failures++))
-    verify_service "tool_d"     "localhost" "${TEST_TOOL_PORT:-19202}" 15 2 || ((failures++))
-    verify_service "market_d"   "localhost" "${TEST_MARKET_PORT:-19203}" 15 2 || ((failures++))
-    verify_service "sched_d"    "localhost" "${TEST_SCHED_PORT:-19204}" 15 2 || ((failures++))
-    verify_service "hook_d"     "localhost" "${TEST_HOOK_PORT:-19301}" 15 2 || ((failures++))
-    verify_service "notify_d"   "localhost" "${TEST_NOTIFY_PORT:-19304}" 15 2 || ((failures++))
-    verify_service "gateway_d"  "localhost" "${TEST_GATEWAY_HTTP_PORT:-8080}" 30 2 || ((failures++))
+    verify_service "redis"      "localhost" "${TEST_REDIS_PORT:-16379}" 10 2 || failures=$((failures + 1))
+    verify_service "postgres"   "localhost" "${TEST_POSTGRES_PORT:-15432}" 10 2 || failures=$((failures + 1))
+    verify_service "corekern"   "localhost" "${TEST_COREKERN_PORT:-19001}" 20 2 || failures=$((failures + 1))
+    verify_service "coreloopthree" "localhost" "${TEST_CL3_PORT:-19002}" 20 2 || failures=$((failures + 1))
+    verify_service "taskflow"   "localhost" "${TEST_TASKFLOW_PORT:-19003}" 15 2 || failures=$((failures + 1))
+    verify_service "memory"     "localhost" "${TEST_MEMORY_PORT:-19004}" 15 2 || failures=$((failures + 1))
+    verify_service "channel_d"  "localhost" "${TEST_CHANNEL_PORT:-19101}" 15 2 || failures=$((failures + 1))
+    verify_service "monit_d"    "localhost" "${TEST_MONIT_PORT:-19102}" 15 2 || failures=$((failures + 1))
+    verify_service "llm_d"      "localhost" "${TEST_LLM_PORT:-19201}" 20 2 || failures=$((failures + 1))
+    verify_service "tool_d"     "localhost" "${TEST_TOOL_PORT:-19202}" 15 2 || failures=$((failures + 1))
+    verify_service "market_d"   "localhost" "${TEST_MARKET_PORT:-19203}" 15 2 || failures=$((failures + 1))
+    verify_service "sched_d"    "localhost" "${TEST_SCHED_PORT:-19204}" 15 2 || failures=$((failures + 1))
+    verify_service "notify_d"   "localhost" "${TEST_NOTIFY_PORT:-19304}" 15 2 || failures=$((failures + 1))
+    verify_service "gateway_d"  "localhost" "${TEST_GATEWAY_HTTP_PORT:-8080}" 30 2 || failures=$((failures + 1))
 
     echo ""
     if [[ "${failures}" -eq 0 ]]; then
-        log_ok "All 15 services are healthy!"
+        log_ok "All 14 services are healthy!"
         echo ""
         echo "=== Quick Access ==="
         echo "  Gateway HTTP:    http://localhost:${TEST_GATEWAY_HTTP_PORT:-8080}"
@@ -162,7 +161,6 @@ do_verify() {
         ["tool_d"]="${TEST_TOOL_PORT:-19202}"
         ["market_d"]="${TEST_MARKET_PORT:-19203}"
         ["sched_d"]="${TEST_SCHED_PORT:-19204}"
-        ["hook_d"]="${TEST_HOOK_PORT:-19301}"
         ["notify_d"]="${TEST_NOTIFY_PORT:-19304}"
         ["gateway_d"]="${TEST_GATEWAY_HTTP_PORT:-8080}"
     )

@@ -47,10 +47,6 @@ AgentRT Helm Chart — All Daemon Services (18 services)
 {{- include "agentrt.render.service" (dict "root" $ "name" "sched-d" "service" .Values.sched_d.service) }}
 {{- end }}
 
-{{- if .Values.hook_d.enabled }}
-{{- include "agentrt.render.service" (dict "root" $ "name" "hook-d" "service" .Values.hook_d.service) }}
-{{- end }}
-
 {{- if .Values.notify_d.enabled }}
 {{- include "agentrt.render.service" (dict "root" $ "name" "notify-d" "service" .Values.notify_d.service) }}
 {{- end }}

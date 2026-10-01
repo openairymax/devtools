@@ -10,36 +10,32 @@
 set -euo pipefail
 
 ###############################################################################
+# 幂等保护：重复 source 时直接返回，避免模块内 declare -r 常量报只读错误
+###############################################################################
+if [[ -n "${_AGENTRT_LIB_LOADED:-}" ]]; then
+    return 0
+fi
+_AGENTRT_LIB_LOADED=1
+
+###############################################################################
 # 路径常量
 ###############################################################################
-AGENTRT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTRT_SCRIPTS_DIR="$(dirname "$AGENTRT_SCRIPT_DIR")"
-AGENTRT_PROJECT_ROOT="$(dirname "$AGENTRT_SCRIPTS_DIR")"
-AGENTRT_LIB_DIR="$AGENTRT_SCRIPTS_DIR/library"
-AGENTRT_CONFIG_DIR="$AGENTRT_PROJECT_ROOT/manager"
-AGENTRT_heapstore_DIR="$AGENTRT_PROJECT_ROOT/heapstore"
+AGENTRT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ###############################################################################
 # 加载依赖模块
+# 必须在被 source 文件的顶层加载：模块内的 declare -r 常量只在当前作用域
+# 生效，若在函数内 source，函数返回后常量随即消失。
 ###############################################################################
-airy_load_libs() {
-    local libs=("log.sh" "error.sh" "platform.sh")
-    local lib
-
-    for lib in "${libs[@]}"; do
-        local lib_path="$AGENTRT_LIB_DIR/$lib"
-        if [[ -f "$lib_path" ]]; then
-            # 使用 shellcheck 忽略 SC1090
-            # shellcheck source=/dev/null
-            source "$lib_path"
-        else
-            echo -e "\033[0;31m[ERROR]\033[0m Missing required library: $lib_path"
-            return 1
-        fi
-    done
-}
-
-airy_load_libs
+for _agentrt_dep in log.sh error.sh platform.sh; do
+    if [[ ! -f "$AGENTRT_LIB_DIR/$_agentrt_dep" ]]; then
+        echo -e "\033[0;31m[ERROR]\033[0m Missing required library: $AGENTRT_LIB_DIR/$_agentrt_dep" >&2
+        return 1
+    fi
+    # shellcheck source=/dev/null
+    source "$AGENTRT_LIB_DIR/$_agentrt_dep"
+done
+unset _agentrt_dep
 
 ###############################################################################
 # 字符串工具
@@ -68,7 +64,11 @@ airy_contains() {
 
 airy_random_string() {
     local length="${1:-16}"
-    LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | head -c "$length"
+    local out=""
+    while (( ${#out} < length )); do
+        out+="$(head -c "$(( length * 2 + 32 ))" /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9')"
+    done
+    printf '%s' "${out:0:length}"
 }
 
 ###############################################################################
@@ -168,7 +168,7 @@ airy_wait_for_process() {
             return 124
         fi
         sleep 1
-        ((elapsed++))
+        elapsed=$((elapsed + 1))
     done
 
     return 0
@@ -215,7 +215,7 @@ airy_wait_for_url() {
             return 0
         fi
         sleep 2
-        ((elapsed+=2))
+        elapsed=$((elapsed + 2))
     done
 
     return 1
@@ -297,7 +297,7 @@ airy_config_get() {
     fi
 
     local value
-    value=$(grep "^${key}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+    value=$(grep "^${key}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'" || true)
 
     if [[ -z "$value" ]]; then
         echo "$default"
@@ -395,7 +395,6 @@ airy_download() {
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f airy_load_libs
 export -f airy_to_lower airy_to_upper airy_trim airy_contains airy_random_string
 export -f airy_mkdir airy_safe_rm airy_backup_file airy_file_size airy_is_executable
 export -f airy_is_process_running airy_wait_for_process airy_kill_process

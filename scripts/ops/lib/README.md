@@ -23,7 +23,7 @@ lib/
 
 ### common.sh — 通用工具函数入口
 
-脚本采用 `set -euo pipefail` 严格模式；`source` 时通过 `airy_load_libs` 自动加载 `log.sh`、`error.sh`、`platform.sh`（缺失任一模块即报错返回）。按类别提供的工具：
+脚本采用 `set -euo pipefail` 严格模式；`source` 时在文件顶层按序加载 `log.sh`、`error.sh`、`platform.sh`（缺失任一模块即报错返回）。各模块本身不设置 shell 选项，严格模式统一由 `common.sh` 负责。按类别提供的工具：
 
 - 字符串：`airy_to_lower` / `airy_to_upper` / `airy_trim` / `airy_contains` / `airy_random_string`
 - 文件：`airy_mkdir` / `airy_safe_rm` / `airy_backup_file` / `airy_file_size` / `airy_is_executable`

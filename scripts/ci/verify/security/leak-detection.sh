@@ -205,7 +205,7 @@ DAEMON_NAMES=(
     "corekern" "coreloopthree" "taskflow" "memory"
     "channel_d" "monit_d"
     "llm_d" "tool_d" "market_d" "sched_d"
-    "hook_d" "notify_d"
+    "notify_d"
     "gateway_d"
 )
 

@@ -49,9 +49,6 @@ data:
         sched:
           host: {{ include "agentrt.fullname" . }}-sched-d
           port: 9204
-        hook:
-          host: {{ include "agentrt.fullname" . }}-hook-d
-          port: 9301
         notify:
           host: {{ include "agentrt.fullname" . }}-notify-d
           port: 9304

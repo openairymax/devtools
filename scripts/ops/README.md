@@ -109,7 +109,7 @@ Docker 容器化部署方案已迁移至 `deploy/docker/`，采用单 Dockerfile
 
 所有运维 Shell 脚本共享的基础库：
 
-- **common.sh**：通用工具函数入口，自动加载 `log.sh`、`error.sh`、`platform.sh` 依赖。提供 `source_common_lib` 函数供其他脚本引用。
+- **common.sh**：通用工具函数入口，`source` 时自动加载 `log.sh`、`error.sh`、`platform.sh` 依赖，并统一启用 `set -euo pipefail` 严格模式。
 - **error.sh**：统一错误码体系，定义 1000-2999+ 范围的错误码常量和错误处理函数。错误码按模块分段分配，确保全局唯一。
 - **log.sh**：多级别日志输出，支持 DEBUG、INFO、WARN、ERROR、FATAL 五个级别。支持彩色终端输出和日志文件持久化。
 - **platform.sh**：平台检测，自动识别操作系统类型（Linux/macOS/Windows/WSL）和 CPU 架构（x86_64/ARM64），为其他脚本提供平台相关的条件判断。
