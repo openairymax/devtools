@@ -1,20 +1,22 @@
 #!/bin/bash
-# P0.19.6: 圈复杂度 CI 阈值检查脚本
-# 使用 lizard v1.23.0 扫描源码圈复杂度
-# 阈值: CCN ≤ 15 通过; 16~25 警告; > 25 拒绝; > 50 阻断性拒绝
-# 增量检测: PR 中新增/修改函数 CCN > 15 即拒绝
+# 圈复杂度 CI 阈值检查脚本（方案 §6.3 G25）
+# 使用 lizard 扫描源码圈复杂度（版本无关，任何提供 --csv 的 lizard 均可）
+# 阈值一律取自 thresholds.conf（唯一权威源），本文件不内联字面量；
+# 增量检测: PR 中新增/修改函数 CCN 超阈值即拒绝
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# 脚本位于 tools/scripts/ci/pipeline/validate/ — 需向上 5 级到达项目根目录
+# 脚本位于 tools/scripts/ci/quality/gates/ — 需向上 5 级到达伞仓根
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 
 # ============================================================================
-# 配置
+# 配置（SSoT：thresholds.conf）
 # ============================================================================
-CCN_PASS=15        # CCN ≤ 15: 通过
-CCN_WARN=25        # CCN 16~25: 警告
-CCN_FAIL=50        # CCN > 50: 阻断性拒绝
+# shellcheck source=../thresholds.conf
+source "${SCRIPT_DIR}/../thresholds.conf"
+CCN_PASS="${CCN_FN_PASS}"   # CCN ≤ 此值: 通过
+CCN_WARN="${CCN_FN_WARN}"   # 超过 PASS 且 ≤ 此值: 警告
+CCN_FAIL="${CCN_FN_FAIL}"   # 超过此值: 阻断性拒绝
 
 # 颜色输出
 COLOR_RED='\033[0;31m'
@@ -47,7 +49,7 @@ SCAN_DIRS=(
     "${PROJECT_ROOT}/agent-workload/agentrt/gateway"
     "${PROJECT_ROOT}/agent-workload/agentrt/heapstore"
     "${PROJECT_ROOT}/agent-workload/agentrt/protocols"
-    "${PROJECT_ROOT}/agent-workload/agentrt/sdk"
+    "${PROJECT_ROOT}/agent-workload/agentrt/tools"
     "${PROJECT_ROOT}/agent-workload/agentrt/tests"
 )
 
