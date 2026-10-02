@@ -1374,7 +1374,6 @@ daemon_l1_transport_enabled
 daemon_l2_bridge_start
 daemon_l2_bridge_start_ex
 daemon_l2_bridge_stop
-daemon_l2_build_request
 daemon_l2_channel_for_socket
 daemon_l2_envelope_decode
 daemon_l2_envelope_encode
@@ -1412,7 +1411,6 @@ detect_from_content_type
 detect_protocol_internal
 dispatch_notifications
 dispatch_result_cleanup
-dns_is_domain_allowed
 dpolicy_engine_add_rule
 dpolicy_engine_commit_version
 dpolicy_engine_create
@@ -1882,7 +1880,6 @@ http2_set_nonblocking
 http2_stream_append_body
 http2_stream_set_header_str
 http2_submit_response_impl
-http_add_security_headers
 http_gateway_get_name
 http_gateway_get_stats
 http_gateway_is_running
@@ -1891,8 +1888,6 @@ http_gateway_queue_unauthorized
 http_gateway_register_endpoint
 http_gateway_route_auth_required
 http_gateway_set_handler
-http_security_cleanup
-http_validate_request
 initialize_atomic_vars
 initialize_loop_resources
 init_performance_stats
@@ -2323,18 +2318,6 @@ network_connection_create
 network_connection_destroy
 network_create_default_config
 network_dns_result_free
-network_filter_add_rule
-network_filter_check_access
-network_filter_check_url
-network_filter_cleanup
-network_filter_close_connection
-network_filter_get_connections
-network_filter_get_rule
-network_filter_get_stats
-network_filter_list_rules
-network_filter_remove_rule
-network_filter_reset_stats
-network_filter_update_rule
 network_get_error_message
 network_http_response_free
 network_pool_available
@@ -2342,11 +2325,6 @@ network_pool_health_check
 network_receive_exact
 network_set_event_callback
 network_set_rw_timeout
-network_utils_ip_in_cidr
-network_utils_parse_url
-network_utils_protocol_string
-network_utils_validate_ip
-network_utils_validate_port
 notify_d_active_client_count
 notify_d_broadcast_event
 notify_d_dispatch_jsonrpc
@@ -3121,8 +3099,6 @@ thread_pool_is_running
 thread_pool_pending_count
 thread_registry_worker
 thread_strategy_worker
-tls_get_cipher_suites
-tls_verify_cert_chain
 tool_approval_check_for_agent
 tool_approval_destroy
 tool_approval_get_agent_id
