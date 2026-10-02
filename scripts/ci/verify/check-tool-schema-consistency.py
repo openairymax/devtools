@@ -6,7 +6,8 @@
 对比两处工具 schema 定义：
 - Python 侧：ecosystem/agents/airymax_agents/base.py 的 BUILTIN_TOOL_SCHEMAS
   （Python SDK 注册给 LLM 的工具 schema）
-- C 侧：agentrt/daemons/tool_d/src/service_builtin.c 的 .id（运行时工具注册表）
+- C 侧：agentrt/daemons/tool_d/src/builtin/builtin.c 的 tool_builtin_run
+  分发表（运行时工具注册表，strcmp(tool_id, "...") 链）
 
 约束（SSoT）：Python 侧是 C 侧的能力子集——Python 不得声明 C 侧不存在的
 工具（防 LLM 调用到运行时无法执行的工具）；C 侧多出未在 Python 暴露的
@@ -37,10 +38,10 @@ def load_python_tools(base_py):
     return tools
 
 
-def load_c_tools(service_builtin_c):
-    """提取 service_builtin.c 中工具注册的 .id 集合。"""
-    src = open(service_builtin_c, encoding="utf-8").read()
-    return set(re.findall(r'\.id\s*=\s*"([^"]+)"', src))
+def load_c_tools(builtin_c):
+    """提取 builtin.c tool_builtin_run 分发表中的工具 id 集合。"""
+    src = open(builtin_c, encoding="utf-8").read()
+    return set(re.findall(r'strcmp\(\s*tool_id\s*,\s*"([^"]+)"\s*\)\s*==\s*0', src))
 
 
 def main():
@@ -49,7 +50,8 @@ def main():
     root = os.path.normpath(root)
 
     base_py = os.path.join(root, "agent-workload/ecosystem/agents/airymax_agents/base.py")
-    builtin_c = os.path.join(root, "agent-workload/agentrt/daemons/tool_d/src/service_builtin.c")
+    builtin_c = os.path.join(
+        root, "agent-workload/agentrt/daemons/tool_d/src/builtin/builtin.c")
 
     if not os.path.exists(base_py) or not os.path.exists(builtin_c):
         print(f"FAIL: 未找到对比源（{base_py} / {builtin_c}）", file=sys.stderr)
@@ -62,7 +64,7 @@ def main():
     only_c = sorted(c_tools - py_tools)
 
     print(f"[INFO] Python BUILTIN_TOOL_SCHEMAS: {len(py_tools)} 个")
-    print(f"[INFO] C service_builtin .id:       {len(c_tools)} 个")
+    print(f"[INFO] C tool_builtin_run ids:      {len(c_tools)} 个")
     if only_c:
         print(f"[INFO] 仅 C 侧（能力隔离，允许）: {only_c}")
     if only_py:
