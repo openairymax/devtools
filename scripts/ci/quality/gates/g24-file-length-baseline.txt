@@ -1,6 +1,5 @@
 atoms/coreloopthree/src/dispatch/roadmap/rs_semantic_cache.c
 commons/platform/src/platform_compat.c
 commons/utils/error/handler.c
-daemons/common/src/daemon/daemon_rpc_client.c
 gateway/src/gateway/http_gateway.c
 tools/airy_cli/src/cmd/airy_cli_cmd_system.c
