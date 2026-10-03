@@ -2798,7 +2798,6 @@ sched_dag_detect_cycle
 sched_dag_error_is_fatal
 sched_dag_error_is_transient
 sched_dag_finalize_terminal
-sched_dag_free_on_error
 sched_dag_min_retry_at
 sched_dag_parse_node_deps
 sched_dag_parse_node_fields
