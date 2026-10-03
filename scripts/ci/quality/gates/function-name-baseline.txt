@@ -2524,10 +2524,6 @@ platform_path_dirname
 platform_path_is_directory
 platform_path_is_file
 platform_path_normalize
-platform_recursive_mutex_destroy
-platform_recursive_mutex_init
-platform_recursive_mutex_lock
-platform_recursive_mutex_unlock
 platform_resolve_path
 platform_rwlock_destroy
 platform_rwlock_rdlock
