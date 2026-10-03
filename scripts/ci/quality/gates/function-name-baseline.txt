@@ -1180,7 +1180,6 @@ cupolas_http_is_url_safe
 cupolas_http_validate_request
 cupolas_internal_config_cleanup
 cupolas_internal_config_init_defaults
-cupolas_match_host_pattern
 cupolas_match_url_pattern
 cupolas_mem_alloc_aligned
 cupolas_memory_alloc_protected
