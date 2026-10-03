@@ -60,7 +60,6 @@ a2a_v03_validate_session
 a2a_v03_verify_signature
 adaptive_threshold_adjust
 add_alloc_info_unlocked
-agent_generate_agent_id
 agent_info_calculate_weight
 agent_info_update_stats
 agent_invoke_timeout_s
@@ -2196,7 +2195,6 @@ mem_compress_gate_pass
 mem_compress_plan_free
 mem_curl_global_init_once
 mem_emb_client_destroy
-mem_generate_record_id
 mem_jsonl_path_resolve
 mem_ledger_history_free
 mem_ledger_set_token_model
