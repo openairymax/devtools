@@ -7,10 +7,8 @@ load market_d/include/market_service.h	10
 load monit_d/include/monitor_service.h	9
 load sched_d/src/sched_service_internal.h	9
 load tool_d/src/builtin/tool_builtin_internal.h	9
-load common/include/daemon_errors.h	7
 load sched_d/include/scheduler_service.h	7
 load tool_d/src/core/executor.h	7
-load agent_d/src/service.h	6
 load channel_d/include/channel_service.h	6
 load common/include/svc_auth.h	6
 load common/src/auth/svc_auth_internal.h	6
