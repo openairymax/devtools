@@ -45,8 +45,9 @@ CI_SKIP_DEPLOY="${CI_SKIP_DEPLOY:-false}"
 CI_BUILD_TYPE="${CI_BUILD_TYPE:-Release}"
 CI_MODULE="${CI_MODULE:-all}"
 CI_PARALLEL="${CI_PARALLEL:-auto}"
-CI_ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${PROJECT_ROOT}/ci-artifacts}"
-CI_LOG_DIR="${CI_LOG_DIR:-${PROJECT_ROOT}/ci-logs}"
+# 铁律 4.7：CI 产物与日志落源码区外（对齐 release.sh 先例）
+CI_ARTIFACT_DIR="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}"
+CI_LOG_DIR="${CI_LOG_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-logs}"
 CI_BUILD_DIR="${AGENTRT_BUILD_DIR:-${HOME}/.airymaxrt-build/AgentRT-build}"
 
 # 时间统计

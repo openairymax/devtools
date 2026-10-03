@@ -8,8 +8,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 伞仓 airymaxhub 根：verify/security 上跳 5 级
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 AGENTRT_ROOT="$PROJECT_ROOT/agent-workload/agentrt"
-BUILD_DIR="${AGENTRT_ROOT}/build/leak-detection"
-ARTIFACTS_DIR="${PROJECT_ROOT}/ci-artifacts/leak-detection"
+# 铁律 4.7：浸泡构建与制品落源码区外（对齐 release.sh 先例），环境变量可覆盖
+BUILD_DIR="${GATE_BUILD_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/leak-detection}"
+ARTIFACTS_DIR="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}/leak-detection"
 SUPPRESSIONS_DIR="${PROJECT_ROOT}/agent-workload/ecosystem/manager/sanitizer"
 
 # ============================================================================

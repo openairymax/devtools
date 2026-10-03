@@ -225,7 +225,8 @@ done
 ###############################################################################
 # 生成合约版本快照（供后续 CI 使用）
 ###############################################################################
-SNAPSHOT_FILE="${PROJECT_ROOT}/ci-artifacts/contract-versions.txt"
+# 铁律 4.7：快照落源码区外（对齐 release.sh 先例），CI_ARTIFACT_DIR 可覆盖
+SNAPSHOT_FILE="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}/contract-versions.txt"
 mkdir -p "$(dirname "${SNAPSHOT_FILE}")"
 
 echo "# AgentRT Contract Versions Snapshot" > "${SNAPSHOT_FILE}"
