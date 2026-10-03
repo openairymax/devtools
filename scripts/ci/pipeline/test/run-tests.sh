@@ -11,6 +11,9 @@ set -euo pipefail
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
+# 铁律 4.7：CI 产物与日志落源码区外（对齐 release.sh 先例），环境变量可覆盖
+CI_ARTIFACTS_BASE="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}"
+CI_LOGS_BASE="${CI_LOG_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-logs}"
 
 ###############################################################################
 # 颜色和日志
@@ -156,7 +159,7 @@ run_ctest() {
     fi
 
     case "$TEST_OUTPUT_FORMAT" in
-        json)  ctest_args+=("--no-compress-output" "-T" "Test" "-O" "${PROJECT_ROOT}/ci-logs/ctest.json") ;;
+        json)  ctest_args+=("--no-compress-output" "-T" "Test" "-O" "${CI_LOGS_BASE}/ctest.json") ;;
         junit) ctest_args+=("--no-compress-output" "-T" "Test" "-O" "JUnitTestResults.xml") ;;
         xml)   ctest_args+=("--no-compress-output" "-T" "Test" "-O" "TestResults.xml") ;;
         *)     ctest_args+=("-V") ;;
@@ -244,8 +247,8 @@ run_pytest() {
         pytest_args+=(
             "--cov=."
             "--cov-report=term-missing"
-            "--cov-report=html:${PROJECT_ROOT}/ci-artifacts/coverage-html"
-            "--cov-report=xml:${PROJECT_ROOT}/ci-artifacts/coverage.xml"
+            "--cov-report=html:${CI_ARTIFACTS_BASE}/coverage-html"
+            "--cov-report=xml:${CI_ARTIFACTS_BASE}/coverage.xml"
         )
     fi
 
@@ -256,8 +259,8 @@ run_pytest() {
 
     # 输出格式
     case "$TEST_OUTPUT_FORMAT" in
-        json) pytest_args+=("--json-report" "--json-report-file=${PROJECT_ROOT}/ci-artifacts/pytest-results.json") ;;
-        junit) pytest_args+=("--junitxml=${PROJECT_ROOT}/ci-artifacts/pytest-results.xml") ;;
+        json) pytest_args+=("--json-report" "--json-report-file=${CI_ARTIFACTS_BASE}/pytest-results.json") ;;
+        junit) pytest_args+=("--junitxml=${CI_ARTIFACTS_BASE}/pytest-results.xml") ;;
     esac
 
     # 执行测试
@@ -344,7 +347,7 @@ main() {
     log_info "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "Module: ${TEST_MODULE}, Timeout: ${TEST_TIMEOUT}s"
 
-    mkdir -p "${PROJECT_ROOT}/ci-artifacts" "${PROJECT_ROOT}/ci-logs"
+    mkdir -p "${CI_ARTIFACTS_BASE}" "${CI_LOGS_BASE}"
 
     run_ctest
     run_pytest

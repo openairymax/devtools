@@ -19,7 +19,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
 COMPOSE_FILE="${PROJECT_ROOT}/deploy/docker/docker-compose.test.yml"
 INTEG_SCRIPT="${SCRIPT_DIR}/test-integration.sh"
-ARTIFACT_DIR="${PROJECT_ROOT}/ci-artifacts/tests"
+# 铁律 4.7：测试制品落源码区外（对齐 release.sh 先例），CI_ARTIFACT_DIR 可覆盖
+ARTIFACT_DIR="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}/tests"
 
 # 颜色
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'

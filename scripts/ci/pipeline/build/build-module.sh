@@ -11,6 +11,8 @@ set -euo pipefail
 ###############################################################################
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
+# 铁律 4.7：构建日志落源码区外（对齐 release.sh 先例），CI_LOG_DIR 可覆盖
+CI_LOGS_BASE="${CI_LOG_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-logs}"
 
 ###############################################################################
 # 颜色和日志
@@ -229,7 +231,7 @@ build_module() {
             "${CMAKE_EXTRA_ARGS[@]}"
         )
 
-        local cmake_log="${PROJECT_ROOT}/ci-logs/${module}-cmake.log"
+        local cmake_log="${CI_LOGS_BASE}/${module}-cmake.log"
         mkdir -p "$(dirname "$cmake_log")"
 
         log_info "Running CMake configuration..."
@@ -244,7 +246,7 @@ build_module() {
         fi
     fi
 
-    local build_log="${PROJECT_ROOT}/ci-logs/${module}-build.log"
+    local build_log="${CI_LOGS_BASE}/${module}-build.log"
     local jobs=$(get_parallel_jobs)
 
     log_info "Building with $jobs parallel jobs..."

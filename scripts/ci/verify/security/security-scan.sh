@@ -8,7 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 伞仓 airymaxhub 根：verify/security 上跳 5 级（问题 5：曾按扁平布局多跳一级）
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 AGENTRT_ROOT="$PROJECT_ROOT/agent-workload/agentrt"
-ARTIFACTS_DIR="${PROJECT_ROOT}/ci-artifacts/security-scan"
+# 铁律 4.7：扫描制品落源码区外（对齐 release.sh 先例），CI_ARTIFACT_DIR 可覆盖
+ARTIFACTS_DIR="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}/security-scan"
 
 # ============================================================================
 # 颜色输出

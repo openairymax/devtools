@@ -19,7 +19,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
-ARTIFACT_DIR="${PROJECT_ROOT}/ci-artifacts/cross-repo"
+# 铁律 4.7：核验制品落源码区外（对齐 release.sh 先例），CI_ARTIFACT_DIR 可覆盖
+ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${WORKSPACE_ROOT}/works-engineering/airymaxrt-build/ci-artifacts}/cross-repo"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; MAGENTA='\033[0;35m'; NC='\033[0m'

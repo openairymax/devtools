@@ -37,7 +37,8 @@ log_error() { echo -e "${RED}[DEPLOY-ERR]${NC} $*" >&2; }
 ###############################################################################
 # 配置
 ###############################################################################
-OUTPUT_DIR="${ARTIFACT_OUTPUT_DIR:-${PROJECT_ROOT}/ci-artifacts}"
+# 铁律 4.7：部署制品落源码区外（对齐 release.sh 先例），环境变量可覆盖
+OUTPUT_DIR="${ARTIFACT_OUTPUT_DIR:-${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}}"
 VERSION="${VERSION_OVERRIDE:-}"
 BUILD_NUMBER="${GITHUB_RUN_NUMBER:-$(date +%Y%m%d%H%M)}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io/spharx}"
