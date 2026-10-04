@@ -964,7 +964,6 @@ claude_adapter_destroy
 claude_adapter_is_initialized
 claude_adapter_version
 claude_config_default
-claude_estimate_tokens
 claude_generate_response
 claude_get_protocol_adapter
 claude_get_usage_statistics
