@@ -871,12 +871,6 @@ builtin_index_compact
 builtin_index_destroy
 builtin_index_total_docs
 builtin_index_visit_cb
-builtin_retrieval_bm25_score
-builtin_retrieval_cosine_similarity
-builtin_retrieval_create
-builtin_retrieval_destroy
-builtin_retrieval_tokenize
-builtin_retrieval_update_stats
 builtin_scan_noise_dir
 builtin_storage_count
 builtin_storage_create
@@ -929,7 +923,6 @@ checkpoint_vertices_release
 check_subsystem_health
 china_eco_add_llm_provider
 china_eco_add_storage_bridge
-china_eco_curl_write_cb
 china_eco_get_protocol_adapter
 china_eco_llm_chat_http
 china_eco_proto_capabilities
@@ -2265,7 +2258,6 @@ mig_get_version_file_path
 migrate_v1_0_to_v1_1_agent_fields
 migrate_v1_1_to_v2_0_session_metadata
 mig_restore_data_file
-ml_planner_destroy_single_node
 ml_planner_fill_grad_metadata
 ml_planner_rule_based_plan
 ml_planner_try_load_model
@@ -2699,7 +2691,6 @@ register_router_endpoints
 register_service_internal
 registry_lock_is_held
 remove_alloc_info_unlocked
-remove_edge_from_all_indexes
 remove_vertex_index_entry
 request_context_create
 request_context_destroy
