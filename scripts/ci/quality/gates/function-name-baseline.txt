@@ -251,7 +251,6 @@ airy_event_loop_get_fd_count
 airy_event_loop_mod_fd
 airy_event_loop_remove_fd
 airy_event_loop_stop_async
-airy_event_loop_timers
 airy_event_loop_wakeup
 airy_execution_delegate_create
 airy_execution_delegate_depth
