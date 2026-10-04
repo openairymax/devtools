@@ -14,10 +14,15 @@
 #      ≥ 2 次（跨文件；或同文件且窗口首行相距 ≥ W，以排除同一区段的自身重叠），
 #      即判为克隆组；指纹用 SHA-1 而非内建 hash()，保证跨进程/跨平台可复现；
 #   4. 重复行数：克隆组中除首个出现外的副本行计入重复行（冗余副本口径，取值
-#      保守且单调）；overall = 重复行数 / 归一化总行数。
+#      保守且单调）；overall = 重复行数 / 归一化总行数；
+#   5. 架构镜像豁免：--exemptions 指定清单（每行一对 agentrt 相对路径与理由
+#      标签，'|' 分隔）；克隆组内全部文件都属于清单中某一对时整组豁免——
+#      仅用于分层决议强制的镜像（如 corekern freestanding 不得依赖 commons），
+#      组内若涉及第三个文件则绝不豁免，杜绝清单被用作普遍放水口。
 #
 # 用法: clone_detect.py [--root DIR] [--modules M ...] [--window N]
-#                       [--target X] [--ceiling Y] [--top N] [--json-only]
+#                       [--target X] [--ceiling Y] [--top N] [--exemptions F]
+#                       [--json-only]
 # 退出码: 0 = PASS（≤ target）；2 = WARN（target ~ ceiling）；1 = FAIL（> ceiling）；
 #         3 = 环境错误（根目录不存在）
 
@@ -121,7 +126,39 @@ def collect_files(root, modules):
     return found
 
 
-def scan(root, modules, window, top):
+def load_exemptions(path):
+    """加载架构镜像豁免清单，返回 [frozenset({a, b}), ...]。
+
+    每行格式 `<relpath A> | <relpath B> | <reason>`；空行与 '#' 注释行忽略。
+    路径归一为正斜杠分隔的相对形式，与克隆组文件集合直接比对；格式残缺
+    的行以环境错误退出（fail-closed），绝不静默放过。
+    """
+    pairs = []
+    with open(path, 'r', encoding='utf-8') as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) != 3 or not parts[0] or not parts[1] or not parts[2]:
+                print("[ERR] bad exemption line: %s" % line, file=sys.stderr)
+                sys.exit(3)
+            pair = set()
+            for p in (parts[0], parts[1]):
+                pair.add(os.path.normpath(p).replace(os.sep, '/'))
+            pairs.append(frozenset(pair))
+    return pairs
+
+
+def group_exempt(places, paths, root, exemptions):
+    """克隆组内全部文件都属于清单中某一对时豁免；涉及第三文件即不豁免。"""
+    files = set()
+    for fidx, _ in places:
+        files.add(os.path.relpath(paths[fidx], root).replace(os.sep, '/'))
+    return any(files <= pair for pair in exemptions)
+
+
+def scan(root, modules, window, top, exemptions):
     """扫描并返回 (每模块统计, 路径表, 原始行号表, 克隆组表)。
 
     统计项为 [总行, 重复行]；克隆组表元素为 [(文件下标, 归一化行下标), ...]。
@@ -162,6 +199,8 @@ def scan(root, modules, window, top):
             prev = p
         if len(filtered) < 2:
             continue
+        if exemptions and group_exempt(filtered, paths, root, exemptions):
+            continue
         for fidx, start in filtered[1:]:
             dup[fidx].update(range(start, start + window))
         if top > 0:
@@ -179,12 +218,14 @@ def scan(root, modules, window, top):
     return stats, paths, origs_all, groups
 
 
-def human_report(stats, modules, window, target, ceiling, groups, paths, origs):
+def human_report(stats, modules, window, target, ceiling, groups, paths, origs,
+                 n_exempt):
     """打印人读报告，返回 (总行, 重复行, 重复率)。"""
     total_lines = 0
     total_dup = 0
-    print("[INFO] G26 clone scan: window=%d lines, target<%.1f%%, ceiling<=%.1f%%"
-          % (window, target, ceiling))
+    print("[INFO] G26 clone scan: window=%d lines, target<%.1f%%, "
+          "ceiling<=%.1f%%, exemptions=%d"
+          % (window, target, ceiling, n_exempt))
     print("%-12s %10s %10s %8s" % ("module", "lines", "dup", "rate"))
     for m in modules:
         lines, d = stats[m]
@@ -212,6 +253,7 @@ def main():
     ap.add_argument('--target', type=float, default=3.0)
     ap.add_argument('--ceiling', type=float, default=5.0)
     ap.add_argument('--top', type=int, default=0)
+    ap.add_argument('--exemptions', default=None)
     ap.add_argument('--json-only', action='store_true')
     args = ap.parse_args()
 
@@ -220,8 +262,16 @@ def main():
         print("[ERR] root not found: %s" % root, file=sys.stderr)
         return 3
 
+    exemptions = []
+    if args.exemptions:
+        if not os.path.isfile(args.exemptions):
+            print("[ERR] exemptions list not found: %s" % args.exemptions,
+                  file=sys.stderr)
+            return 3
+        exemptions = load_exemptions(args.exemptions)
+
     stats, paths, origs, groups = scan(root, args.modules, args.window,
-                                       args.top)
+                                       args.top, exemptions)
     if args.json_only:
         total_lines = sum(stats[m][0] for m in args.modules)
         total_dup = sum(stats[m][1] for m in args.modules)
@@ -229,7 +279,7 @@ def main():
     else:
         total_lines, total_dup, total_rate = human_report(
             stats, args.modules, args.window, args.target, args.ceiling,
-            groups, paths, origs)
+            groups, paths, origs, len(exemptions))
 
     payload = {
         "window": args.window,

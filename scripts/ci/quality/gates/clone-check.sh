@@ -22,6 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
 BASELINE="$SCRIPT_DIR/g26-clone-baseline.txt"
+EXEMPTIONS="$SCRIPT_DIR/g26-clone-exemptions.txt"
 DETECTOR="$SCRIPT_DIR/../src/clone_detect.py"
 # shellcheck source=../thresholds.conf
 source "$SCRIPT_DIR/../thresholds.conf"
@@ -51,14 +52,20 @@ if [ ! -f "$DETECTOR" ]; then
     log_err "clone detector not found: ${DETECTOR}"
     exit 3
 fi
+if [ ! -f "$EXEMPTIONS" ]; then
+    log_err "clone exemptions list not found: ${EXEMPTIONS}"
+    exit 3
+fi
 if ! command -v python3 >/dev/null 2>&1; then
     log_err "python3 not found (clone detector requires it)"
     exit 3
 fi
 
-# 采集当前重复率（检测器仅在 --json-only 下输出单行 JSON，便于解析）
+# 采集当前重复率（检测器仅在 --json-only 下输出单行 JSON，便于解析；
+#   架构镜像豁免清单随命令行传入，门禁脚本不做内联豁免）
 JSON="$(python3 "$DETECTOR" --root "$AGENTRT" --window "$DUP_WINDOW" \
-        --target "$DUP_TARGET" --ceiling "$DUP_CEIL" --json-only)" || {
+        --target "$DUP_TARGET" --ceiling "$DUP_CEIL" \
+        --exemptions "$EXEMPTIONS" --json-only)" || {
     log_err "clone detector execution failed"
     exit 3
 }
