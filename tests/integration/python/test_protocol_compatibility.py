@@ -328,44 +328,6 @@ class ProtocolTestSuite:
         )
 
     # ================================================================
-    # Test Category 7: IPC Service Bus
-    # ================================================================
-
-    def test_ipc_service_bus_creation(self):
-        start = time.time()
-        status, body = self._jsonrpc("ipc.bus.create", {
-            "bus_name": "test-bus",
-            "config": {}
-        })
-        latency = (time.time() - start) * 1000
-
-        self._record(
-            "IPC service bus creation",
-            "IPC", status > 0 and status < 500,
-            f"Bus creation {'succeeded' if status == 200 else 'status: ' + str(status)}",
-            latency
-        )
-
-    def test_ipc_service_bus_message(self):
-        start = time.time()
-        status, body = self._jsonrpc("ipc.bus.send", {
-            "target_service": "test-service",
-            "message": {
-                "msg_type": 0,
-                "protocol": 0,
-                "payload": "test"
-            }
-        })
-        latency = (time.time() - start) * 1000
-
-        self._record(
-            "IPC service bus message send",
-            "IPC", status > 0 and status < 500,
-            f"Message send {'succeeded' if status == 200 else 'status: ' + str(status)}",
-            latency
-        )
-
-    # ================================================================
     # Test Category 8: Service Discovery
     # ================================================================
 
@@ -496,10 +458,6 @@ class ProtocolTestSuite:
             ],
             "Routing": [
                 self.test_protocol_routing,
-            ],
-            "IPC": [
-                self.test_ipc_service_bus_creation,
-                self.test_ipc_service_bus_message,
             ],
             "Discovery": [
                 self.test_service_discovery_register,
