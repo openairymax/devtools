@@ -585,8 +585,6 @@ airy_task_desc_create
 airy_task_desc_validate
 airy_task_get_priority
 airy_task_set_priority
-airy_tcache_get_stats
-airy_tcache_reset_stats
 airy_tc_adjust_dynamic_budget
 airy_tc_allocate_attention
 airy_tc_chain_checkpoint
@@ -2806,10 +2804,8 @@ sync_internal_update_stats_lock
 sync_internal_update_stats_timeout
 sync_internal_update_stats_wait
 sync_rwlock_read_lock_ex
-sync_rwlock_tryrdlock
 sync_rwlock_try_read_lock
 sync_rwlock_try_write_lock
-sync_rwlock_trywrlock
 sync_rwlock_unlock_ex
 sync_rwlock_write_lock_ex
 syscall_svc_call_unwrap
