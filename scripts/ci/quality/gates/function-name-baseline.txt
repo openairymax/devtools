@@ -388,10 +388,8 @@ airy_memory_write_async
 airy_mem_pool_destroy
 airy_mempool_emerg_avail
 airy_mempool_get_stats
-airy_mempool_get_watermark
 airy_mempool_reset_stats
 airy_mempool_set_emergency
-airy_mempool_validate
 airy_mem_stats_record_alloc
 airy_mem_stats_record_dealloc
 airy_mem_stats_record_oom
@@ -2120,14 +2118,6 @@ memory_get_current_usage
 memory_get_global_stats
 memory_get_peak_usage
 memory_inform_evaluation
-memory_pool_align_size
-memory_pool_allocate_blocks
-memory_pool_create_default
-memory_pool_free_blocks
-memory_pool_get_stats
-memory_pool_lock_destroy
-memory_pool_lock_init
-memory_pool_reset_stats
 memory_remove_debug_info
 memory_reset_global_stats
 memory_retrieve_for_generation
@@ -2156,10 +2146,7 @@ mem_persist_append_record
 mem_persist_load_existing
 mem_persist_repair_utf8
 mem_persist_rewrite_all
-mempool_calc_watermark
 mempool_class_destroy
-mempool_mutex_destroy
-mempool_reserve_alloc
 mem_recent_items_free
 mem_record_build_vector
 mem_record_free_vector
@@ -2776,8 +2763,6 @@ skill_execute_image_gen
 skill_execute_pipeline
 skill_execute_text_process
 skill_execute_web_search
-slab_get_partial_page
-slab_return_partial_page
 sock_set_recv_timeout
 sort_guards_by_priority
 spec_resolve_rust_binary
