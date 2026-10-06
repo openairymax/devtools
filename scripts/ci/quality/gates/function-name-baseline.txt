@@ -399,9 +399,6 @@ airy_metric_counter_create
 airy_metric_counter_inc
 airy_metric_gauge_create
 airy_metric_gauge_set
-airy_metrics_export_prometheus
-airy_metrics_export_prom_filt
-airy_metrics_increment
 airy_model_context_add_entry
 airy_model_context_create
 airy_model_context_destroy
@@ -2164,7 +2161,6 @@ method_dispatcher_dispatch
 method_dispatcher_register
 metrics_export_prometheus
 metrics_get_sampling_interval
-metrics_get_series_count
 metrics_get_timestamp_ns
 metrics_histogram_observe
 metrics_summary_observe
