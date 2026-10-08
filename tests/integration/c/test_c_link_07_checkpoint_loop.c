@@ -23,7 +23,6 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <ftw.h>
-#include <dirent.h>
 
 #include "memory_compat.h"
 #include "checkpoint_adapter.h"
@@ -472,23 +471,23 @@ static void *concurrent_checkpoint_thread(void *arg) {
                                            "session-concurrent", (uint64_t)i, &snap);
         free_snapshot_fields(&snap);
 
-        if (ret == 0) {
+        if (ret != 0) {
+            args->error_count++;
+            continue;
+        }
+
+        /* Verify the checkpoint we just saved can be restored. */
+        checkpoint_snapshot_t *restored = NULL;
+        int rret = checkpoint_adapter_restore(args->adapter, task_id, &restored);
+        if (rret == 0 && restored != NULL) {
+            checkpoint_snapshot_free(restored);
             args->success_count++;
-
-            /* Try to restore what we just saved */
-            checkpoint_snapshot_t *restored = NULL;
-            ret = checkpoint_adapter_restore(args->adapter, task_id, &restored);
-            if (ret == 0 && restored != NULL) {
-                checkpoint_snapshot_free(restored);
-            } else {
-                args->error_count++;
-            }
-
-            /* Clean up */
-            checkpoint_adapter_delete(args->adapter, task_id, 0);
         } else {
             args->error_count++;
         }
+
+        /* Clean up */
+        checkpoint_adapter_delete(args->adapter, task_id, 0);
     }
     return NULL;
 }
