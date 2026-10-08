@@ -126,13 +126,13 @@ case "$SCAN_TARGET" in
         TOTAL_VIOLATIONS=$?
         ;;
     cupolas)
-        scan_directory "$PROJECT_ROOT/agent-workload/agentrt/cupolas" "Cupolas Module"
+        scan_directory "$PROJECT_ROOT/agent-workload/products/cupolas" "Cupolas Module"
         TOTAL_VIOLATIONS=$?
         ;;
     all)
         V1=0; scan_directory "$PROJECT_ROOT/agent-workload/agentrt/daemons" "Daemon Module" || V1=$?
         V2=0; scan_directory "$PROJECT_ROOT/agent-workload/agentrt/gateway" "Gateway Module" || V2=$?
-        V3=0; scan_directory "$PROJECT_ROOT/agent-workload/agentrt/cupolas" "Cupolas Module" || V3=$?
+        V3=0; scan_directory "$PROJECT_ROOT/agent-workload/products/cupolas" "Cupolas Module" || V3=$?
         TOTAL_VIOLATIONS=$((V1 + V2 + V3))
         ;;
     *)

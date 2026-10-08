@@ -117,8 +117,8 @@ INPUT_ENCODING         = UTF-8
 
 INPUT                  = agentrt/atoms \
                          agentrt/commons \
-                         agentrt/cupolas/include \
-                         agentrt/cupolas/src \
+                         products/cupolas/include \
+                         products/cupolas/src \
                          agentrt/daemons/common/include \
                          agentrt/daemons/gateway_d \
                          agentrt/daemons/llm_d/include \
@@ -152,7 +152,7 @@ FILE_PATTERNS          = *.c \
 
 RECURSIVE              = YES
 
-EXCLUDE                = agentrt/cupolas/src/mainpage.dox
+EXCLUDE                = products/cupolas/src/mainpage.dox
 
 EXCLUDE_PATTERNS       = */tests/* \
                          */fuzz/* \
@@ -298,7 +298,7 @@ INCLUDE_PATH           = agentrt/atoms/corekern/include \
                          agentrt/commons/utils/sync/include \
                          agentrt/commons/utils/token/include \
                          agentrt/commons/utils/types/include \
-                         agentrt/cupolas/include \
+                         products/cupolas/include \
                          agentrt/daemons/common/include \
                          agentrt/daemons/llm_d/include \
                          agentrt/daemons/tool_d/include \

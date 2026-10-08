@@ -613,15 +613,19 @@ check_ban_175_180() {
 
     # BAN-177: cupolas 契约检查
     log_info "BAN-177: Checking cupolas contracts..."
+    # §254a：cupolas 叶子仓挂点已迁出核心树至 products 装配仓。源根主取
+    # products/cupolas（SSoT 唯一权威），独立检出（无 products）时回退核心树。
+    local cp_dir="${PROJECT_ROOT}/agent-workload/products/cupolas"
+    [[ -d "$cp_dir" ]] || cp_dir="${PROJECT_ROOT}/agent-workload/agentrt/cupolas"
     local cp_contracts=0
     grep -rq 'sanitizer_core\|sanitize_input\|SANITIZE_FULL' \
-        --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${cp_dir}/" 2>/dev/null && ((cp_contracts++)) || true
     grep -rq 'permission_engine\|permission_check\|RBAC' \
-        --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${cp_dir}/" 2>/dev/null && ((cp_contracts++)) || true
     grep -rq 'audit_logger\|audit.*hash\|hash_chain' \
-        --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${cp_dir}/" 2>/dev/null && ((cp_contracts++)) || true
     grep -rq 'AES.*GCM\|vault_encrypt\|cupolas_vault' \
-        --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${cp_dir}/" 2>/dev/null && ((cp_contracts++)) || true
     if [[ $cp_contracts -ge 3 ]]; then
         log_ok "BAN-177: Cupolas contracts defined ($cp_contracts/4 modules)"
     else

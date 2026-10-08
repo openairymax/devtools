@@ -1,8 +1,9 @@
 #!/bin/bash
 # 0.1.19 G2 体积硬门禁 + 里程碑阶梯（方案 §0.2 阶梯执法 / §0.5 G2）
 #
-# 口径（台账 §0.1）：agentrt/ 八模块（atoms commons daemons cupolas gateway
+# 口径（台账 §0.1；§254a）：agentrt/ 七模块（atoms commons daemons gateway
 #   heapstore protocols tools）下 *.c + *.h，排除 tests/，另计 cmake/ 组织码。
+#   cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，不再计入本账。
 # 阶梯（方案 §0.2）：M1 ≤348,000 / M2 ≤313,000 / M3 ≤312,000 / M4 ≤293,000 /
 #   M5 ≤243,000 / M6 ≤232,000 / M7 ≤184,000 / M8 ≤121,000 / M9 ≤117,000 /
 #   M10 <100,000。
@@ -18,7 +19,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
 BASELINE="$SCRIPT_DIR/v16-loc-budget-baseline.txt"
 
-MODULES=(atoms commons daemons cupolas gateway heapstore protocols tools)
+MODULES=(atoms commons daemons gateway heapstore protocols tools)
 
 # 里程碑阶梯：名 -> 上限（M10 为 <100,000，取 99,999 作计数断言）
 MILESTONES=(M1 M2 M3 M4 M5 M6 M7 M8 M9 M10)
@@ -86,7 +87,7 @@ cur_idx="$(idx_of "$current")" || {
     exit 2
 }
 
-section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 8 modules + cmake/, tests/ excluded)"
+section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 7 modules + cmake/, tests/ excluded)"
 
 total=0
 for m in "${MODULES[@]}"; do

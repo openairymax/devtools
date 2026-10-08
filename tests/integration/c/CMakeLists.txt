@@ -12,6 +12,14 @@ add_compile_definitions(AIRY_COMPLIANCE_IMPL)
 # ============================================================================
 # 公共 include 路径
 # ============================================================================
+# §254a：cupolas 叶子仓挂点已迁出核心树至 products 装配仓。源根优先取 core
+# 顶层下发的 CUPOLAS_SRC_DIR（SSoT，一源多态）；未下发时回退伞仓默认挂点，
+# 保证本文件脱离 core 变量亦可独立解析。
+if(NOT CUPOLAS_SRC_DIR)
+    get_filename_component(CUPOLAS_SRC_DIR
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/products/cupolas" ABSOLUTE)
+endif()
+
 set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/corekern/include
@@ -39,8 +47,8 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/cupolas/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/cupolas/src
+    ${CUPOLAS_SRC_DIR}/include
+    ${CUPOLAS_SRC_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

@@ -1,7 +1,8 @@
 #!/bin/bash
 # 0.1.19 G6 禁桩门禁（方案 §0.5 G6；铁律「严禁桩函数、桩实现」）
 #
-# 口径（台账 §0.1 / §1.2）：agentrt/ 下 *.c + *.h，排除 tests/。
+# 口径（台账 §0.1；§254a）：agentrt/ 下 *.c + *.h，排除 tests/。cupolas 应用
+#   壳层已迁出机制核至 products 装配仓（§1.3），不在本门禁扫描域。
 # 判据：生产码内零未竟标记——TODO / FIXME / XXX / HACK / STUB（大写约定、
 #   词边界）与 `#if 0` 死码块，任一命中即 FAIL（零容忍，无基线放宽）。
 #   仅匹配大写标记：小写 `xxx` 系文档占位符（如 `builtin:xxx`），非桩标记；
@@ -14,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
 
-MODULES=(atoms commons daemons cupolas gateway heapstore protocols tools)
+MODULES=(atoms commons daemons gateway heapstore protocols tools)
 
 PATTERN='\b(TODO|FIXME|XXX|HACK|STUB)\b|^[[:space:]]*#[[:space:]]*if[[:space:]]+0([^[:alnum:]_]|$)'
 

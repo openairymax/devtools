@@ -43,7 +43,6 @@ declare -A MODULE_SOURCES=(
     [daemons]="agentrt/daemons"
     [atoms]="agentrt/atoms"
     [commons]="agentrt/commons"
-    [cupolas]="agentrt/cupolas"
     [gateway]="agentrt/gateway"
     [heapstore]="agentrt/heapstore"
 )
@@ -52,7 +51,6 @@ declare -A MODULE_CMAKE_OPTIONS=(
     [daemons]="-DBUILD_TESTS=ON -DENABLE_LLM_DUMMY=ON"
     [atoms]="-DBUILD_TESTS=ON"
     [commons]="-DBUILD_TESTS=ON"
-    [cupolas]="-DBUILD_TESTS=ON"
     [gateway]="-DBUILD_TESTS=ON"
     [heapstore]="-DBUILD_TESTS=ON"
 )
@@ -88,7 +86,7 @@ Usage: ./build-module.sh [OPTIONS]
 
 Options:
     -m, --module NAME     Target module (default: all)
-                           Values: daemons, atoms, commons, cupolas,
+                           Values: daemons, atoms, commons,
                                    gateway, heapstore, all
     -t, --type TYPE       Build type (default: Release)
                            Values: Debug, Release, RelWithDebInfo, MinSizeRel

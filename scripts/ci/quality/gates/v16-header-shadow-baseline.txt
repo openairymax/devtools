@@ -1,16 +1,7 @@
 cache.h|daemons/mem_d/include/cache.h|daemons/tool_d/src/core/cache.h
 error.h|commons/include/airymax/error.h|commons/utils/error/error.h
-mempool.h|atoms/corekern/include/mempool.h|cupolas/src/mempool.h
-metrics.h|commons/utils/observability/metrics.h|daemons/llm_d/src/accounting/metrics.h
-platform.h|commons/platform/include/platform.h|cupolas/src/platform/platform.h
-platform_base.h|commons/platform/include/platform_base.h|cupolas/src/platform/platform_base.h
-platform_internal.h|commons/platform/src/platform_internal.h|cupolas/src/platform/platform_internal.h
-platform_misc.h|commons/platform/include/platform_misc.h|cupolas/src/platform/platform_misc.h
-platform_process.h|commons/platform/include/platform_process.h|cupolas/src/platform/platform_process.h
-platform_time.h|commons/platform/include/platform_time.h|cupolas/src/platform/platform_time.h
 protocol_router.h|protocols/core/router/include/protocol_router.h|protocols/include/protocol_router.h
 registry.h|daemons/llm_d/src/providers/core/registry.h|daemons/tool_d/src/core/registry.h
 service.h|daemons/a2a_d/src/service.h|daemons/agent_d/src/service.h|daemons/llm_d/src/rpc/service.h|daemons/mem_d/src/core/service.h|daemons/tool_d/src/rpc/service.h
-slab.h|atoms/corekern/include/slab.h|cupolas/src/slab.h
 syscalls.h|atoms/syscall/include/syscalls.h|commons/include/airymax/syscalls.h
 types.h|commons/utils/types/types.h|daemons/llm_d/src/config/types.h

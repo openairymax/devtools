@@ -34,8 +34,8 @@ import sys
 
 EXTS = ('.c', '.h', '.cc', '.cpp', '.cxx', '.hpp', '.hxx')
 SKIP_DIRS = ('tests', 'third_party')
-DEFAULT_MODULES = ('atoms', 'commons', 'daemons', 'cupolas',
-                   'gateway', 'heapstore', 'protocols', 'tools')
+DEFAULT_MODULES = ('atoms', 'commons', 'daemons', 'gateway',
+                   'heapstore', 'protocols', 'tools')
 
 
 def strip_comments(text):

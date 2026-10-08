@@ -65,7 +65,6 @@ PUBLIC_ALLOWLIST=(
 scan_dirs=(
     "${PROJECT_ROOT}/agent-workload/agentrt/atoms"
     "${PROJECT_ROOT}/agent-workload/agentrt/commons"
-    "${PROJECT_ROOT}/agent-workload/agentrt/cupolas"
     "${PROJECT_ROOT}/agent-workload/agentrt/daemons"
     "${PROJECT_ROOT}/agent-workload/agentrt/gateway"
     "${PROJECT_ROOT}/agent-workload/agentrt/heapstore"

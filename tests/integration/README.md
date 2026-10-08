@@ -22,7 +22,7 @@
 | `python/` | `daemons/`, `gateway/`, `heapstore/` | Python 层端到端工作流与协议兼容性 |
 | `commons/` | `agentrt/commons/` | Commons 统一基础库集成测试（公共模块跨组件协作） |
 | `coreloopthree/` | `atoms/coreloopthree/` | 三环系统集成（认知-执行联动、记忆演化） |
-| `cupolas/` | `agentrt/cupolas/` | Cupolas 安全穹顶集成测试（跨模块防护链路） |
+| `cupolas/` | `products/cupolas/` | Cupolas 安全穹顶集成测试（跨模块防护链路） |
 | `memoryrovol/` | `atoms/memoryrovol/` | MemoryRovol 记忆系统集成（层级检索与缓存） |
 | `platform/` | `atoms/`, `commons/` | 跨平台 API 兼容性验证（目录递归创建、平台抽象） |
 | `syscall/` | `atoms/syscall/` | 系统调用层端到端流程（5 类接口完整调用链） |

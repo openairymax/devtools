@@ -66,7 +66,7 @@ fi
 
 section "2. flawfinder Security Scan (Level 4)"
 cd "$AGENTRT_ROOT/agentrt"
-L4_HITS=$(flawfinder --minlevel 4 atoms/ commons/ cupolas/ 2>&1 | grep -c "\[4\]" || true)
+L4_HITS=$(flawfinder --minlevel 4 atoms/ commons/ 2>&1 | grep -c "\[4\]" || true)
 L4_THRESHOLD=10
 
 if [ "$L4_HITS" -le "$L4_THRESHOLD" ]; then
@@ -75,7 +75,7 @@ else
     fail "flawfinder Level 4: ${L4_HITS} hits exceeds threshold (${L4_THRESHOLD})"
 fi
 
-L3_HITS=$(flawfinder --minlevel 3 atoms/ commons/ cupolas/ 2>&1 | grep -c "\[3\]" || true)
+L3_HITS=$(flawfinder --minlevel 3 atoms/ commons/ 2>&1 | grep -c "\[3\]" || true)
 if [ "$L3_HITS" -le 40 ]; then
     pass "flawfinder Level 3: ${L3_HITS} hits (threshold: ≤40)"
 else
