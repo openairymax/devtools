@@ -3,9 +3,8 @@
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
 load llm_d/src/providers/core/transport.h	10
 load market_d/include/market_service.h	10
-load monit_d/include/monitor_service.h	9
 load sched_d/src/sched_service_internal.h	9
-load tool_d/src/builtin/tool_builtin_internal.h	9
+load monit_d/include/monitor_service.h	8
 load sched_d/include/scheduler_service.h	7
 load tool_d/src/core/executor.h	7
 load channel_d/include/channel_service.h	6
@@ -26,7 +25,7 @@ fan airy_cli	6
 fan airy_gateway_service	3
 fan channel_d	4
 fan cupolas_d	3
-fan gateway	6
+fan gateway	5
 fan gateway_d	2
 fan llm_d	2
 fan market_d	2
