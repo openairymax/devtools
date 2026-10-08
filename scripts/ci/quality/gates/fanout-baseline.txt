@@ -1,9 +1,7 @@
 # 0.1.19 G13 load/fan baseline (ratchet; only decrease)
 # section load: <daemon-relative header path> <src-face fan-in>
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
-load sched_d/src/sched_service_internal.h	9
 load monit_d/include/monitor_service.h	8
-load sched_d/include/scheduler_service.h	7
 load channel_d/include/channel_service.h	6
 load common/include/svc_auth.h	6
 load common/src/auth/svc_auth_internal.h	6
