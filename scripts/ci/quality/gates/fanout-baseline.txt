@@ -1,7 +1,6 @@
 # 0.1.19 G13 load/fan baseline (ratchet; only decrease)
 # section load: <daemon-relative header path> <src-face fan-in>
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
-load llm_d/src/providers/core/transport.h	10
 load market_d/include/market_service.h	10
 load sched_d/src/sched_service_internal.h	9
 load monit_d/include/monitor_service.h	8
