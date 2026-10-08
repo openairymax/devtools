@@ -43,14 +43,14 @@ CompileFlags:
     - -Iagentrt/commons/utils/logging/include
     - -Iagentrt/commons/utils/sync/include
     - -Iagentrt/commons/utils/observability/include
-    - -Iagentrt/cupolas/include
-    - -Iagentrt/cupolas/src
-    - -Iagentrt/cupolas/src/security
-    - -Iagentrt/cupolas/src/sanitizer
-    - -Iagentrt/cupolas/src/guards
-    - -Iagentrt/cupolas/src/utils
-    - -Iagentrt/cupolas/src/workbench
-    - -Iagentrt/cupolas/src/audit
+    - -Iproducts/cupolas/include
+    - -Iproducts/cupolas/src
+    - -Iproducts/cupolas/src/security
+    - -Iproducts/cupolas/src/sanitizer
+    - -Iproducts/cupolas/src/guards
+    - -Iproducts/cupolas/src/utils
+    - -Iproducts/cupolas/src/workbench
+    - -Iproducts/cupolas/src/audit
     - -Iagentrt/daemons/common/include
     - -Iagentrt/daemons/common/src
     - -Iagentrt/daemons/common/types/include

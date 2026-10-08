@@ -22,7 +22,7 @@
 | `python/` | `daemons/`, `commons/` | Python 性能基准测试（守护进程/公共库性能指标） |
 | `atoms/` | `agentrt/atoms/` | Atoms 层组件性能测试（内核 IPC/记忆/系统调用延迟） |
 | `concurrency/` | `daemons/`, `gateway/` | 并发压力测试（负载测试/报告输出） |
-| `cupolas/` | `agentrt/cupolas/` | Cupolas 安全基准与压力测试（权限检查/清洗吞吐/并发安全） |
+| `cupolas/` | `products/cupolas/` | Cupolas 安全基准与压力测试（权限检查/清洗吞吐/并发安全） |
 | `retrieval_latency/` | `atoms/memory/`, `atoms/memoryrovol/` | 记忆检索延迟测试（L1-L4 层延迟/命中率） |
 | `token_efficiency/` | `commons/utils/token/` | Token 效率与预算管理测试（预算控制精度/计数效率） |
 

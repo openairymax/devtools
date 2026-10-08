@@ -17,18 +17,18 @@
 
 > **版本**：v0.1.5
 
-## 与 agentrt/ 模块对应关系
+## 与 agentrt/ 与 products/ 模块对应关系
 
-| tests/security/ 目录 | 对应的 agentrt/ 模块 | 测试内容 |
+| tests/security/ 目录 | 对应的源模块 | 测试内容 |
 |---------------------|---------------------|----------|
-| `c/test_security_audit.c` | `agentrt/cupolas/audit/` | C 层安全审计套件（审计链完整性、事件签名验证） |
-| `c/test_sec017_compliance.c` | `agentrt/cupolas/` | SEC-017 桩函数合规验证（安全接口桩函数完整性） |
-| `cupolas/fuzz_permission.c` | `agentrt/cupolas/permission/` | 权限模糊测试（随机权限请求、越权检测） |
-| `cupolas/fuzz_sanitizer.c` | `agentrt/cupolas/sanitizer/` | 清洗器模糊测试（随机恶意输入、边界条件） |
-| `python/fuzz_framework.py` | `agentrt/cupolas/sanitizer/` | Python 模糊测试框架（输入清洗器自动化模糊测试） |
-| `python/sast_dast_scanner.py` | `agentrt/cupolas/security/` | SAST/DAST 静态/动态扫描器（代码安全扫描） |
-| `python/test_input_sanitizer.py` | `agentrt/cupolas/sanitizer/` | 输入净化测试（XSS/SQL 注入/命令注入/路径遍历） |
-| `python/test_permissions.py` | `agentrt/cupolas/permission/` | 权限检查测试（RBAC+ABAC 双模型） |
+| `c/test_security_audit.c` | `products/cupolas/audit/` | C 层安全审计套件（审计链完整性、事件签名验证） |
+| `c/test_sec017_compliance.c` | `products/cupolas/` | SEC-017 桩函数合规验证（安全接口桩函数完整性） |
+| `cupolas/fuzz_permission.c` | `products/cupolas/permission/` | 权限模糊测试（随机权限请求、越权检测） |
+| `cupolas/fuzz_sanitizer.c` | `products/cupolas/sanitizer/` | 清洗器模糊测试（随机恶意输入、边界条件） |
+| `python/fuzz_framework.py` | `products/cupolas/sanitizer/` | Python 模糊测试框架（输入清洗器自动化模糊测试） |
+| `python/sast_dast_scanner.py` | `products/cupolas/security/` | SAST/DAST 静态/动态扫描器（代码安全扫描） |
+| `python/test_input_sanitizer.py` | `products/cupolas/sanitizer/` | 输入净化测试（XSS/SQL 注入/命令注入/路径遍历） |
+| `python/test_permissions.py` | `products/cupolas/permission/` | 权限检查测试（RBAC+ABAC 双模型） |
 | `python/test_sandbox.py` | `agentrt/daemons/common/` | 沙箱隔离测试（执行环境隔离/资源限制/逃逸防护） |
 
 ## 目录结构

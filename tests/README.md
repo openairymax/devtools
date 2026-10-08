@@ -19,7 +19,7 @@
 | `unit/atoms/memory/` | `agentrt/atoms/memory/` | CMocka — 内置记忆子系统（L1+L2 层） |
 | `unit/atoms/syscall/` | `agentrt/atoms/syscall/` | CMocka — 系统调用接口（5 类接口 + 4 层保护） |
 | `unit/commons/` | `agentrt/commons/` | CMocka + pytest — 统一基础库（平台抽象/日志/配置/内存/同步等 20+ 子模块） |
-| `unit/cupolas/` | `agentrt/cupolas/` | CMocka — 安全穹顶单元测试（防护/清洗/权限/审计/守卫框架） |
+| `unit/cupolas/` | `products/cupolas/` | CMocka — 安全穹顶单元测试（防护/清洗/权限/审计/守卫框架） |
 | `unit/daemons/common/` | `agentrt/daemons/common/` | CMocka — 公共服务库（19 个组件） |
 | `unit/daemons/gateway_d/` | `agentrt/daemons/gateway_d/` | CMocka + pytest — API 网关守护进程 |
 | `unit/daemons/llm_d/` | `agentrt/daemons/llm_d/` | CMocka + pytest — LLM 服务守护进程（多 Provider） |
@@ -35,16 +35,16 @@
 | `integration/python/` | `agentrt/daemons/`, `agentrt/gateway/`, `agentrt/heapstore/` | pytest — Python 层端到端工作流与协议兼容性 |
 | `integration/commons/` | `agentrt/commons/` | CMocka — Commons 统一基础库集成测试 |
 | `integration/coreloopthree/` | `agentrt/atoms/coreloopthree/` | pytest — 三环系统集成（认知-执行联动） |
-| `integration/cupolas/` | `agentrt/cupolas/` | CMocka — Cupolas 安全穹顶集成测试 |
+| `integration/cupolas/` | `products/cupolas/` | CMocka — Cupolas 安全穹顶集成测试 |
 | `integration/memoryrovol/` | `agentrt/atoms/memoryrovol/` | pytest — 记忆系统检索与层级测试 |
 | `integration/platform/` | `agentrt/atoms/`, `agentrt/commons/` | CMocka — 跨平台 API 兼容性验证 |
 | `integration/syscall/` | `agentrt/atoms/syscall/` | pytest — 系统调用端到端流程 |
 | `benchmarks/atoms/` | `agentrt/atoms/` | C — Atoms 层性能基准 |
 | `benchmarks/concurrency/` | `agentrt/daemons/`, `agentrt/gateway/` | pytest-benchmark — 并发压力测试 |
-| `benchmarks/cupolas/` | `agentrt/cupolas/` | C — Cupolas 安全基准与压力测试 |
-| `security/c/` | `agentrt/cupolas/` | CMocka — C 层安全审计 |
-| `security/cupolas/` | `agentrt/cupolas/` | C — Cupolas 安全模糊测试 |
-| `security/python/` | `agentrt/cupolas/` | pytest — Python 层安全测试 |
+| `benchmarks/cupolas/` | `products/cupolas/` | C — Cupolas 安全基准与压力测试 |
+| `security/c/` | `products/cupolas/` | CMocka — C 层安全审计 |
+| `security/cupolas/` | `products/cupolas/` | C — Cupolas 安全模糊测试 |
+| `security/python/` | `products/cupolas/` | pytest — Python 层安全测试 |
 | `contract/python/` | `agentrt/daemons/`, `ecosystem/openlab/` | pytest — 接口契约验证 |
 
 ## 目录结构

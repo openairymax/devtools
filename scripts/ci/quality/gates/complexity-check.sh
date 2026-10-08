@@ -44,7 +44,6 @@ log_info "lizard 版本: ${LIZARD_VERSION}"
 SCAN_DIRS=(
     "${PROJECT_ROOT}/agent-workload/agentrt/atoms"
     "${PROJECT_ROOT}/agent-workload/agentrt/commons"
-    "${PROJECT_ROOT}/agent-workload/agentrt/cupolas"
     "${PROJECT_ROOT}/agent-workload/agentrt/daemons"
     "${PROJECT_ROOT}/agent-workload/agentrt/gateway"
     "${PROJECT_ROOT}/agent-workload/agentrt/heapstore"

@@ -114,7 +114,7 @@ check_static_analysis() {
     # flawfinder Level 4+
     if check_tool flawfinder; then
         local l4_hits
-        l4_hits=$(flawfinder --minlevel 4 "${AGENTRT_ROOT}/atoms/" "${AGENTRT_ROOT}/commons/" "${AGENTRT_ROOT}/cupolas/" 2>&1 | grep -c "\[4\]" || true)
+        l4_hits=$(flawfinder --minlevel 4 "${AGENTRT_ROOT}/atoms/" "${AGENTRT_ROOT}/commons/" 2>&1 | grep -c "\[4\]" || true)
         if [ "$l4_hits" -le 10 ]; then
             pass "flawfinder L4: ${l4_hits} hits (threshold: <=10)"
         else
@@ -131,7 +131,6 @@ check_static_analysis() {
             --error-exitcode=0 \
             "${AGENTRT_ROOT}/atoms/corekern/" "${AGENTRT_ROOT}/atoms/coreloopthree/" \
             "${AGENTRT_ROOT}/atoms/syscall/" "${AGENTRT_ROOT}/atoms/commons/" \
-            "${AGENTRT_ROOT}/cupolas/" \
             2>&1 | grep -c "error:" || true)
         if [ "$cppcheck_errors" -eq 0 ]; then
             pass "cppcheck: 0 errors"

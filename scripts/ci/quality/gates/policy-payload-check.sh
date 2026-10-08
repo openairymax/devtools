@@ -109,7 +109,7 @@ PAT="(^|[^A-Za-z0-9])(${ALT})([^A-Za-z0-9]|$)"
 ###############################################################################
 GOV_SRC="$(find \
     "$AGENTRT/atoms" "$AGENTRT/commons" "$AGENTRT/daemons" \
-    "$AGENTRT/cupolas" "$AGENTRT/gateway" "$AGENTRT/heapstore" \
+    "$AGENTRT/gateway" "$AGENTRT/heapstore" \
     "$AGENTRT/tools" "$AGENTRT/protocols/core" "$AGENTRT/protocols/common" \
     "$AGENTRT/protocols/src" "$AGENTRT/protocols/include" \
     -type f \( -name '*.c' -o -name '*.h' \) \

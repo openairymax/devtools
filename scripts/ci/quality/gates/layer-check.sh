@@ -21,8 +21,9 @@
 #   C. 跨进程零符号引用（G23）：daemon 目标的允许集不得含其它 daemon 的服务库
 #      或任意 daemon_* 库（跨界调用必须走总线）；例外仅在白名单登记后才豁免。
 #   D. 层界单向（G21，代码面）：源码相对 include 不得反向跨层（由下向上）。
-#      层序（自底向上）= commons < atoms < cupolas < heapstore < gateway <
-#      protocols < daemons；反向边 = 0。
+#      层序（自底向上）= commons < atoms < heapstore < gateway <
+#      protocols < daemons；反向边 = 0。（cupolas 已按方案 §1.3 迁出
+#      agentrt 树至 products，不再参与层序。）
 #
 # 范围界定（按设计排除，非遗漏）：
 #   - tests/ 、third_party/ 、构建区：非生产码，不构成层界断言对象。
@@ -238,11 +239,10 @@ layer_rank() {
     case "$1" in
         commons) echo 1 ;;
         atoms) echo 2 ;;
-        cupolas) echo 3 ;;
-        heapstore) echo 4 ;;
-        gateway) echo 5 ;;
-        protocols) echo 6 ;;
-        daemons) echo 7 ;;
+        heapstore) echo 3 ;;
+        gateway) echo 4 ;;
+        protocols) echo 5 ;;
+        daemons) echo 6 ;;
         *) echo 0 ;;
     esac
 }

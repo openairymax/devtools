@@ -188,7 +188,7 @@ check_project_structure() {
     echo -e "\n${BLUE}检查项目结构...${NC}"
 
     # 检查关键目录
-    DIRS=("atoms" "daemons" "cupolas" "toolkit" "manager" "scripts" "paper" "tests")
+    DIRS=("atoms" "daemons" "toolkit" "manager" "scripts" "paper" "tests")
     for dir in "${DIRS[@]}"; do
         if [ -d "$dir" ]; then
             print_check "目录：$dir" "PASS"

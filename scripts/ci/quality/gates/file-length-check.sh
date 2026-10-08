@@ -1,8 +1,9 @@
 #!/bin/bash
 # 0.1.19 G24 文件行数硬门禁（方案 §0.5 G24：≤ 800 行/文件）
 #
-# 口径（台账 §0.1）：agentrt/ 八模块（atoms commons daemons cupolas gateway
+# 口径（台账 §0.1；§254a）：agentrt/ 七模块（atoms commons daemons gateway
 #   heapstore protocols tools）下 *.c + *.h，排除 tests/ 与 third_party/。
+#   cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，不在本门禁扫描域。
 #   前二者非本仓可维护代码：tests/ 为用例，third_party/ 为上游客供，均不适用
 #   本仓可读性上限（G24 的立意是"单文件在生产码中可被一次通读"）。
 # 判据：单文件行数 ≤ 800 即 PASS。超限文件须入基线（既有债务），基线外新增
@@ -19,7 +20,7 @@ AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
 BASELINE="$SCRIPT_DIR/g24-file-length-baseline.txt"
 
 MAX_LINES=800
-MODULES=(atoms commons daemons cupolas gateway heapstore protocols tools)
+MODULES=(atoms commons daemons gateway heapstore protocols tools)
 
 UPDATE_BASELINE=0
 if [ "${1:-}" = "--update-baseline" ]; then
