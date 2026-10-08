@@ -194,13 +194,18 @@ read_field() {  # $1=两列表 $2=键 -> 值
 }
 
 if [ "$UPDATE_BASELINE" -eq 1 ]; then
+    # 空段过滤用 sed 而非 grep：grep 空输入退 1，pipefail 下会中断本块；
+    # 临时文件 + mv 落盘，避免截断基线后中途失败造成基线损毁（load 清零
+    # 后曾实际触发，教训见台账 §249）。
+    _bl_tmp="$(mktemp "${BASELINE}.tmp.XXXXXX")"
     {
         printf '# 0.1.19 G13 load/fan baseline (ratchet; only decrease)\n'
         printf '# section load: <daemon-relative header path> <src-face fan-in>\n'
         printf '# section fan : <whitelist target> <distinct project libs, self-held excluded>\n'
-        printf '%s\n' "$LOAD_OVER" | grep . | sed 's/^/load /'
-        printf '%s\n' "$FAN_TBL"   | grep . | sed 's/^/fan /'
-    } > "$BASELINE"
+        printf '%s\n' "$LOAD_OVER" | sed -e '/^$/d' -e 's/^/load /'
+        printf '%s\n' "$FAN_TBL"   | sed -e '/^$/d' -e 's/^/fan /'
+    } > "$_bl_tmp"
+    mv -f "$_bl_tmp" "$BASELINE"
     log_info "基线已更新：load 超限 ${LOAD_OVER_N} 项 / fan ${FAN_N} 项（fanout-baseline.txt）"
     exit 0
 fi

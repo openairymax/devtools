@@ -15,7 +15,7 @@ fan maths_d	4
 fan mem_d	3
 fan monit_d	2
 fan notify_d	5
-fan sched_d	10
+fan sched_d	8
 fan supervisor_d	0
 fan think_d	6
-fan tool_d	8
+fan tool_d	5
