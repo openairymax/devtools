@@ -1,9 +1,6 @@
 # 0.1.19 G13 load/fan baseline (ratchet; only decrease)
 # section load: <daemon-relative header path> <src-face fan-in>
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
-load market_d/src/market_service_internal.h	6
-load supervisor_d/src/supervisor_d.h	6
-load tool_d/include/tool_service.h	6
 fan a2a_d	4
 fan agent_d	3
 fan airy_cli	6
