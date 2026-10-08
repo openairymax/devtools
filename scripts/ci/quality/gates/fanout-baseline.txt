@@ -1,7 +1,6 @@
 # 0.1.19 G13 load/fan baseline (ratchet; only decrease)
 # section load: <daemon-relative header path> <src-face fan-in>
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
-load common/include/svc_auth.h	6
 load common/src/auth/svc_auth_internal.h	6
 load cupolas_d/include/svc_cupolas_d.h	6
 load llm_d/include/llm_service.h	6
