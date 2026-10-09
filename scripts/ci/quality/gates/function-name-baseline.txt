@@ -945,8 +945,6 @@ daemon_bootstrap_sd_start_unix
 daemon_bootstrap_sd_stop
 daemon_check_llm_permission
 daemon_check_tool_permission
-daemon_cupolas_cleanup
-daemon_cupolas_init_pep
 daemon_event_driver_add_fd
 daemon_event_driver_add_server_fd
 daemon_event_driver_add_timer

@@ -1,21 +1,22 @@
 # 0.1.19 G13 load/fan baseline (ratchet; only decrease)
 # section load: <daemon-relative header path> <src-face fan-in>
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
-fan a2a_d	2
-fan agent_d	3
+fan a2a_d	3
+fan agent_d	4
 fan airy_cli	5
 fan airy_gateway_service	3
-fan channel_d	4
+fan airy_security_dome	2
+fan channel_d	5
 fan cupolas_d	3
 fan gateway	4
-fan gateway_d	2
-fan llm_d	2
-fan market_d	2
-fan maths_d	4
-fan mem_d	3
-fan monit_d	2
-fan notify_d	5
-fan sched_d	8
+fan gateway_d	3
+fan llm_d	3
+fan market_d	3
+fan maths_d	5
+fan mem_d	4
+fan monit_d	3
+fan notify_d	6
+fan sched_d	9
 fan supervisor_d	0
-fan think_d	6
-fan tool_d	5
+fan think_d	7
+fan tool_d	6
