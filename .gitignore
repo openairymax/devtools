@@ -22,6 +22,8 @@
 !vcpkg.json
 !deploy/
 !deploy/**
+!airy_depgraph/
+!airy_depgraph/**
 !scripts/
 !scripts/**
 !tests/
