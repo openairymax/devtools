@@ -1,14 +1,16 @@
 #!/bin/bash
 # 0.1.19 G24 文件行数硬门禁（方案 §0.5 G24：≤ 800 行/文件）
 #
-# 口径（台账 §0.1；§254a）：agentrt/ 七模块（atoms commons daemons gateway
-#   heapstore protocols tools）下 *.c + *.h，排除 tests/ 与 third_party/。
-#   cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，不在本门禁扫描域。
+# 口径（台账 §0.1；§254a；§254c）：agentrt/ 七模块（atoms commons daemons
+#   gateway heapstore protocols tools）+ products/cupolas 产品壳下 *.c + *.h，
+#   排除 tests/ 与 third_party/。cupolas 按 §1.3 迁出机制核，§254c 起作为
+#   独立根纳入本门禁扫描域（同一 ≤800 上限）。
 #   前二者非本仓可维护代码：tests/ 为用例，third_party/ 为上游客供，均不适用
 #   本仓可读性上限（G24 的立意是"单文件在生产码中可被一次通读"）。
 # 判据：单文件行数 ≤ 800 即 PASS。超限文件须入基线（既有债务），基线外新增
 #   超限文件即 FAIL——fail-closed 阻断新债，既有债务随 L4/L5 拆分收敛。
-# 基线：g24-file-length-baseline.txt，每行一个相对 agentrt/ 的路径；
+# 基线：g24-file-length-baseline.txt，存量条目相对 agentrt/，产品壳条目相对
+#   agent-workload/（products/cupolas/…），双口径并存；
 #   收敛后以 --update-baseline 重生成（消失即视为拆分成效）。
 # 用法: file-length-check.sh [--update-baseline]
 # 退出码: 0 = 通过；1 = 存在基线外超限文件；2 = 环境错误（树/基线缺失）
@@ -17,6 +19,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
+AW_ROOT="${PROJECT_ROOT}/agent-workload"
+CUPOLAS_DIR="${AW_ROOT}/products/cupolas"
 BASELINE="$SCRIPT_DIR/g24-file-length-baseline.txt"
 
 MAX_LINES=800
@@ -44,6 +48,11 @@ if [ ! -d "$AGENTRT" ]; then
     exit 2
 fi
 
+if [ ! -d "$CUPOLAS_DIR" ]; then
+    log_err "cupolas source tree not found: ${CUPOLAS_DIR}"
+    exit 2
+fi
+
 # 输出 "相对路径 行数"，仅含超限文件
 scan_over_limit() {
     local m d
@@ -64,6 +73,16 @@ scan_over_limit() {
                     if (n > max) { sub("^" root, "", p); printf "%s %d\n", p, n }
                 }' || true
     done
+    find "$CUPOLAS_DIR" -type f \( -name '*.c' -o -name '*.h' \) \
+        | { grep -v '/tests/' || true; } \
+        | { grep -v '/third_party/' || true; } \
+        | tr '\n' '\0' | xargs -0 -r wc -l 2>/dev/null \
+        | awk -v max="$MAX_LINES" -v root="$AW_ROOT/" '
+            $2 == "total" { next }
+            {
+                n = $1; p = $2;
+                if (n > max) { sub("^" root, "", p); printf "%s %d\n", p, n }
+            }' || true
 }
 
 TMP_CUR="$(mktemp)"

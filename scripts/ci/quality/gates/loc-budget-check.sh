@@ -1,9 +1,10 @@
 #!/bin/bash
 # 0.1.19 G2 体积硬门禁 + 里程碑阶梯（方案 §0.2 阶梯执法 / §0.5 G2）
 #
-# 口径（台账 §0.1；§254a）：agentrt/ 七模块（atoms commons daemons gateway
-#   heapstore protocols tools）下 *.c + *.h，排除 tests/，另计 cmake/ 组织码。
-#   cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，不再计入本账。
+# 口径（台账 §0.1；§254a；§254c）：agentrt/ 七模块（atoms commons daemons
+#   gateway heapstore protocols tools）下 *.c + *.h，排除 tests/，另计 cmake/
+#   组织码。cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，不入主账；
+#   §254c 起单列独立子账（基线键 cupolas=<N>），棘轮「只降不升」。
 # 阶梯（方案 §0.2）：M1 ≤348,000 / M2 ≤313,000 / M3 ≤312,000 / M4 ≤293,000 /
 #   M5 ≤243,000 / M6 ≤232,000 / M7 ≤184,000 / M8 ≤121,000 / M9 ≤117,000 /
 #   M10 <100,000。
@@ -17,6 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
+CUPOLAS_DIR="${PROJECT_ROOT}/agent-workload/products/cupolas"
 BASELINE="$SCRIPT_DIR/v16-loc-budget-baseline.txt"
 
 MODULES=(atoms commons daemons gateway heapstore protocols tools)
@@ -82,12 +84,22 @@ if [ -z "$current" ]; then
     exit 2
 fi
 
+cupolas_pin="$(sed -n 's/^cupolas=//p' "$BASELINE" | head -n1)"
+if [ -z "$cupolas_pin" ]; then
+    log_err "baseline missing 'cupolas=' key: ${BASELINE}"
+    exit 2
+fi
+if [ ! -d "$CUPOLAS_DIR" ]; then
+    log_err "cupolas source tree not found: ${CUPOLAS_DIR}"
+    exit 2
+fi
+
 cur_idx="$(idx_of "$current")" || {
     log_err "unknown milestone in baseline: current=${current}"
     exit 2
 }
 
-section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 7 modules + cmake/, tests/ excluded)"
+section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 7 modules + cmake/, tests/ excluded; cupolas sub-ledger pin=${cupolas_pin})"
 
 total=0
 for m in "${MODULES[@]}"; do
@@ -112,6 +124,10 @@ printf '  %-10s %8d\n' "cmake" "$cmake_loc"
 echo "  ----------------------"
 printf '  %-10s %8d\n' "TOTAL" "$total"
 
+cupolas_total=$(find "$CUPOLAS_DIR" -type f \( -name '*.c' -o -name '*.h' \) \
+    | { grep -v '/tests/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
+printf '  %-10s %8d  (独立子账，不计入主 total)\n' "cupolas" "$cupolas_total"
+
 ceiling="$(ceil_of "$current")"
 next_idx=$((cur_idx + 1))
 
@@ -126,8 +142,12 @@ if [ "$ADVANCE" -eq 1 ]; then
         log_err "--advance refused: total=$total exceeds ${next} ceiling=${next_ceiling}"
         exit 1
     fi
-    echo "current=${next}" > "$BASELINE"
-    log_ok "milestone advanced: ${current} -> ${next} (total=${total} <= ${next_ceiling})"
+    cupolas_new_pin="$cupolas_pin"
+    if [ "$cupolas_total" -lt "$cupolas_new_pin" ]; then
+        cupolas_new_pin="$cupolas_total"
+    fi
+    printf 'current=%s\ncupolas=%s\n' "$next" "$cupolas_new_pin" > "$BASELINE"
+    log_ok "milestone advanced: ${current} -> ${next} (total=${total} <= ${next_ceiling}), cupolas pin -> ${cupolas_new_pin}"
     current="$next"
     ceiling="$next_ceiling"
     cur_idx="$next_idx"
@@ -143,6 +163,13 @@ if [ "$total" -gt "$ceiling" ]; then
 fi
 
 log_ok "total=${total} <= ${current} ceiling=${ceiling} (slack=$((ceiling - total)))"
+
+if [ "$cupolas_total" -gt "$cupolas_pin" ]; then
+    log_err "cupolas sub-ledger: total=${cupolas_total} exceeds pin=${cupolas_pin} by $((cupolas_total - cupolas_pin))"
+    log_err "子账棘轮只降不升：cupolas 缩水不抵扣机制核账，但同样禁止增长"
+    exit 1
+fi
+log_ok "cupolas=${cupolas_total} <= pin=${cupolas_pin} (子账 slack=$((cupolas_pin - cupolas_total)))"
 
 if [ "$next_idx" -lt "${#MILESTONES[@]}" ]; then
     next="${MILESTONES[$next_idx]}"
