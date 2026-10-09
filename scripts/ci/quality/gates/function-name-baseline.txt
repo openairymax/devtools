@@ -1346,12 +1346,9 @@ initialize_atomic_vars
 initialize_loop_resources
 init_performance_stats
 intent_add_rule_to_parser
-intent_contains_ignore_case
 intent_extract_entities
-intent_extract_keywords
 intent_free_rule_list
 intent_match_by_rules
-intent_string_similarity
 interactive_approval_block
 interactive_approval_create
 interactive_approval_destroy
