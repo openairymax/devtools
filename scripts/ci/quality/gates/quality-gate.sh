@@ -787,6 +787,35 @@ gate_fanout() {
 }
 
 # ============================================================================
+# Gate 26: G1 功能守恒（公开功能面符号快照双跑）
+# 生产码 AIRY_API 公开函数符号集 S 与基线 S0 双向对比：丢失即 fail-closed，
+# 新增须以 --update-baseline 显式记账。免构建、确定性、跨平台。
+# 退出码: 0=通过 1=公开面变更(丢失/未记账新增) 2=环境错误(告警)
+# ============================================================================
+gate_symbol_conservation() {
+    section "Gate 26: Symbol Conservation Check (G1, public surface)"
+
+    local sc_script="${SCRIPT_DIR}/symbol-conservation-check.sh"
+    if [ -f "$sc_script" ]; then
+        log_info "Running G1 public-surface symbol conservation check..."
+        local sc_out sc_rc=0
+        sc_out=$(bash "$sc_script" 2>&1) || sc_rc=$?
+        echo "$sc_out" | tail -40
+        if [ "$sc_rc" -eq 0 ]; then
+            check_gate "SymbolConservation" 0
+        elif [ "$sc_rc" -eq 2 ]; then
+            log_warn "symbol conservation check: environment error, manual review required"
+            check_gate "SymbolConservation" 2
+        else
+            check_gate "SymbolConservation" 1
+        fi
+    else
+        log_warn "symbol conservation check script not found: ${sc_script}"
+        check_gate "SymbolConservation" 2
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -810,6 +839,7 @@ main() {
     local skip_policy_payload=false
     local skip_layer=false
     local skip_fanout=false
+    local skip_symbol=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -894,12 +924,16 @@ main() {
                 skip_fanout=true
                 shift
                 ;;
+            --skip-symbol)
+                skip_symbol=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -927,6 +961,7 @@ main() {
                 echo "  23. Policy Payload Check (G18/G19, mechanism-core zero vendor names)"
                 echo "  24. Layer Boundary Check (G21/G23, one-way + zero cross-process symbol)"
                 echo "  25. Fan-out Check (G13, header load <= 5 + target fan ratchet)"
+                echo "  26. Symbol Conservation Check (G1, AIRY_API public surface)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -949,6 +984,7 @@ main() {
                 echo "  --skip-policy-payload  Skip G18/G19 policy payload (mechanism-core zero vendor names) check"
                 echo "  --skip-layer          Skip G21/G23 layer boundary (one-way + zero cross-process symbol) check"
                 echo "  --skip-fanout         Skip G13 fan-out (header load <= 5 + target fan ratchet) check"
+                echo "  --skip-symbol         Skip G1 public-surface symbol conservation check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -989,6 +1025,7 @@ main() {
         $skip_policy_payload || gate_policy_payload
         $skip_layer || gate_layer
         $skip_fanout || gate_fanout
+        $skip_symbol || gate_symbol_conservation
     fi
 
     # 输出结果
