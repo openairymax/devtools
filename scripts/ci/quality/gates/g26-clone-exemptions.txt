@@ -4,7 +4,9 @@
 #   路径相对 agentrt 根、'/' 分隔、顺序无关；克隆组内全部文件都属于清单中
 #   某一对时整组豁免，涉及第三个文件则绝不豁免（见 clone_detect.py 判据 5）。
 #
-# 豁免族定义（唯一理由）：corekern standalone/freestanding 闭包对 commons
+# 豁免族定义（唯一理由）：
+#
+# 族 1 corekern-mirror：corekern standalone/freestanding 闭包对 commons
 #   权威源的按设计镜像——corekern 作为下层不得依赖 commons 实现或重头文件，
 #   故将自身实际消费的最小片段（算法 / 宏 / 守卫类型）镜像留存。镜像为架构
 #   决议所需而非偷懒复制：id 算法因 freestanding 无 hosted libc 且跨 TU 序列
@@ -12,7 +14,15 @@
 #   AIRY_*_T_DEFINED）为「不得包含 commons/utils/* 头」下的最小自持副本。
 #   镜像以清单如实记账，不在代码中消解（台账 §178/§181）。
 #
-# 新增豁免必须：属上述唯一族 + 附架构决议依据；其余一切重复走代码消解。
+# 族 2 dsl-selfcontain：[DSL] 降级生存层块（#ifdef AIRY_SC_FALLBACK 区域）
+#   按 docs/docs-linux/10-architecture/11-degraded-survival-layer.md §5.3
+#   必须自包含——不得依赖 [SC] 主体任何符号，且构建系统对降级块区域单独
+#   hash 校验（完整性边界 = 降级块文本本身）。故降级块与主体间的同形片段
+#   为容灾兜底所需而非偷懒复制：主体完好时被守卫宏短路，主体损坏时恢复
+#   类型桥接。以清单如实记账，不在代码中消解（台账 §320）。
+#
+# 新增豁免必须：属上述豁免族之一 + 附架构决议依据；其余一切重复走代码消解。
 atoms/corekern/freestanding/src/shim_id.c | commons/utils/id/airy_id.c | corekern-mirror
 atoms/corekern/include/kern_error.h | commons/utils/error/error.h | corekern-mirror
 atoms/corekern/include/corekern_observability.h | commons/utils/types/types.h | corekern-mirror
+commons/include/airymax/uapi_compat.h | commons/include/airymax/uapi_compat.h | dsl-selfcontain
