@@ -14,7 +14,10 @@
 # 判定项：
 #   A. 白名单自洽：link-whitelist.txt 可解析、目标唯一、语法合法；值侧出现的
 #      项目库（前缀 airy_/libairy_/coreloopthree/cognition/svc_/daemon_）必须
-#      解析到真实 CMake 目标，否则即「未登记项目库」，fail-closed。
+#      解析到真实 CMake 目标，否则即「未登记项目库」，fail-closed。目标宇宙 =
+#      agentrt 树 ∪ 顶层装配块挂载的外户源根（products/ 下 cupolas /
+#      lang_gateway / cognition），使外户目标（如 airy_cupolas_service）合法
+#      解析（§296 修复：曾仅扫 agentrt，误判外户目标未登记而 fail-closed）。
 #   B. 层界单向（G21，白名单面）：认知引擎只对 think_d 暴露服务面——gateway 系
 #      目标禁链 coreloopthree/cognition；内核机制只被 daemon 服务面访问——
 #      客户端目标（airy_cli / gateway 系）禁链 airy_atoms。
@@ -127,8 +130,23 @@ else
     log_ok "A3. 白名单目标唯一"
 fi
 
+# A4 目标宇宙 = agentrt 树 ∪ 顶层装配块挂载的外户源根。0.1.19 方案 §1.3
+# 将 cupolas 等产品壳迁出核心树至 products/；agentrt/CMakeLists.txt 顶层
+# 装配块以三态探测 add_subdirectory 挂载 cupolas / lang_gateway / cognition
+# （§255 起 cupolas_d 亦于顶层挂载），其 CMake 目标（airy_cupolas_service /
+# cupolas_d 等）合法出现在白名单值侧。源根缺席（standalone 平铺布局）即
+# 跳过，等价该外户未挂载。
+CMAKE_SCAN_ROOTS=("$AGENTRT")
+for _ext in cupolas lang_gateway cognition; do
+    _ext_dir="$PROJECT_ROOT/agent-workload/products/$_ext"
+    if [ -d "$_ext_dir" ]; then
+        CMAKE_SCAN_ROOTS+=("$_ext_dir")
+    fi
+done
+EXT_ROOT_N=$(( ${#CMAKE_SCAN_ROOTS[@]} - 1 ))
+
 CMAKE_TARGETS="$(grep -rhE '^[[:space:]]*add_(library|executable)[[:space:]]*\(' \
-    --include=CMakeLists.txt "$AGENTRT" 2>/dev/null \
+    --include=CMakeLists.txt "${CMAKE_SCAN_ROOTS[@]}" 2>/dev/null \
     | sed -E 's/^[[:space:]]*add_(library|executable)[[:space:]]*\([[:space:]]*//' \
     | awk '{print $1}' | grep -E '^[A-Za-z_][A-Za-z0-9_]*$' | sort -u || true)"
 CMAKE_N="$(printf '%s\n' "$CMAKE_TARGETS" | grep -c . || true)"
@@ -149,7 +167,7 @@ while IFS=$'\t' read -r t libs; do
     done
 done <<< "$WL_GOOD"
 if [ "$UNREG" -eq 0 ]; then
-    log_ok "A4. 值侧项目库全部解析到已知目标（CMake 目标 ${CMAKE_N} 个）"
+    log_ok "A4. 值侧项目库全部解析到已知目标（CMake 目标 ${CMAKE_N} 个；外户源根 ${EXT_ROOT_N} 个）"
 fi
 
 allowed_set() {  # $1=target -> 该目标允许链接的项目库（空格分隔）
