@@ -579,11 +579,13 @@ check_ban_175_180() {
 
     # BAN-175: Thinkdual 契约检查
     # 注：契约名以实际在位的 API 为准——
-    #   · 思维链：thinking_chain.h 导出 airy_tc_chain_create/destroy（非 thinking_chain_*）
+    #   · 思维链：tc.h 定义 airy_tc_ops_t 能力表（chain_create/destroy 为其成员），
+    #     经 are_ops_set_tc()/are_ops_get_tc() 注入与分发；旧全局符号
+    #     airy_tc_chain_create/destroy 已随 ops 表收口废除（勿再引用）
     #   · 三重批判协调器：triple_coordinator 已按 CHANGELOG 废除，由 GRAD 取代（grad_coordinator）
     log_info "BAN-175: Checking dual thinking system contracts..."
     local dt_contracts=0
-    grep -rq 'airy_tc_chain_create\|airy_tc_chain_destroy' \
+    grep -rq 'airy_tc_ops_t' \
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'grad_coordinator' \
         --include="*.h" "${PROJECT_ROOT}/agent-workload/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
