@@ -5,12 +5,18 @@
  * @file test_c_link_05_safety_tool.c
  * @brief C-L05 Integration Test: Cupolas SafetyGuard → tool_d
  *
- * Tests the safety guard bridge connecting Cupolas SafetyGuard to tool_d:
+ * Tests the safety guard bridge connecting Cupolas SafetyGuard to tool_d
+ * through the public chain entry safety_guard_bridge_check_for_agent():
  * 1. Normal path: All 6 guard types pass → tool execution allowed
  * 2. Error path: Permission denied → DENY result
  * 3. Error path: Rate limit exceeded → DENY result
  * 4. Timeout path: Guard chain timeout handling
  * 5. Concurrent path: Multiple simultaneous guard checks
+ *
+ * The per-guard single-shot probes (permission / rate-limit / content-filter
+ * direct calls) and the stats / audit direct probes were removed together
+ * with the dead exports they exercised: those behaviours are internal
+ * guard-chain stages now, observable only through the chain result.
  */
 
 #include <stdio.h>
@@ -92,7 +98,8 @@ static void test_normal_all_guards_pass(void) {
     safety_guard_bridge_result_t result;
     memset(&result, 0, sizeof(result));
 
-    int ret = safety_guard_bridge_check(bridge, &meta, params, &result);
+    /* agent_id = NULL: fall back to the bridge default (test-agent-001) */
+    int ret = safety_guard_bridge_check_for_agent(bridge, NULL, &meta, params, &result);
     CHECK_EQ(ret, 0, "All guards should pass");
 
     CHECK(result.permission_passed, "Permission guard should pass");
@@ -104,35 +111,6 @@ static void test_normal_all_guards_pass(void) {
 
     free(meta.name);
     free(meta.description);
-    safety_guard_bridge_destroy(bridge);
-    PASS();
-}
-
-/* ============================================================================
- * P1.16e-2: Normal Path — Individual guard checks
- * ============================================================================ */
-
-static void test_normal_individual_guards(void) {
-    TEST("C-L05 Normal: Individual guard checks (permission, rate, content)");
-
-    safety_guard_bridge_t *bridge = safety_guard_bridge_create(NULL);
-    CHECK(bridge != NULL, "safety_guard_bridge_create returned NULL");
-
-    /* Permission check */
-    int ret = safety_guard_bridge_check_permission(bridge, "agent-001",
-                                                    "file_read", "execute");
-    CHECK_EQ(ret, 0, "Permission check should pass");
-
-    /* Rate limit check */
-    ret = safety_guard_bridge_check_rate_limit(bridge, "file_read");
-    CHECK_EQ(ret, 0, "Rate limit check should pass");
-
-    /* Content filter */
-    char sanitized[4096] = {0};
-    ret = safety_guard_bridge_filter_content(bridge, "{\"path\": \"/tmp/test\"}",
-                                              sanitized, sizeof(sanitized));
-    CHECK_EQ(ret, 0, "Content filter should pass");
-
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -164,7 +142,7 @@ static void test_error_permission_denied(void) {
     safety_guard_bridge_result_t result;
     memset(&result, 0, sizeof(result));
 
-    int ret = safety_guard_bridge_check(bridge, &meta, params, &result);
+    int ret = safety_guard_bridge_check_for_agent(bridge, NULL, &meta, params, &result);
     /* Permission check should fail for restricted agent */
     CHECK(ret != 0 || !result.permission_passed,
           "Restricted agent should be denied shell_exec");
@@ -184,24 +162,27 @@ static void test_error_rate_limit_exceeded(void) {
 
     safety_guard_bridge_config_t config = {0};
     config.enable_rate_limit_guard = true;
-    config.enable_permission_guard = false;
-    config.enable_content_filter = false;
-    config.enable_input_sanitization = false;
-    config.enable_resource_quota = false;
-    config.enable_audit_guard = false;
     config.rate_limit_per_minute = 2; /* Very low limit */
 
     safety_guard_bridge_t *bridge = safety_guard_bridge_create(&config);
     CHECK(bridge != NULL, "safety_guard_bridge_create returned NULL");
 
-    /* Exhaust the rate limit */
+    tool_metadata_t meta = {0};
+    meta.name = "file_read";
+    meta.description = "rate limit probe";
+    safety_guard_bridge_result_t result;
+
+    /* Exhaust the rate limit through the guard chain */
     for (int i = 0; i < 10; i++) {
-        safety_guard_bridge_check_rate_limit(bridge, "file_read");
+        memset(&result, 0, sizeof(result));
+        safety_guard_bridge_check_for_agent(bridge, NULL, &meta, "{}", &result);
     }
 
     /* Next check should be rate limited */
-    int ret = safety_guard_bridge_check_rate_limit(bridge, "file_read");
-    CHECK(ret != 0, "Rate limit should be exceeded after many calls");
+    memset(&result, 0, sizeof(result));
+    int ret = safety_guard_bridge_check_for_agent(bridge, NULL, &meta, "{}", &result);
+    CHECK(ret != 0 && !result.rate_limit_passed,
+          "Rate limit should be exceeded after many calls");
 
     safety_guard_bridge_destroy(bridge);
     PASS();
@@ -217,14 +198,8 @@ static void test_error_null_bridge(void) {
     tool_metadata_t meta = {0};
     safety_guard_bridge_result_t result;
 
-    int ret = safety_guard_bridge_check(NULL, &meta, "{}", &result);
+    int ret = safety_guard_bridge_check_for_agent(NULL, NULL, &meta, "{}", &result);
     CHECK(ret != 0, "NULL bridge check should fail");
-
-    ret = safety_guard_bridge_check_permission(NULL, "agent", "tool", "execute");
-    CHECK(ret != 0, "NULL bridge permission check should fail");
-
-    ret = safety_guard_bridge_check_rate_limit(NULL, "tool");
-    CHECK(ret != 0, "NULL bridge rate limit check should fail");
 
     /* NULL bridge destroy should be safe */
     safety_guard_bridge_destroy(NULL);
@@ -260,7 +235,7 @@ static void test_timeout_guard_chain(void) {
     safety_guard_bridge_result_t result;
 
     /* Guard chain should complete quickly */
-    int ret = safety_guard_bridge_check(bridge, &meta, params, &result);
+    int ret = safety_guard_bridge_check_for_agent(bridge, NULL, &meta, params, &result);
     CHECK_EQ(ret, 0, "Guard chain should complete within timeout");
 
     CHECK_EQ(result.guard_chain_length, 6, "Should have 6 guards in chain");
@@ -304,7 +279,8 @@ static void *concurrent_safety_thread(void *arg) {
         safety_guard_bridge_result_t result;
         memset(&result, 0, sizeof(result));
 
-        int ret = safety_guard_bridge_check(args->bridge, &meta, params, &result);
+        int ret = safety_guard_bridge_check_for_agent(args->bridge, NULL, &meta,
+                                                       params, &result);
         if (ret == 0) {
             args->success_count++;
         } else {
@@ -354,49 +330,6 @@ static void test_concurrent_safety_checks(void) {
              SAFETY_CONCURRENT_THREADS * SAFETY_CHECKS_PER_THREAD,
              "All checks should complete");
 
-    /* Verify stats */
-    uint64_t total_checks = 0, denied = 0, rate_limited = 0;
-    safety_guard_bridge_get_stats(bridge, &total_checks, &denied, &rate_limited);
-    CHECK(total_checks > 0, "Stats should reflect performed checks");
-
-    safety_guard_bridge_destroy(bridge);
-    PASS();
-}
-
-/* ============================================================================
- * P1.16e-8: Audit log recording
- * ============================================================================ */
-
-static void test_audit_log_recording(void) {
-    TEST("C-L05 Normal: Audit log recording on DENY");
-
-    safety_guard_bridge_config_t config = {0};
-    config.enable_audit_guard = true;
-    config.enable_permission_guard = true;
-    config.agent_id = "audit-agent";
-
-    safety_guard_bridge_t *bridge = safety_guard_bridge_create(&config);
-    CHECK(bridge != NULL, "safety_guard_bridge_create returned NULL");
-
-    /* Record an audit event */
-    int ret = safety_guard_bridge_audit_log(bridge, "TOOL_DENY",
-                                             "shell_exec", 0,
-                                             "Permission denied by RBAC",
-                                             "audit-agent");
-    CHECK_EQ(ret, 0, "Audit log should be recorded successfully");
-
-    /* Record another event */
-    ret = safety_guard_bridge_audit_log(bridge, "RATE_LIMIT",
-                                         "file_read", 0,
-                                         "Rate limit exceeded",
-                                         "audit-agent");
-    CHECK_EQ(ret, 0, "Second audit log should be recorded");
-
-    /* Verify stats reflect the denies */
-    uint64_t total_checks = 0, denied = 0, rate_limited = 0;
-    safety_guard_bridge_get_stats(bridge, &total_checks, &denied, &rate_limited);
-    CHECK((int64_t)denied >= 0, "Stats should be accessible");
-
     safety_guard_bridge_destroy(bridge);
     PASS();
 }
@@ -416,20 +349,15 @@ int main(void) {
      * 以验证 P1.16e-3 的权限拒绝路径。 */
     daemon_security_init(NULL, NULL);
     daemon_security_add_acl_rule("test-agent-001", "file_read", true);
-    daemon_security_add_acl_rule("agent-001", "file_read", true);
     daemon_security_add_acl_rule("test-agent", "quick_tool", true);
     daemon_security_add_acl_rule("concurrent-agent", "concurrent_tool", true);
-    daemon_security_add_acl_rule("audit-agent", "shell_exec", true);
-    daemon_security_add_acl_rule("audit-agent", "file_read", true);
 
     test_normal_all_guards_pass();
-    test_normal_individual_guards();
     test_error_permission_denied();
     test_error_rate_limit_exceeded();
     test_error_null_bridge();
     test_timeout_guard_chain();
     test_concurrent_safety_checks();
-    test_audit_log_recording();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            g_tests_passed, g_tests_total, g_tests_failed);
