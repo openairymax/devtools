@@ -4,7 +4,7 @@
 
 ## 概述
 
-`unit/` 目录是 AgentRT 的单元测试中心，共 **129 个文件**（含 3 个结构文件与 1 个遗留日志），按被测模块划分为 `atoms/`、`commons/`、`cupolas/`、`daemon/`、`heapstore/`、`manager/`、`scripts/`、`toolkit/`、`utils/` 等子目录。C 语言测试经 CMake 构建后用 ctest 运行；Python 测试（manager 的配置校验套件、scripts 的插件注册表测试、toolkit 的 SDK/管理器测试等）使用 pytest 驱动。每个测试文件专注于验证单个模块或函数的正确性，确保各组件在隔离环境下行为符合预期。
+`unit/` 目录是 AgentRT 的单元测试中心，共 **117 个文件**（含 3 个结构文件与 1 个遗留日志），按被测模块划分为 `atoms/`、`commons/`、`cupolas/`、`daemon/`、`manager/`、`scripts/`、`toolkit/`、`utils/` 等子目录。C 语言测试经 CMake 构建后用 ctest 运行；Python 测试（manager 的配置校验套件、scripts 的插件注册表测试、toolkit 的 SDK/管理器测试等）使用 pytest 驱动。每个测试文件专注于验证单个模块或函数的正确性，确保各组件在隔离环境下行为符合预期。
 
 单元测试遵循以下原则：
 
@@ -18,7 +18,7 @@
 ## 目录结构
 
 ```
-unit/                              # 共 129 个文件
+unit/                              # 共 117 个文件
 ├── README.md                      # 本文档
 ├── CMakeLists.txt                 # 单元测试构建入口（挂载 atoms/coreloopthree、commons/unit）
 ├── __init__.py                    # Python 包初始化
@@ -40,7 +40,6 @@ unit/                              # 共 129 个文件
 │   ├── monit_d/                   #   监控告警守护进程测试（4 个文件）
 │   ├── sched_d/                   #   任务调度守护进程测试（2 个文件）
 │   └── tool_d/                    #   工具执行守护进程测试（7 个文件，含 Python 测试 test_tool_service.py）
-├── heapstore/                     # 堆存储测试（12 个文件：核心/注册表/批量/IPC/日志/内存/追踪/边界/模糊并发等）
 ├── manager/                       # 统一配置管理中心 Python 测试（8 个文件，run_all_tests.py 为运行入口）
 ├── scripts/                       # scripts/toolkit 插件注册表 pytest 测试（1 个文件：test_plugin.py）
 ├── toolkit/                       # 运维工具包与多语言 SDK Python 测试（12 个文件）
