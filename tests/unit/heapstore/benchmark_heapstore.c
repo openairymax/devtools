@@ -21,7 +21,6 @@
 #include "heapstore_log.h"
 #include "heapstore_registry.h"
 #include "heapstore_trace.h"
-#include "heapstore_ipc.h"
 #include "heapstore_memory.h"
 
 #define BENCHMARK_ITERATIONS 10000
@@ -165,45 +164,6 @@ static void benchmark_trace_batch_write(void) {
     heapstore_shutdown();
 }
 
-static void benchmark_ipc_operations(void) {
-    printf("\n=== IPC Operations Benchmark ===\n");
-
-    heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
-
-    double start = get_time_ms();
-
-    for (int i = 0; i < 5000; i++) {
-        heapstore_ipc_channel_t channel;
-        AIRY_MEMSET(&channel, 0, sizeof(channel));
-        snprintf(channel.channel_id, sizeof(channel.channel_id), "bench_ch_%d", i);
-        snprintf(channel.name, sizeof(channel.name), "Benchmark Channel %d", i);
-        snprintf(channel.type, sizeof(channel.type), "benchmark");
-        channel.created_at = (uint64_t)time(NULL);
-        snprintf(channel.status, sizeof(channel.status), "active");
-
-        heapstore_ipc_record_channel(&channel);
-    }
-
-    double elapsed = get_time_ms() - start;
-    printf("5000 IPC channel inserts: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 5000 * 1000.0 / elapsed);
-
-    start = get_time_ms();
-
-    for (int i = 0; i < 5000; i++) {
-        heapstore_ipc_channel_t channel;
-        AIRY_MEMSET(&channel, 0, sizeof(channel));
-        snprintf(channel.channel_id, sizeof(channel.channel_id), "bench_ch_%d", i);
-        heapstore_ipc_get_channel(channel.channel_id, &channel);
-    }
-
-    elapsed = get_time_ms() - start;
-    printf("5000 IPC channel lookups: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 5000 * 1000.0 / elapsed);
-
-    heapstore_shutdown();
-}
-
 static void benchmark_memory_operations(void) {
     printf("\n=== Memory Operations Benchmark ===\n");
 
@@ -246,37 +206,6 @@ static void benchmark_memory_operations(void) {
     heapstore_shutdown();
 }
 
-static void benchmark_stats_operations(void) {
-    printf("\n=== Stats Operations Benchmark ===\n");
-
-    heapstore_init(&(heapstore_config_t){.root_path = "bench_heapstore"});
-
-    for (int i = 0; i < 1000; i++) {
-        heapstore_ipc_channel_t channel;
-        AIRY_MEMSET(&channel, 0, sizeof(channel));
-        snprintf(channel.channel_id, sizeof(channel.channel_id), "stats_ch_%d", i);
-        snprintf(channel.name, sizeof(channel.name), "Stats Channel %d", i);
-        snprintf(channel.type, sizeof(channel.type), "stats");
-        channel.created_at = (uint64_t)time(NULL);
-        snprintf(channel.status, sizeof(channel.status), "active");
-        heapstore_ipc_record_channel(&channel);
-    }
-
-    double start = get_time_ms();
-
-    for (int i = 0; i < 10000; i++) {
-        uint32_t ch_count = 0, buf_count = 0;
-        uint64_t total_size = 0;
-        heapstore_ipc_get_stats(&ch_count, &buf_count, &total_size);
-    }
-
-    double elapsed = get_time_ms() - start;
-    printf("10000 stats queries: %.2f ms (%.2f ops/sec)\n",
-           elapsed, 10000 * 1000.0 / elapsed);
-
-    heapstore_shutdown();
-}
-
 int main(void) {
     printf("===========================================\n");
     printf("   AgentRT heapstore Performance Benchmark\n");
@@ -291,9 +220,7 @@ int main(void) {
     benchmark_registry_insert();
     benchmark_trace_write();
     benchmark_trace_batch_write();
-    benchmark_ipc_operations();
     benchmark_memory_operations();
-    benchmark_stats_operations();
 
     printf("\n===========================================\n");
     printf("           Benchmark Complete\n");

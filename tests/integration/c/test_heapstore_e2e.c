@@ -6,7 +6,6 @@
  * - CRUD 全生命周期：创建 → 写入 → 读取 → 更新 → 删除 → 验证
  * - 批量写入与批量删除
  * - 注册表服务注册/查找/列表/注销
- * - IPC 跨角色数据传递（生产者 → 消费者）
  * - Token 计数分配/使用/释放/复用
  * - 持久化：写入 → 同步 → 关闭 → 重开 → 验证数据完整
  *
@@ -19,7 +18,6 @@
 
 #include "heapstore.h"
 #include "heapstore_batch.h"
-#include "heapstore_ipc.h"
 #include "heapstore_memory.h"
 #include "heapstore_registry.h"
 #include "heapstore_token.h"
@@ -374,112 +372,13 @@ static void e2e_scenario_3_registry_service_management(void)
 }
 
 /* ======================================================================== */
-/*  场景4: HeapStore IPC 跨角色数据传递                                     */
-/*  创建通道 → 生产者写入 → 消费者读取 → 验证数据完整性                      */
-/* ======================================================================== */
-
-static void e2e_scenario_4_ipc_producer_consumer(void)
-{
-    printf("\n--- [E2E-HS-04] HeapStore IPC 跨角色数据传递 ---\n");
-
-    heapstore_error_t err = e2e_heapstore_init("ipc");
-    TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 1: HeapStore 初始化成功");
-
-    err = heapstore_ipc_init();
-    TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED,
-                "Step 1: IPC 子系统初始化");
-
-    /* Step 2: 创建 IPC 通道 */
-    const char *channel_id = "ch_e2e_producer_consumer";
-    const char *channel_name = "E2E Producer-Consumer Channel";
-
-    err = heapstore_ipc_create_channel(channel_id, channel_name, "binder", 8192);
-    TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED,
-                "Step 2: 创建 IPC 通道");
-
-    /* Step 3: 生产者写入数据 */
-    const char *producer_data = "Hello from Producer! E2E IPC test payload.";
-    size_t producer_len = strlen(producer_data) + 1;
-
-    err = heapstore_ipc_send(channel_id, producer_data, producer_len);
-    TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_NOT_FOUND ||
-                err == heapstore_ERR_NOT_SUPPORTED,
-                "Step 3: 生产者发送数据");
-
-    /* Step 4: 消费者读取数据 */
-    if (err == heapstore_SUCCESS) {
-        void *consumer_data = NULL;
-        size_t consumer_len = 0;
-
-        err = heapstore_ipc_receive(channel_id, &consumer_data, &consumer_len);
-        if (err == heapstore_SUCCESS && consumer_data != NULL) {
-            TEST_ASSERT(consumer_len == producer_len,
-                        "Step 4: 消费者接收数据长度匹配");
-            TEST_ASSERT(memcmp(consumer_data, producer_data, producer_len) == 0,
-                        "Step 4: 消费者接收数据内容完整");
-            free(consumer_data);
-        } else {
-            TEST_ASSERT(1, "Step 4: 消费者接收接口可调用");
-        }
-    } else {
-        TEST_ASSERT(1, "Step 4: 跳过消费者验证（通道不支持直接传输）");
-    }
-
-    /* Step 5: 通过元数据通道验证数据完整性 */
-    heapstore_ipc_channel_t ch_info;
-    AIRY_MEMSET(&ch_info, 0, sizeof(ch_info));
-    err = heapstore_ipc_get_channel(channel_id, &ch_info);
-    if (err == heapstore_SUCCESS) {
-        TEST_ASSERT_STR_EQ(ch_info.name, channel_name, "Step 5: 通道名称匹配");
-        TEST_ASSERT_STR_EQ(ch_info.channel_id, channel_id, "Step 5: 通道 ID 匹配");
-    }
-
-    /* Step 6: 记录并读取 IPC 缓冲区 */
-    heapstore_ipc_buffer_t buffer;
-    AIRY_MEMSET(&buffer, 0, sizeof(buffer));
-    snprintf(buffer.buffer_id, sizeof(buffer.buffer_id), "buf_e2e_%ld", (long)now_timestamp());
-    snprintf(buffer.channel_id, sizeof(buffer.channel_id), "%s", channel_id);
-    buffer.size = 4096;
-    buffer.used = 2048;
-    buffer.created_at = now_timestamp();
-    snprintf(buffer.status, sizeof(buffer.status), "active");
-
-    err = heapstore_ipc_record_buffer(&buffer);
-    if (err == heapstore_SUCCESS) {
-        heapstore_ipc_buffer_t read_buf;
-        AIRY_MEMSET(&read_buf, 0, sizeof(read_buf));
-        err = heapstore_ipc_get_buffer(buffer.buffer_id, &read_buf);
-        TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 6: 读取缓冲区记录成功");
-        TEST_ASSERT(read_buf.size == buffer.size, "Step 6: 缓冲区大小匹配");
-    }
-
-    /* Step 7: IPC 统计验证 */
-    uint32_t ch_count = 0, buf_count = 0;
-    uint64_t total_size = 0;
-    err = heapstore_ipc_get_stats(&ch_count, &buf_count, &total_size);
-    TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 7: IPC 统计查询成功");
-    TEST_ASSERT(ch_count >= 1, "Step 7: 至少1个通道");
-
-    /* Step 8: 清理通道 */
-    err = heapstore_ipc_destroy_channel(channel_id);
-    TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_NOT_FOUND,
-                "Step 8: 销毁 IPC 通道");
-
-    bool ipc_healthy = heapstore_ipc_is_healthy();
-    TEST_ASSERT(ipc_healthy, "Step 8: IPC 系统健康");
-
-    heapstore_ipc_shutdown();
-    heapstore_shutdown();
-}
-
-/* ======================================================================== */
-/*  场景5: HeapStore Token 管理                                              */
+/*  场景4: HeapStore Token 管理                                              */
 /*  分配 Token → 使用 Token → 释放 Token → 验证复用                          */
 /* ======================================================================== */
 
-static void e2e_scenario_5_token_management(void)
+static void e2e_scenario_4_token_management(void)
 {
-    printf("\n--- [E2E-HS-05] HeapStore Token 管理 ---\n");
+    printf("\n--- [E2E-HS-04] HeapStore Token 管理 ---\n");
 
     heapstore_error_t err = e2e_heapstore_init("token");
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 1: HeapStore 初始化成功");
@@ -581,13 +480,13 @@ static void e2e_scenario_5_token_management(void)
 }
 
 /* ======================================================================== */
-/*  场景6: HeapStore 持久化验证                                              */
+/*  场景5: HeapStore 持久化验证                                              */
 /*  写入记录 → 同步到磁盘 → 关闭 → 重新打开 → 验证数据完整                   */
 /* ======================================================================== */
 
-static void e2e_scenario_6_persistence(void)
+static void e2e_scenario_5_persistence(void)
 {
-    printf("\n--- [E2E-HS-06] HeapStore 持久化验证 ---\n");
+    printf("\n--- [E2E-HS-05] HeapStore 持久化验证 ---\n");
 
     const char *persist_root = "hs_e2e_persist_root";
     char unique_id[128];
@@ -713,8 +612,9 @@ static void e2e_scenario_6_persistence(void)
         TEST_ASSERT(1, "Phase 2 Step 9: Skill 查询接口可调用");
 
         /* Step 10: 健康检查 */
-        bool reg_ok = false, trace_ok = false, log_ok = false, ipc_ok = false, mem_ok = false;
-        err = heapstore_health_check(&reg_ok, &trace_ok, &log_ok, &ipc_ok, &mem_ok);
+        /* ipc_ok 已随 IPC 通道子域清退，传 NULL */
+        bool reg_ok = false, trace_ok = false, log_ok = false, mem_ok = false;
+        err = heapstore_health_check(&reg_ok, &trace_ok, &log_ok, NULL, &mem_ok);
         TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Phase 2 Step 10: 健康检查成功");
         TEST_ASSERT(reg_ok, "Phase 2 Step 10: 注册表子系统健康");
 
@@ -726,13 +626,13 @@ static void e2e_scenario_6_persistence(void)
 }
 
 /* ======================================================================== */
-/*  场景7: HeapStore 跨子系统联动验证                                        */
-/*  同时操作 Registry + IPC + Memory + Token + Trace，验证子系统间无冲突      */
+/*  场景6: HeapStore 跨子系统联动验证                                        */
+/*  同时操作 Registry + Memory + Token + Trace，验证子系统间无冲突            */
 /* ======================================================================== */
 
-static void e2e_scenario_7_cross_subsystem(void)
+static void e2e_scenario_6_cross_subsystem(void)
 {
-    printf("\n--- [E2E-HS-07] HeapStore 跨子系统联动验证 ---\n");
+    printf("\n--- [E2E-HS-06] HeapStore 跨子系统联动验证 ---\n");
 
     heapstore_error_t err = e2e_heapstore_init("cross");
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 1: HeapStore 初始化成功");
@@ -742,10 +642,6 @@ static void e2e_scenario_7_cross_subsystem(void)
     TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED,
                 "Step 1: Registry 初始化");
 
-    err = heapstore_ipc_init();
-    TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED,
-                "Step 1: IPC 初始化");
-
     err = heapstore_memory_init();
     TEST_ASSERT(err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED,
                 "Step 1: Memory 初始化");
@@ -753,7 +649,7 @@ static void e2e_scenario_7_cross_subsystem(void)
     err = heapstore_token_init();
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 1: Token 初始化");
 
-    /* Step 2: 注册 Agent → 创建 IPC 通道 → 分配内存池 → 记录 Token */
+    /* Step 2: 注册 Agent → 分配内存池 → 记录 Token */
     heapstore_agent_record_t agent;
     AIRY_MEMSET(&agent, 0, sizeof(agent));
     snprintf(agent.id, sizeof(agent.id), "cross_agent_%ld", (long)now_timestamp());
@@ -766,19 +662,6 @@ static void e2e_scenario_7_cross_subsystem(void)
 
     err = heapstore_registry_add_agent(&agent);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 2: 注册 Agent");
-
-    heapstore_ipc_channel_t ch;
-    AIRY_MEMSET(&ch, 0, sizeof(ch));
-    snprintf(ch.channel_id, sizeof(ch.channel_id), "cross_ch_%ld", (long)now_timestamp());
-    snprintf(ch.name, sizeof(ch.name), "Cross-Subsystem Channel");
-    snprintf(ch.type, sizeof(ch.type), "binder");
-    ch.created_at = now_timestamp();
-    ch.buffer_size = 16384;
-    ch.current_usage = 0;
-    snprintf(ch.status, sizeof(ch.status), "active");
-
-    err = heapstore_ipc_record_channel(&ch);
-    TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 2: 记录 IPC 通道");
 
     heapstore_memory_pool_t pool;
     AIRY_MEMSET(&pool, 0, sizeof(pool));
@@ -804,11 +687,6 @@ static void e2e_scenario_7_cross_subsystem(void)
     err = heapstore_registry_get_agent(agent.id, &read_agent);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 Agent 记录");
 
-    heapstore_ipc_channel_t read_ch;
-    AIRY_MEMSET(&read_ch, 0, sizeof(read_ch));
-    err = heapstore_ipc_get_channel(ch.channel_id, &read_ch);
-    TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 IPC 通道");
-
     heapstore_memory_pool_t read_pool;
     AIRY_MEMSET(&read_pool, 0, sizeof(read_pool));
     err = heapstore_memory_get_pool(pool.pool_id, &read_pool);
@@ -820,9 +698,9 @@ static void e2e_scenario_7_cross_subsystem(void)
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 Token 统计");
     TEST_ASSERT(token_stats.total_prompt_tokens >= 5000, "Step 3: Token 统计正确");
 
-    /* Step 4: 健康检查所有子系统 */
-    bool reg_ok = false, trace_ok = false, log_ok = false, ipc_ok = false, mem_ok = false;
-    err = heapstore_health_check(&reg_ok, &trace_ok, &log_ok, &ipc_ok, &mem_ok);
+    /* Step 4: 健康检查所有子系统（ipc_ok 已随 IPC 通道子域清退，传 NULL） */
+    bool reg_ok = false, trace_ok = false, log_ok = false, mem_ok = false;
+    err = heapstore_health_check(&reg_ok, &trace_ok, &log_ok, NULL, &mem_ok);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 4: 全局健康检查成功");
 
     /* Step 5: 性能指标 */
@@ -835,7 +713,6 @@ static void e2e_scenario_7_cross_subsystem(void)
     /* Step 6: 清理 */
     heapstore_registry_delete_agent(agent.id);
     heapstore_memory_shutdown();
-    heapstore_ipc_shutdown();
     heapstore_token_shutdown();
     heapstore_registry_shutdown();
     heapstore_shutdown();
@@ -843,13 +720,13 @@ static void e2e_scenario_7_cross_subsystem(void)
 }
 
 /* ======================================================================== */
-/*  场景8: HeapStore 熔断器与错误恢复                                        */
+/*  场景7: HeapStore 熔断器与错误恢复                                        */
 /*  触发熔断器 → 验证熔断状态 → 重置熔断器 → 恢复正常                        */
 /* ======================================================================== */
 
-static void e2e_scenario_8_circuit_breaker(void)
+static void e2e_scenario_7_circuit_breaker(void)
 {
-    printf("\n--- [E2E-HS-08] HeapStore 熔断器与错误恢复 ---\n");
+    printf("\n--- [E2E-HS-07] HeapStore 熔断器与错误恢复 ---\n");
 
     heapstore_config_t config = {
         .root_path = "hs_e2e_circuit",
@@ -910,18 +787,17 @@ int main(void)
 {
     printf("========================================\n");
     printf("  AgentRT HeapStore E2E 集成测试套件\n");
-    printf("  覆盖: CRUD / Batch / Registry / IPC\n");
-    printf("        Token / Persistence / Cross-Subsystem / Circuit\n");
+    printf("  覆盖: CRUD / Batch / Registry / Token\n");
+    printf("        Persistence / Cross-Subsystem / Circuit\n");
     printf("========================================\n");
 
     e2e_scenario_1_crud_lifecycle();
     e2e_scenario_2_batch_operations();
     e2e_scenario_3_registry_service_management();
-    e2e_scenario_4_ipc_producer_consumer();
-    e2e_scenario_5_token_management();
-    e2e_scenario_6_persistence();
-    e2e_scenario_7_cross_subsystem();
-    e2e_scenario_8_circuit_breaker();
+    e2e_scenario_4_token_management();
+    e2e_scenario_5_persistence();
+    e2e_scenario_6_cross_subsystem();
+    e2e_scenario_7_circuit_breaker();
 
     printf("\n========================================\n");
     printf("  HeapStore E2E 测试结果汇总\n");
