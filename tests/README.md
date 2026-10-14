@@ -27,7 +27,6 @@
 | `unit/daemons/market_d/` | `agentrt/daemons/market_d/` | CMocka — 应用市场守护进程 |
 | `unit/daemons/monit_d/` | `agentrt/daemons/monit_d/` | CMocka — 监控告警守护进程 |
 | `unit/daemons/tool_d/` | `agentrt/daemons/tool_d/` | CMocka + pytest — 工具执行守护进程 |
-| `unit/heapstore/` | `agentrt/heapstore/` | CMocka — 运行时数据存储（SQLite + 内存后端混合存储） |
 | `unit/manager/` | `ecosystem/manager/` | pytest — 统一配置管理中心（多模块 Schema + 热重载） |
 | `unit/openlab/` | `ecosystem/openlab/` | pytest — 开放生态系统（Apps/Contrib/Markets） |
 | `unit/toolkit/` | `sdk/` + `scripts/toolkit/` | pytest — 运维工具包与多语言 SDK（Python/Rust） |
@@ -63,7 +62,7 @@ tests/
 ├── 构建配置
 │   ├── CMakeLists.txt           # 测试构建入口（C 测试）
 │   └── Makefile                 # Make 测试入口
-├── unit/                        # 单元测试（138 个文件）
+├── unit/                        # 单元测试（127 个文件）
 │   ├── atoms/                   #   Atoms 微核心层测试（26 个文件）
 │   │   ├── corekern/            #     微核心核心（7 个文件）
 │   │   ├── coreloopthree/       #     三环运行时（11 个文件）
@@ -81,7 +80,6 @@ tests/
 │   │   ├── monit_d/             #     监控告警（4 个文件）
 │   │   ├── sched_d/             #     任务调度（2 个文件）
 │   │   └── tool_d/              #     工具执行（7 个文件）
-│   ├── heapstore/               #   堆存储测试（11 个文件）
 │   ├── manager/                 #   管理器配置测试（8 个文件）
 │   ├── openlab/                 #   OpenLab 生态测试（10 个文件）
 │   └── toolkit/                 #   工具包与 SDK 测试（12 个文件）
