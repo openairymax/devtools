@@ -578,10 +578,6 @@ api_rec_next_credential
 api_rec_remove_credential
 api_rec_set_retry_config
 apply_capability_flags
-are_ipc_checksum_compute
-are_ipc_header_validate
-are_ipc_message_create
-are_ipc_message_destroy
 are_ops_get_checkpoint
 are_ops_get_heapstore
 are_ops_set_checkpoint
