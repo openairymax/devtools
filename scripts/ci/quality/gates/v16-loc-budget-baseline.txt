@@ -1,2 +1,2 @@
-current=M5
-cupolas=27125
+current=M6
+cupolas=27077
