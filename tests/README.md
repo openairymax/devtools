@@ -83,8 +83,8 @@ tests/
 │   ├── manager/                 #   管理器配置测试（8 个文件）
 │   ├── openlab/                 #   OpenLab 生态测试（10 个文件）
 │   └── toolkit/                 #   工具包与 SDK 测试（12 个文件）
-├── integration/                 # 集成测试（含端到端，17 个文件）
-│   ├── c/                       #   C 集成测试（3 个文件）
+├── integration/                 # 集成测试（含端到端，16 个文件）
+│   ├── c/                       #   C 集成测试（2 个文件）
 │   ├── python/                  #   Python 集成测试（3 个文件）
 │   ├── commons/                 #   Commons 集成测试（2 个文件）
 │   ├── coreloopthree/           #   三环系统集成（2 个文件）
