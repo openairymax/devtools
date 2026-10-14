@@ -784,7 +784,6 @@ daemon_ipc_ops_cleanup
 daemon_llm_ops_cleanup
 daemon_rpc_call_cancelable
 daemon_rpc_call_stream
-daemon_sanitize_llm_input
 daemon_sanitize_tool_params
 daemon_security_add_acl_rule
 daemon_security_load_rules_file
