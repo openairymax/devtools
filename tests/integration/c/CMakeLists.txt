@@ -185,41 +185,12 @@ configure_real_lib_test(test_c_link_05_safety_tool
 # （MCP→tool_d / OpenAI→llm_d / A2A→sched_d 协议适配器）替代，测试随机制废弃移除。
 # 新机制的验证由 HTTP 端到端承担（见 06-agent-gateway-wiring.md Phase 2 出口标准）。
 
-# C-L12: CoreLoopThree → MemoryRovol（已迁移到真实库）
-# v0.1.1 修复：真实 memoryrovol_bridge_create 依赖 builtin_init 成功，
-# 测试环境无 MemoryRovol 库时优雅降级到 builtin（弱符号机制）。
-# config_path 为 NULL 时使用默认路径，builtin_storage_create 会创建目录。
-#
-# Task #38: memoryrovol.h 是商业产品头文件，仅在 products/memoryrovol 存在时可用。
-# 当 MemoryRovol 不可用时跳过该测试（非阻断），避免编译失败。
-set(_MEMORYROVOL_INCLUDE_DIR "")
-if(TARGET airy_memoryrovol_bridge)
-    # 通过 airy_memoryrovol_bridge 接口库获取 include 路径
-    get_target_property(_bridge_inc airy_memoryrovol_bridge INTERFACE_INCLUDE_DIRECTORIES)
-    if(_bridge_inc)
-        set(_MEMORYROVOL_INCLUDE_DIR "${_bridge_inc}")
-    endif()
-elseif(DEFINED MEMORYROVOL_DIR AND EXISTS "${MEMORYROVOL_DIR}/include/memoryrovol.h")
-    set(_MEMORYROVOL_INCLUDE_DIR "${MEMORYROVOL_DIR}/include")
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../products/memoryrovol/include/memoryrovol.h")
-    set(_MEMORYROVOL_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../products/memoryrovol/include")
-endif()
-
-if(_MEMORYROVOL_INCLUDE_DIR AND (TARGET airy_memoryrovol OR TARGET airy_memoryrovol_bridge))
-    configure_real_lib_test(test_c_link_12_memoryrovol_bridge
-        LIBS airy_coreloopthree airy_memory airy_core svc_common
-    )
-    if(TARGET airy_memoryrovol)
-        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE airy_memoryrovol)
-    elseif(TARGET airy_memoryrovol_bridge)
-        target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE airy_memoryrovol_bridge)
-    endif()
-    if(NOT TARGET airy_memoryrovol)
-        target_include_directories(test_c_link_12_memoryrovol_bridge PRIVATE ${_MEMORYROVOL_INCLUDE_DIR})
-    endif()
-else()
-    airy_print_warn("  [integration] test_c_link_12_memoryrovol_bridge: SKIPPED (MemoryRovol commercial library not built — set AGENTRT_WITH_MEMORYROVOL=ON and build products/memoryrovol)")
-endif()
+# C-L12: CoreLoopThree → MemoryRovol — 已随 0.1.19 C3（记忆引擎双栈塌缩）
+# 整体退役。coreloopthree 的 memoryrovol_bridge 桥（memoryrovol_bridge.h/.c）
+# 与进程内 builtin provider 已消解：进程内唯一 provider 为 memrpc（coreloop
+# 经 provider vtable 转发 mem_d 守护进程）。连接线契约随桥退役，集成测试整体
+# 删除（对齐 C-L09 / C-L11 退役先例）。MemoryRovol 产品侧 API（airy_mr_*）
+# 的覆盖归属 products/memoryrovol，不在本连接线测试面内。
 
 # ============================================================================
 # 已有测试 (保留)
