@@ -81,7 +81,7 @@ tests/
 │   │   ├── monit_d/             #     监控告警（4 个文件）
 │   │   ├── sched_d/             #     任务调度（2 个文件）
 │   │   └── tool_d/              #     工具执行（7 个文件）
-│   ├── heapstore/               #   堆存储测试（13 个文件）
+│   ├── heapstore/               #   堆存储测试（11 个文件）
 │   ├── manager/                 #   管理器配置测试（8 个文件）
 │   ├── openlab/                 #   OpenLab 生态测试（10 个文件）
 │   └── toolkit/                 #   工具包与 SDK 测试（12 个文件）

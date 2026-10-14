@@ -17,7 +17,6 @@
 #include "heapstore_log.h"
 #include "heapstore_registry.h"
 #include "heapstore_trace.h"
-#include "heapstore_ipc.h"
 #include "heapstore_memory.h"
 
 static void test_full_lifecycle(void) {
@@ -73,11 +72,6 @@ static void test_all_subsystems_init(void) {
     err = heapstore_trace_init();
     if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
         printf("  Trace initialized\n");
-    }
-
-    err = heapstore_ipc_init();
-    if (err == heapstore_SUCCESS || err == heapstore_ERR_ALREADY_INITIALIZED) {
-        printf("  IPC initialized\n");
     }
 
     err = heapstore_memory_init();
@@ -202,11 +196,7 @@ static void test_concurrent_access_simulation(void) {
         heapstore_trace_get_stats(&total, &pending, &size);
     }
 
-    uint32_t ch_count = 0, buf_count = 0;
     uint64_t total_size = 0;
-    heapstore_ipc_get_stats(&ch_count, &buf_count, &total_size);
-    printf("  IPC - Channels: %u, Buffers: %u\n", ch_count, buf_count);
-
     uint32_t pool_count = 0, alloc_count = 0;
     heapstore_memory_get_stats(&pool_count, &alloc_count, &total_size);
     printf("  Memory - Pools: %u, Allocations: %u\n", pool_count, alloc_count);
