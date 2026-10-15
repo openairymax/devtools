@@ -1,10 +1,11 @@
 #!/bin/bash
 # 0.1.19 G2 体积硬门禁 + 里程碑阶梯（方案 §0.2 阶梯执法 / §0.5 G2）
 #
-# 口径（台账 §0.1；§254a；§254c）：agentrt/ 七模块（atoms commons daemons
-#   gateway heapstore protocols tools）下 *.c + *.h，排除 tests/，另计 cmake/
-#   组织码。cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，不入主账；
-#   §254c 起单列独立子账（基线键 cupolas=<N>），棘轮「只降不升」。
+# 口径（台账 §0.1；§254a；§254c；§229）：agentrt/ 七模块（atoms commons
+#   daemons gateway heapstore protocols tools）下 *.c + *.h，排除 tests/ 与
+#   third_party/（vendored 第三方，非项目自研码，§229 裁定比照 tests/ 排除），
+#   另计 cmake/ 组织码。cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，
+#   不入主账；§254c 起单列独立子账（基线键 cupolas=<N>），棘轮「只降不升」。
 # 阶梯（方案 §6.2）：M1 ≤348,000 / M2 ≤313,000 / M3 ≤312,000 / M4 ≤293,000 /
 #   M5 ≤243,000 / M6 ≤232,000 / M7 ≤184,000 / M8 ≤168,000 / M9 ≤146,000 /
 #   M10 <100,000。M7/M10 为锚点（±0），中间梯级为「塌缩波阶梯」（W1~W7），
@@ -100,7 +101,7 @@ cur_idx="$(idx_of "$current")" || {
     exit 2
 }
 
-section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 7 modules + cmake/, tests/ excluded; cupolas sub-ledger pin=${cupolas_pin})"
+section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 7 modules + cmake/, tests/ & third_party/ excluded; cupolas sub-ledger pin=${cupolas_pin})"
 
 total=0
 for m in "${MODULES[@]}"; do
@@ -110,7 +111,7 @@ for m in "${MODULES[@]}"; do
         exit 2
     fi
     n=$(find "$d" -type f \( -name '*.c' -o -name '*.h' \) \
-        | { grep -v '/tests/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
+        | { grep -v -e '/tests/' -e '/third_party/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
     total=$((total + n))
     printf '  %-10s %8d\n' "$m" "$n"
 done
@@ -126,7 +127,7 @@ echo "  ----------------------"
 printf '  %-10s %8d\n' "TOTAL" "$total"
 
 cupolas_total=$(find "$CUPOLAS_DIR" -type f \( -name '*.c' -o -name '*.h' \) \
-    | { grep -v '/tests/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
+    | { grep -v -e '/tests/' -e '/third_party/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
 printf '  %-10s %8d  (独立子账，不计入主 total)\n' "cupolas" "$cupolas_total"
 
 ceiling="$(ceil_of "$current")"
