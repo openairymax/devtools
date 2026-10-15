@@ -102,10 +102,9 @@ configure_real_lib_test(test_c_link_03_market_openlab
     LIBS airy_common
 )
 
-# C-L07: Checkpoint → CoreLoopThree（checkpoint_adapter 真实实现）
-configure_real_lib_test(test_c_link_07_checkpoint_loop
-    LIBS airy_coreloopthree
-)
+# C-L07: Checkpoint → CoreLoopThree — 已随 0.1.19 u76 checkpoint_adapter
+# 死面清除整体退役（adapter 四件套已删除，checkpoint 本体由 loop_checkpoint
+# 承载，svc_test_checkpoint 覆盖）
 
 # C-L08: ServiceDiscovery → All Daemons（service_discovery 真实实现）
 configure_real_lib_test(test_c_link_08_service_discovery
