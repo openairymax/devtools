@@ -1,20 +1,29 @@
 #!/bin/bash
 # 0.1.19 G2 体积硬门禁 + 里程碑阶梯（方案 §0.2 阶梯执法 / §0.5 G2）
 #
-# 口径（台账 §0.1；§254a；§254c；§229）：agentrt/ 七模块（atoms commons
-#   daemons gateway heapstore protocols tools）下 *.c + *.h，排除 tests/ 与
-#   third_party/（vendored 第三方，非项目自研码，§229 裁定比照 tests/ 排除），
-#   另计 cmake/ 组织码。cupolas 应用壳层按 §1.3 迁出机制核至 products 装配仓，
-#   不入主账；§254c 起单列独立子账（基线键 cupolas=<N>），棘轮「只降不升」。
-# 阶梯（方案 §6.2）：M1 ≤348,000 / M2 ≤313,000 / M3 ≤312,000 / M4 ≤293,000 /
-#   M5 ≤243,000 / M6 ≤232,000 / M7 ≤184,000 / M8 ≤168,000 / M9 ≤146,000 /
-#   M10 <100,000。M7/M10 为锚点（±0），中间梯级为「塌缩波阶梯」（W1~W7），
-#   随每波实测重排；乙段重排（2026-10-15，§224 §五 / §225）。
-# 判据：实测总量 ≤ 当前 pin 里程碑上限即 PASS；超出即 FAIL——未达阶梯值即
-#   停线整改，不得带入下一里程碑。实测已达下一里程碑时以 --advance 推进 pin。
-# 基线：v16-loc-budget-baseline.txt —— 每行 <键>=<值>；current=<M#>。
+# 口径（台账 §258「三层重新分账」裁定，2026-10-16）：按项目术语把 agentrt/ 分三层
+#   分别计量，取代旧「七模块合一账」口径——按「原子件 · 能力格 · 形态面」归位：
+#     · 机制核（硬门禁账，目标 < 100,000 行）= 原子件层 atoms + 能力格层 commons +
+#       堆存层 heapstore + 网关层 gateway + 组织码 cmake/。
+#       （gateway 属机制核：agentrt 的 ingress/execute 形态面在机制侧的承载，
+#        非可选壳层；§1.2 丙口径终裁「机制核含 gateway」。）
+#     · 形态面子账（棘轮只降不升）= daemons + protocols + tools。
+#     · 应用壳子账（棘轮只降不升）= products/cupolas（§1.3 迁出机制核的壳层本体）。
+#   三层互不抵扣：子账缩水不减机制核，机制核减重亦不计入子账。
+#   ⚠ 本口径为「分账口径裁定」，非减重——不得以口径变更冒充减重（守恒律·三账分立）。
+# 计数口径：各账 *.c + *.h，排除 tests/ 与 third_party/（vendored 第三方，非项目自研
+#   码，§229 裁定比照 tests/ 排除）。
+# 阶梯（方案 §6.2 甲段；2026-10-16 机制核口径重锚；旧 M1~M9 七模块合一账阶梯作废）：
+#   K0 = 现值锚（§6.2 甲 M0 133,881）/ K1 = §6.2 甲 M2 ★ ≤119k /
+#   K2 = §6.2 甲 M5 ★ ≤112k / K3 = §6.2 甲 M7 ★ ≤105k /
+#   K4 = §6.2 甲 M10 < 100,000 终局硬门禁（取 99,999 作计数断言）。
+#   中间梯级随每波实测重排，未实测前不得虚挂。
+# 判据：实测机制核 ≤ 当前 pin 梯级上限即 PASS；超出即 FAIL——未达梯级值即停线整改，
+#   不得带入下一梯级。子账棘轮只降不升，任一子账超出其 pin 亦 FAIL。
+#   实测已达下一梯级时以 --advance 推进 pin（子账 pin 同步收敛为实测值）。
+# 基线：v16-loc-budget-baseline.txt —— 每行 <键>=<值>；current=<K#>; facade=<N>; cupolas=<N>。
 # 用法: loc-budget-check.sh [--advance]
-# 退出码: 0 = 通过；1 = 超出当前上限；2 = 环境错误（树/基线缺失）
+# 退出码: 0 = 通过；1 = 机制核超限 / 子账增长；2 = 环境错误（树/基线缺失）
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,20 +32,16 @@ AGENTRT="${PROJECT_ROOT}/agent-workload/agentrt"
 CUPOLAS_DIR="${PROJECT_ROOT}/agent-workload/products/cupolas"
 BASELINE="$SCRIPT_DIR/v16-loc-budget-baseline.txt"
 
-MODULES=(atoms commons daemons gateway heapstore protocols tools)
+CORE_MODULES=(atoms commons heapstore gateway)     # 机制核：原子件 + 能力格 + 堆存 + 网关
+FACADE_MODULES=(daemons protocols tools)           # 形态面
 
-# 里程碑阶梯：名 -> 上限（M10 为 <100,000，取 99,999 作计数断言）
-MILESTONES=(M1 M2 M3 M4 M5 M6 M7 M8 M9 M10)
-CEIL_M1=348000
-CEIL_M2=313000
-CEIL_M3=312000
-CEIL_M4=293000
-CEIL_M5=243000
-CEIL_M6=232000
-CEIL_M7=184000
-CEIL_M8=168000
-CEIL_M9=146000
-CEIL_M10=99999
+# 阶梯（机制核口径）：名 -> 上限（对接方案 §6.2 甲段 ★ 锚点；K4 为 <100,000，取 99,999）
+MILESTONES=(K0 K1 K2 K3 K4)
+CEIL_K0=133881    # 现值锚（方案 §6.2 甲 M0）
+CEIL_K1=119000    # 方案 §6.2 甲 M2 ★
+CEIL_K2=112000    # 方案 §6.2 甲 M5 ★
+CEIL_K3=105000    # 方案 §6.2 甲 M7 ★
+CEIL_K4=99999     # 方案 §6.2 甲 M10 < 100,000 硬门禁
 
 ADVANCE=0
 if [ "${1:-}" = "--advance" ]; then
@@ -70,13 +75,20 @@ idx_of() {
     return 1
 }
 
+# 单账计数：dir 下 *.c + *.h，排除 tests/ 与 third_party/
+count_loc() {
+    find "$1" -type f \( -name '*.c' -o -name '*.h' \) \
+        | { grep -v -e '/tests/' -e '/third_party/' || true; } \
+        | tr '\n' '\0' | xargs -0 -r cat | wc -l
+}
+
 if [ ! -d "$AGENTRT" ]; then
     log_err "agentrt source tree not found: ${AGENTRT}"
     exit 2
 fi
 
 if [ ! -f "$BASELINE" ]; then
-    log_err "baseline not found: ${BASELINE} (expected line: current=<M#>)"
+    log_err "baseline not found: ${BASELINE} (expected keys: current=<K#>; facade=<N>; cupolas=<N>)"
     exit 2
 fi
 
@@ -86,11 +98,18 @@ if [ -z "$current" ]; then
     exit 2
 fi
 
+facade_pin="$(sed -n 's/^facade=//p' "$BASELINE" | head -n1)"
+if [ -z "$facade_pin" ]; then
+    log_err "baseline missing 'facade=' key: ${BASELINE}"
+    exit 2
+fi
+
 cupolas_pin="$(sed -n 's/^cupolas=//p' "$BASELINE" | head -n1)"
 if [ -z "$cupolas_pin" ]; then
     log_err "baseline missing 'cupolas=' key: ${BASELINE}"
     exit 2
 fi
+
 if [ ! -d "$CUPOLAS_DIR" ]; then
     log_err "cupolas source tree not found: ${CUPOLAS_DIR}"
     exit 2
@@ -101,34 +120,49 @@ cur_idx="$(idx_of "$current")" || {
     exit 2
 }
 
-section "0.1.19 G2 LOC budget gate (pin=${current}, scope: 7 modules + cmake/, tests/ & third_party/ excluded; cupolas sub-ledger pin=${cupolas_pin})"
+section "0.1.19 G2 LOC budget gate (pin=${current}, 机制核=atoms+commons+heapstore+gateway+cmake; 形态面 & cupolas 独立子账)"
 
-total=0
-for m in "${MODULES[@]}"; do
+for m in "${CORE_MODULES[@]}"; do
     d="$AGENTRT/$m"
     if [ ! -d "$d" ]; then
         log_err "module tree missing: ${d}"
         exit 2
     fi
-    n=$(find "$d" -type f \( -name '*.c' -o -name '*.h' \) \
-        | { grep -v -e '/tests/' -e '/third_party/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
-    total=$((total + n))
+done
+for m in "${FACADE_MODULES[@]}"; do
+    d="$AGENTRT/$m"
+    if [ ! -d "$d" ]; then
+        log_err "module tree missing: ${d}"
+        exit 2
+    fi
+done
+
+core=0
+for m in "${CORE_MODULES[@]}"; do
+    n=$(count_loc "$AGENTRT/$m")
+    core=$((core + n))
+    printf '  %-10s %8d\n' "$m" "$n"
+done
+cmake_loc=0
+if [ -d "$AGENTRT/cmake" ]; then
+    cmake_loc=$(count_loc "$AGENTRT/cmake")
+fi
+core=$((core + cmake_loc))
+printf '  %-10s %8d\n' "cmake" "$cmake_loc"
+
+facade=0
+for m in "${FACADE_MODULES[@]}"; do
+    n=$(count_loc "$AGENTRT/$m")
+    facade=$((facade + n))
     printf '  %-10s %8d\n' "$m" "$n"
 done
 
-cmake_loc=0
-if [ -d "$AGENTRT/cmake" ]; then
-    cmake_loc=$(find "$AGENTRT/cmake" -type f \( -name '*.c' -o -name '*.h' \) \
-        | tr '\n' '\0' | xargs -0 -r cat | wc -l)
-fi
-total=$((total + cmake_loc))
-printf '  %-10s %8d\n' "cmake" "$cmake_loc"
-echo "  ----------------------"
-printf '  %-10s %8d\n' "TOTAL" "$total"
+cupolas_total=$(count_loc "$CUPOLAS_DIR")
 
-cupolas_total=$(find "$CUPOLAS_DIR" -type f \( -name '*.c' -o -name '*.h' \) \
-    | { grep -v -e '/tests/' -e '/third_party/' || true; } | tr '\n' '\0' | xargs -0 -r cat | wc -l)
-printf '  %-10s %8d  (独立子账，不计入主 total)\n' "cupolas" "$cupolas_total"
+echo "  ----------------------"
+printf '  %-10s %8d  (机制核：原子件+能力格+堆存+网关+组织码)\n' "core" "$core"
+printf '  %-10s %8d  (形态面子账，不计入机制核)\n' "facade" "$facade"
+printf '  %-10s %8d  (应用壳子账，不计入机制核)\n' "cupolas" "$cupolas_total"
 
 ceiling="$(ceil_of "$current")"
 next_idx=$((cur_idx + 1))
@@ -140,16 +174,20 @@ if [ "$ADVANCE" -eq 1 ]; then
     fi
     next="${MILESTONES[$next_idx]}"
     next_ceiling="$(ceil_of "$next")"
-    if [ "$total" -gt "$next_ceiling" ]; then
-        log_err "--advance refused: total=$total exceeds ${next} ceiling=${next_ceiling}"
+    if [ "$core" -gt "$next_ceiling" ]; then
+        log_err "--advance refused: core=${core} exceeds ${next} ceiling=${next_ceiling}"
         exit 1
+    fi
+    facade_new_pin="$facade_pin"
+    if [ "$facade" -lt "$facade_new_pin" ]; then
+        facade_new_pin="$facade"
     fi
     cupolas_new_pin="$cupolas_pin"
     if [ "$cupolas_total" -lt "$cupolas_new_pin" ]; then
         cupolas_new_pin="$cupolas_total"
     fi
-    printf 'current=%s\ncupolas=%s\n' "$next" "$cupolas_new_pin" > "$BASELINE"
-    log_ok "milestone advanced: ${current} -> ${next} (total=${total} <= ${next_ceiling}), cupolas pin -> ${cupolas_new_pin}"
+    printf 'current=%s\nfacade=%s\ncupolas=%s\n' "$next" "$facade_new_pin" "$cupolas_new_pin" > "$BASELINE"
+    log_ok "milestone advanced: ${current} -> ${next} (core=${core} <= ${next_ceiling}), facade pin -> ${facade_new_pin}, cupolas pin -> ${cupolas_new_pin}"
     current="$next"
     ceiling="$next_ceiling"
     cur_idx="$next_idx"
@@ -158,17 +196,23 @@ fi
 
 section "0.1.19 G2 loc-budget gate"
 
-if [ "$total" -gt "$ceiling" ]; then
-    log_err "total=${total} exceeds pin ${current} ceiling=${ceiling} by $((total - ceiling))"
-    log_err "阶梯执法：未达阶梯值即停线整改，不得带入下一里程碑"
+if [ "$core" -gt "$ceiling" ]; then
+    log_err "机制核 core=${core} exceeds pin ${current} ceiling=${ceiling} by $((core - ceiling))"
+    log_err "阶梯执法：未达梯级值即停线整改，不得带入下一梯级"
     exit 1
 fi
+log_ok "机制核 core=${core} <= ${current} ceiling=${ceiling} (slack=$((ceiling - core)))"
 
-log_ok "total=${total} <= ${current} ceiling=${ceiling} (slack=$((ceiling - total)))"
+if [ "$facade" -gt "$facade_pin" ]; then
+    log_err "形态面子账: total=${facade} exceeds pin=${facade_pin} by $((facade - facade_pin))"
+    log_err "子账棘轮只降不升：形态面缩水不抵扣机制核，但同样禁止增长"
+    exit 1
+fi
+log_ok "形态面 facade=${facade} <= pin=${facade_pin} (子账 slack=$((facade_pin - facade)))"
 
 if [ "$cupolas_total" -gt "$cupolas_pin" ]; then
-    log_err "cupolas sub-ledger: total=${cupolas_total} exceeds pin=${cupolas_pin} by $((cupolas_total - cupolas_pin))"
-    log_err "子账棘轮只降不升：cupolas 缩水不抵扣机制核账，但同样禁止增长"
+    log_err "应用壳子账: total=${cupolas_total} exceeds pin=${cupolas_pin} by $((cupolas_total - cupolas_pin))"
+    log_err "子账棘轮只降不升：cupolas 缩水不抵扣机制核，但同样禁止增长"
     exit 1
 fi
 log_ok "cupolas=${cupolas_total} <= pin=${cupolas_pin} (子账 slack=$((cupolas_pin - cupolas_total)))"
@@ -176,10 +220,10 @@ log_ok "cupolas=${cupolas_total} <= pin=${cupolas_pin} (子账 slack=$((cupolas_
 if [ "$next_idx" -lt "${#MILESTONES[@]}" ]; then
     next="${MILESTONES[$next_idx]}"
     next_ceiling="$(ceil_of "$next")"
-    if [ "$total" -le "$next_ceiling" ]; then
+    if [ "$core" -le "$next_ceiling" ]; then
         log_warn "next milestone ${next} (<=${next_ceiling}) already met — run --advance"
     else
-        log_warn "gap to ${next} ceiling=${next_ceiling}: $((total - next_ceiling))"
+        log_warn "gap to ${next} ceiling=${next_ceiling}: $((core - next_ceiling))"
     fi
 fi
 
