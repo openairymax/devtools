@@ -1,9 +1,10 @@
 #!/bin/bash
 # 0.1.19 G2 体积硬门禁 + 里程碑阶梯（方案 §0.2 阶梯执法 / §0.5 G2）
 #
-# 口径（台账 §258「三层重新分账」裁定，2026-10-16）：按项目术语把 agentrt/ 分三层
-#   分别计量，取代旧「七模块合一账」口径——按「原子件 · 能力格 · 形态面」归位：
-#     · 机制核（硬门禁账，目标 < 100,000 行）= 原子件层 atoms + 能力格层 commons +
+# 口径（台账 §258「三层重新分账」裁定，2026-10-16；2026-10-16 SLOC 重锚）：按项目
+#   术语把 agentrt/ 分三层分别计量，取代旧「七模块合一账」口径——按「原子件 ·
+#   能力格 · 形态面」归位：
+#     · 机制核（硬门禁账，目标 < 80,000 有效行）= 原子件层 atoms + 能力格层 commons +
 #       堆存层 heapstore + 网关层 gateway + 组织码 cmake/。
 #       （gateway 属机制核：agentrt 的 ingress/execute 形态面在机制侧的承载，
 #        非可选壳层；§1.2 丙口径终裁「机制核含 gateway」。）
@@ -11,13 +12,17 @@
 #     · 应用壳子账（棘轮只降不升）= products/cupolas（§1.3 迁出机制核的壳层本体）。
 #   三层互不抵扣：子账缩水不减机制核，机制核减重亦不计入子账。
 #   ⚠ 本口径为「分账口径裁定」，非减重——不得以口径变更冒充减重（守恒律·三账分立）。
-# 计数口径：各账 *.c + *.h，排除 tests/ 与 third_party/（vendored 第三方，非项目自研
-#   码，§229 裁定比照 tests/ 排除）。
-# 阶梯（方案 §6.2 甲段；2026-10-16 机制核口径重锚；旧 M1~M9 七模块合一账阶梯作废）：
-#   K0 = 现值锚（§6.2 甲 M0 133,881）/ K1 = §6.2 甲 M2 ★ ≤119k /
-#   K2 = §6.2 甲 M5 ★ ≤112k / K3 = §6.2 甲 M7 ★ ≤105k /
-#   K4 = §6.2 甲 M10 < 100,000 终局硬门禁（取 99,999 作计数断言）。
-#   中间梯级随每波实测重排，未实测前不得虚挂。
+# 计数口径：SLOC「有效行」= 各账 *.c + *.h，排除 tests/ 与 third_party/（vendored
+#   第三方，非项目自研码，§229 裁定比照 tests/ 排除）后，再扣除空行与整行注释
+#   （`^[[:space:]]*$` 与 `^[[:space:]]*(//|/*|*)`）。项目自有术语见
+#   《0.1.19-机制核减重可行性细分方案》§1.1「有效代码」列：机制核现值 = 85,535
+#   有效行（对应物理行 133,880）。
+#   ⚠ PLOC（物理行 wc -l）→ SLOC（有效行）为口径裁定，非减重（守恒律·口径不可腾挪）。
+# 阶梯（方案 §6.2 甲段；2026-10-16 SLOC 重锚；旧 PLOC 阶梯 K0=133,881… 作废）：
+#   K0 = 现值锚（SLOC 85,535）/ K1 ≤83,500 / K2 ≤82,000 / K3 ≤80,500 /
+#   K4 = < 80,000 终局硬门禁（取 79,999 作计数断言）。
+#   中间梯级 provisional，随每波实测重排，未实测前不得虚挂。
+#   映射 §6.2 甲端锚点：K0=M0、K1=M2★、K2=M5★、K3=M7★、K4=M10。
 # 判据：实测机制核 ≤ 当前 pin 梯级上限即 PASS；超出即 FAIL——未达梯级值即停线整改，
 #   不得带入下一梯级。子账棘轮只降不升，任一子账超出其 pin 亦 FAIL。
 #   实测已达下一梯级时以 --advance 推进 pin（子账 pin 同步收敛为实测值）。
@@ -35,13 +40,13 @@ BASELINE="$SCRIPT_DIR/v16-loc-budget-baseline.txt"
 CORE_MODULES=(atoms commons heapstore gateway)     # 机制核：原子件 + 能力格 + 堆存 + 网关
 FACADE_MODULES=(daemons protocols tools)           # 形态面
 
-# 阶梯（机制核口径）：名 -> 上限（对接方案 §6.2 甲段 ★ 锚点；K4 为 <100,000，取 99,999）
+# 阶梯（机制核 SLOC 有效行口径）：名 -> 上限（对接方案 §6.2 甲段 ★ 锚点；K4 < 80,000，取 79,999）
 MILESTONES=(K0 K1 K2 K3 K4)
-CEIL_K0=133881    # 现值锚（方案 §6.2 甲 M0）
-CEIL_K1=119000    # 方案 §6.2 甲 M2 ★
-CEIL_K2=112000    # 方案 §6.2 甲 M5 ★
-CEIL_K3=105000    # 方案 §6.2 甲 M7 ★
-CEIL_K4=99999     # 方案 §6.2 甲 M10 < 100,000 硬门禁
+CEIL_K0=85535     # 现值锚（SLOC 有效行；§6.2 甲 M0 重锚）
+CEIL_K1=83500     # §6.2 甲 M2 ★（SLOC 重锚，provisional）
+CEIL_K2=82000     # §6.2 甲 M5 ★（SLOC 重锚，provisional）
+CEIL_K3=80500     # §6.2 甲 M7 ★（SLOC 重锚，provisional）
+CEIL_K4=79999     # §6.2 甲 M10 < 80,000 硬门禁（SLOC 有效行）
 
 ADVANCE=0
 if [ "${1:-}" = "--advance" ]; then
@@ -75,11 +80,15 @@ idx_of() {
     return 1
 }
 
-# 单账计数：dir 下 *.c + *.h，排除 tests/ 与 third_party/
+# 单账计数（SLOC 有效行）：dir 下 *.c + *.h，排除 tests/ 与 third_party/，
+#   再扣除空行与整行注释（与《机制核减重可行性细分方案》§1.1「有效代码」列同口径）
 count_loc() {
     find "$1" -type f \( -name '*.c' -o -name '*.h' \) \
         | { grep -v -e '/tests/' -e '/third_party/' || true; } \
-        | tr '\n' '\0' | xargs -0 -r cat | wc -l
+        | tr '\n' '\0' | xargs -0 -r cat \
+        | { grep -vE '^[[:space:]]*$' || true; } \
+        | { grep -vE '^[[:space:]]*(//|/\*|\*)' || true; } \
+        | wc -l
 }
 
 if [ ! -d "$AGENTRT" ]; then
@@ -120,7 +129,7 @@ cur_idx="$(idx_of "$current")" || {
     exit 2
 }
 
-section "0.1.19 G2 LOC budget gate (pin=${current}, 机制核=atoms+commons+heapstore+gateway+cmake; 形态面 & cupolas 独立子账)"
+section "0.1.19 G2 LOC budget gate (pin=${current}, SLOC 有效行; 机制核=atoms+commons+heapstore+gateway+cmake; 形态面 & cupolas 独立子账)"
 
 for m in "${CORE_MODULES[@]}"; do
     d="$AGENTRT/$m"
@@ -160,7 +169,7 @@ done
 cupolas_total=$(count_loc "$CUPOLAS_DIR")
 
 echo "  ----------------------"
-printf '  %-10s %8d  (机制核：原子件+能力格+堆存+网关+组织码)\n' "core" "$core"
+printf '  %-10s %8d  (机制核：原子件+能力格+堆存+网关+组织码；SLOC 有效行)\n' "core" "$core"
 printf '  %-10s %8d  (形态面子账，不计入机制核)\n' "facade" "$facade"
 printf '  %-10s %8d  (应用壳子账，不计入机制核)\n' "cupolas" "$cupolas_total"
 
