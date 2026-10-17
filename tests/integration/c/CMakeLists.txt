@@ -283,7 +283,6 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/accounting/semantic_cache.c
     ${LLM_D_DIR}/src/rpc/response.c
     ${LLM_D_DIR}/src/accounting/cost_tracker.c
-    ${LLM_D_DIR}/src/adapter/adapter.c
     ${LLM_D_DIR}/src/providers/core/registry.c
     ${LLM_D_DIR}/src/providers/core/secrets.c
     ${LLM_D_DIR}/src/providers/core/http.c
@@ -316,7 +315,6 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${LLM_D_DIR}/src/providers
     # B16-S5 预置：五域归位后的头搜索路径（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/bootstrap
-    ${LLM_D_DIR}/src/adapter
     ${LLM_D_DIR}/src/rpc
     ${LLM_D_DIR}/src/config
     ${LLM_D_DIR}/src/accounting
