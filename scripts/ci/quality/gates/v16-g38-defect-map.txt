@@ -1,0 +1,45 @@
+# 0.1.19 G38-4 缺陷—用例映射 SSoT（方案 §3.7.3 第 4 项）
+#
+# 口径：§3.5 九条运行时缺陷、§3.6.3 D1~D5/D7/D8，每条缺陷至少绑定一行证据。
+# 格式：<defect-id>|<evidence>
+#   evidence = test:<ctest-name>    构建树内已注册的 ctest 用例
+#            = static:<probe-id>    门禁内置静态探针（仅限无 ctest 的防回退断言）
+# 同一缺陷允许多行绑定；新增缺陷先在此登记再修，缺陷清零不得失去回归。
+
+# ── §3.5 发布面运行时缺陷（验收线：施工前清零，且不得回退）──
+# 1 启动器 source profile.env 崩溃 → 逐行解析防回退（无 ctest，静态探针）
+§3.5-1|static:launcher_profile_parse
+# 2 工具业务错误被误映射为服务不可达 → 错误分层 class/code 保义
+§3.5-2|test:svc_test_rpc_err_class
+# 3 fs_write 缺父目录创建语义 → fs_e2e 用例 14/19/20（自建 / create_dirs=0 预检）
+§3.5-3|test:tool_d_test_fs_e2e
+# 4 工具相对路径语义不透明 → 契约 x-airy/path_base 投影
+§3.5-4|test:tool_d_test_tool_contract
+# 5 model.yaml 修改后静默使用旧配置 → 快照 + 请求侧 stat + stale 标记
+§3.5-5|test:svc_test_svc_model_watch
+# 6 LLM 网络错误被 SDK 层笼统化 → 呈现层错误描述 + curl 错误分类透传
+§3.5-6|test:cli_errdesc_unit
+§3.5-6|test:llm_d_test_provider_http_dispatch
+# 7 沙箱边界对 agent/用户不透明 → sandbox_scope 契约 + policy 类拒绝
+§3.5-7|test:tool_d_test_sandbox_integration
+# 8 工具暴露与守护进程可用性未联动 → requires_daemon 可用性过滤
+§3.5-8|test:tool_d_test_tool_avail
+# 9 TUI 会话陈旧无自愈 → 会话 epoch/心跳与重建
+§3.5-9|test:cli_session_restore
+
+# ── §3.6.3 本地低算力性能对策 ──
+# D1 轻量对话模式（model.yaml performance_mode / AIRY_PERF_MODE 覆盖）
+§3.6-D1|test:svc_test_svc_model_defaults
+# D2 五阶段前置折叠 / D2′ GCCP 两段式降档
+§3.6-D2|test:think_d_test_think_gccp_twopass
+§3.6-D2p|test:think_d_test_think_gccp_twopass
+# D3 Ollama 参数透传（keep_alive / num_ctx / num_predict）
+§3.6-D3|test:llm_d_test_provider_reasoning
+# D4 本地超时重试修正（不重试，单次超时即返回带分类的失败）
+§3.6-D4|test:llm_d_test_provider_http_dispatch
+# D5 端点健康探测（/v1/models + status 模型端点健康项）
+§3.6-D5|test:llm_d_test_router_integration
+# D7 IPC 退避降噪（指数退避上限 5s + 60s 窗口聚合）
+§3.6-D7|test:gateway_d_test_gateway_pep_cache
+# D8 工具暴露与 daemon 存活联动（与 §3.5-8 同源，独立登记以对齐任务卡）
+§3.6-D8|test:tool_d_test_tool_avail

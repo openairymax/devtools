@@ -820,6 +820,42 @@ gate_symbol_conservation() {
 }
 
 # ============================================================================
+# Gate 27: 0.1.19 G38 逻辑完备性（五清单）
+# 错误路径穷举 / 状态机穷举 / 依赖闭环 / 缺陷—用例映射 / 时序一致性。
+# 需要已构建的测试树（QUALITY_GATE_BUILD_DIR）；未提供时告警而非误判通过。
+# 退出码: 0=通过 1=逻辑完备性违例 2=环境错误(告警)
+# ============================================================================
+gate_logic_g38() {
+    section "Gate 27: G38 Logic Completeness (0.1.19)"
+
+    local g38_script="${SCRIPT_DIR}/g38-logic-gate.sh"
+    if [ ! -f "$g38_script" ]; then
+        log_warn "g38 logic gate script not found: ${g38_script}"
+        check_gate "LogicCompleteness" 2
+        return 0
+    fi
+
+    if [ -z "${QUALITY_GATE_BUILD_DIR:-}" ]; then
+        log_warn "QUALITY_GATE_BUILD_DIR not set: G38 needs a built test tree"
+        check_gate "LogicCompleteness" 2
+        return 0
+    fi
+
+    log_info "Running G38 five-checklist gate..."
+    local g38_out g38_rc=0
+    g38_out=$(bash "$g38_script" 2>&1) || g38_rc=$?
+    echo "$g38_out" | tail -30
+    if [ "$g38_rc" -eq 0 ]; then
+        check_gate "LogicCompleteness" 0
+    elif [ "$g38_rc" -eq 2 ]; then
+        log_warn "g38 logic gate: environment error, manual review required"
+        check_gate "LogicCompleteness" 2
+    else
+        check_gate "LogicCompleteness" 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -844,6 +880,7 @@ main() {
     local skip_layer=false
     local skip_fanout=false
     local skip_symbol=false
+    local skip_logic_g38=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -932,12 +969,16 @@ main() {
                 skip_symbol=true
                 shift
                 ;;
+            --skip-logic-g38)
+                skip_logic_g38=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -966,6 +1007,7 @@ main() {
                 echo "  24. Layer Boundary Check (G21/G23, one-way + zero cross-process symbol)"
                 echo "  25. Fan-out Check (G13, header load <= 5 + target fan ratchet)"
                 echo "  26. Symbol Conservation Check (G1, AIRY_API public surface)"
+                echo "  27. G38 Logic Completeness (0.1.19, five checklists)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -989,6 +1031,7 @@ main() {
                 echo "  --skip-layer          Skip G21/G23 layer boundary (one-way + zero cross-process symbol) check"
                 echo "  --skip-fanout         Skip G13 fan-out (header load <= 5 + target fan ratchet) check"
                 echo "  --skip-symbol         Skip G1 public-surface symbol conservation check"
+                echo "  --skip-logic-g38      Skip G38 logic-completeness (0.1.19, five checklists) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1030,6 +1073,7 @@ main() {
         $skip_layer || gate_layer
         $skip_fanout || gate_fanout
         $skip_symbol || gate_symbol_conservation
+        $skip_logic_g38 || gate_logic_g38
     fi
 
     # 输出结果
