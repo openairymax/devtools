@@ -9,12 +9,12 @@
 #     均属五件套固定落点，先留 src/ 根、不 churn 生成器；7 领域源全部入子域。
 #
 # 断言：
-#   A1  7 域成形：src/{bootstrap,adapter,rpc,config,accounting,providers,router} 全为目录
+#   A1  6 域成形：src/{bootstrap,rpc,config,accounting,providers,router} 全为目录
 #   A2  src/ 顶层裸文件 = 五件套固定落点 {main.c, svc.c} + 恰 1 个唯一私有头 *_internal.h
 #   A3  include/ 头集 = 2 发布头 + 1 生成头（白名单集合断言，防换名漂移）
 #   A4  唯一私有头及各域 internal.h 拆片后每片入度 ≤ 5
 #   A5  内层域（providers/router/accounting/config）对发布头 include 边 = 0（FATAL）
-#   A6  装配域（bootstrap/adapter）对发布头残余边入基线只减不增（ops 装配现实，收敛驱动）
+#   A6  装配域（bootstrap）对发布头残余边入基线只减不增（ops 装配现实，收敛驱动）
 #
 # 基线：v16-sample-baseline.txt（A6 台账）；--update-baseline 重建。
 # 用法: sample-form-check.sh [--update-baseline]
@@ -52,9 +52,9 @@ if [ ! -d "$LLM_D" ]; then
     exit 2
 fi
 
-# ── A1: 7 域成形 ──────────────────────────────────────────────
-section "A1: seven-domain layout"
-for d in bootstrap adapter rpc config accounting providers router; do
+# ── A1: 6 域成形 ──────────────────────────────────────────────
+section "A1: six-domain layout"
+for d in bootstrap rpc config accounting providers router; do
     if [ -d "${LLM_D}/src/${d}" ]; then
         log_ok "src/${d}/"
     else
