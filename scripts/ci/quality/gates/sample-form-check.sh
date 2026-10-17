@@ -134,7 +134,7 @@ for hdr in $( ( cd "${LLM_D}/include" && ls *.h 2>/dev/null ) || true ); do
         key="${f#"${LLM_D}/"}:${hdr}"
         A6_ENTRIES+=("$key")
     done < <(grep -rl "include \"${hdr}\"\|include <${hdr}>" \
-        "${LLM_D}/src/bootstrap" "${LLM_D}/src/adapter" 2>/dev/null | sort || true)
+        "${LLM_D}/src/bootstrap" 2>/dev/null | sort || true)
 done
 
 section "A6: assembly-domain baseline (bootstrap/adapter)"
