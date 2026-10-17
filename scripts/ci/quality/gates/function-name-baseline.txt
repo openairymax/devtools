@@ -544,12 +544,6 @@ airy_yaml_config_defaults
 airy_yaml_config_free
 airy_yaml_env_override
 airy_yaml_resolve_plat_paths
-alert_add_notification_channel
-alert_add_threshold_rule
-alert_evaluate_metric
-alert_get_count_by_level
-alert_get_unresolved_count
-alert_system_shutdown
 am_active_alert_count
 am_create_default_config
 am_get_alerts_by_level
@@ -1154,9 +1148,6 @@ log_internal_file_state
 log_internal_file_write
 log_internal_format_message
 log_internal_is_terminal
-log_internal_throttle_cleanup
-log_internal_throttle_init_mutex
-log_internal_throttle_suppress
 log_level_from_string
 log_sanitizer_add_pattern
 log_sanitizer_destroy
@@ -1861,10 +1852,6 @@ tool_svc_adapter_register
 tool_validator_create
 tool_validator_destroy
 tool_validator_validate
-tracing_add_span_attribute
-tracing_add_span_event
-tracing_get_active_trace_count
-tracing_get_finished_trace_count
 transfer_has_negation
 transform_context_create
 transform_context_destroy
