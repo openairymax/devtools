@@ -91,7 +91,7 @@ ok "工具链解压: $TC_DIR/root/usr/bin/$TRIPLE-gcc"
 LIBS="libcjson-dev libcjson1 libcap-dev libcap2 libcurl4-openssl-dev libcurl4t64 \
 libevent-dev libevent-core-2.1-7t64 libevent-extra-2.1-7t64 libevent-openssl-2.1-7t64 libevent-pthreads-2.1-7t64 \
 libmicrohttpd-dev libmicrohttpd12t64 libnghttp2-dev libnghttp2-14 libsqlite3-dev libsqlite3-0 \
-libssl-dev libssl3t64 libwebsockets-dev libwebsockets19t64 libyaml-dev libyaml-0-2 zlib1g-dev zlib1g \
+libssl-dev libssl3t64 libwebsockets-dev libwebsockets19t64 zlib1g-dev zlib1g \
 libkrb5-dev libkrb5-3 libgssapi-krb5-2 libk5crypto3 libkrb5support0 libcom-err2 libkeyutils1 \
 libssh2-1-dev libssh2-1t64 libldap2-dev libldap2 libsasl2-2 \
 libpsl-dev libpsl5t64 libidn2-dev libidn2-0 libbrotli-dev libbrotli1 \

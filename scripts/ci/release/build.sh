@@ -258,7 +258,7 @@ fi
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends \
   build-essential make perl curl git ca-certificates python3 python3-pip python3-venv \
-  libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
+  libsqlite3-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev \
   libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev
 # 0.1.6e SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译逻辑收敛到
 # lib-builddeps.sh（单一权威，CI release.yml 各 Linux job 同源调用），

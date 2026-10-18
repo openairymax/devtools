@@ -44,7 +44,7 @@ tools/
 ├── .git-blame-ignore-revs     # Revisions ignored by git blame (formatting commits, etc.)
 ├── .pre-commit-config.yaml    # Pre-commit hooks (formatting, lint, large files, branch naming)
 ├── pyproject.toml             # Python project config (ruff/mypy/black)
-├── vcpkg.json                 # vcpkg C++ dependency manifest (libuv/json-c/libyaml, etc.)
+├── vcpkg.json                 # vcpkg C++ dependency manifest (libuv/json-c, etc.)
 ├── deploy/                    # Deployment configs（docker / kubernetes / systemd）
 ├── scripts/                   # Development & ops scripts
 │   ├── ci/                    # CI/CD（pipeline 编排 / quality 质量 / verify 安全 / release 发布）
@@ -90,7 +90,7 @@ tools/
 
 | File | Purpose |
 |------|---------|
-| `vcpkg.json` | vcpkg dependency manifest (libuv/json-c/libyaml, etc.) |
+| `vcpkg.json` | vcpkg dependency manifest (libuv/json-c, etc.) |
 
 ## Usage
 

@@ -42,7 +42,7 @@ tools/
 ├── .git-blame-ignore-revs     # git blame 忽略的修订（格式化提交等）
 ├── .pre-commit-config.yaml    # pre-commit 钩子配置（格式化、lint、大文件、分支命名）
 ├── pyproject.toml             # Python 项目配置（ruff/mypy/black）
-├── vcpkg.json                 # vcpkg C++ 依赖清单（libuv/json-c/libyaml 等）
+├── vcpkg.json                 # vcpkg C++ 依赖清单（libuv/json-c 等）
 ├── deploy/                    # 部署配置（Docker/Kubernetes）
 ├── scripts/                   # 开发与运维脚本
 │   ├── ci/                    # CI 流水线脚本
@@ -85,7 +85,7 @@ tools/
 
 | 文件 | 用途 |
 |------|------|
-| `vcpkg.json` | vcpkg 依赖清单（libuv/json-c/libyaml 等） |
+| `vcpkg.json` | vcpkg 依赖清单（libuv/json-c 等） |
 
 ## 使用方式
 

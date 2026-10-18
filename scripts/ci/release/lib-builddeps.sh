@@ -21,7 +21,7 @@
 #   .github/workflows/release.yml 各 Linux 构建 job
 #
 # 环境：DEBIAN_FRONTEND 已设置；apt 基础依赖已装（build-essential、
-# libsqlite3-dev、libyaml-dev、zlib1g-dev、libzstd-dev、libevent-dev、
+# libsqlite3-dev、zlib1g-dev、libzstd-dev、libevent-dev、
 # libnghttp2-dev、cmake（3.29.6 源码）、python3、rust 工具链）。
 # ============================================================================
 set -euo pipefail
