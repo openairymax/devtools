@@ -134,10 +134,11 @@ fi
 # 将 cupolas 等产品壳迁出核心树至 products/；agentrt/CMakeLists.txt 顶层
 # 装配块以三态探测 add_subdirectory 挂载 cupolas / lang_gateway / cognition
 # （§255 起 cupolas_d 亦于顶层挂载），其 CMake 目标（airy_cupolas_service /
-# cupolas_d 等）合法出现在白名单值侧。源根缺席（standalone 平铺布局）即
-# 跳过，等价该外户未挂载。
+# cupolas_d 等）合法出现在白名单值侧。gateway_biz 为 0.1.19 刀H 迁出的
+# 业务面产品件（daemons 侧嵌入式装配），其目标 airy_gateway_biz 同属外户。
+# 源根缺席（standalone 平铺布局）即跳过，等价该外户未挂载。
 CMAKE_SCAN_ROOTS=("$AGENTRT")
-for _ext in cupolas lang_gateway cognition; do
+for _ext in cupolas lang_gateway cognition gateway_biz; do
     _ext_dir="$PROJECT_ROOT/agent-workload/products/$_ext"
     if [ -d "$_ext_dir" ]; then
         CMAKE_SCAN_ROOTS+=("$_ext_dir")

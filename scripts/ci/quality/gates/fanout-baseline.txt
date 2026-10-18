@@ -9,7 +9,7 @@ fan airy_security_dome	2
 fan channel_d	5
 fan cupolas_d	3
 fan gateway	4
-fan gateway_d	3
+fan gateway_d	4
 fan llm_d	3
 fan market_d	3
 fan maths_d	5
