@@ -31,7 +31,6 @@ CompileFlags:
     - -Iagentrt/commons/utils/token/include
     - -Iagentrt/commons/utils/network/include
     - -Iagentrt/commons/utils/security/include
-    - -Iagentrt/commons/utils/resource/include
     - -Iagentrt/commons/utils/uuid/include
     - -Iagentrt/commons/utils/strategy/include
     - -Iagentrt/commons/utils/config_unified/include
