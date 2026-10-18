@@ -288,7 +288,6 @@ INCLUDE_PATH           = agentrt/atoms/corekern/include \
                          agentrt/commons/utils/observability/include \
                          agentrt/commons/utils/compat/include \
                          agentrt/commons/utils/config/include \
-                         agentrt/commons/utils/cost/include \
                          agentrt/commons/utils/error/include \
                          agentrt/commons/utils/io/include \
                          agentrt/commons/utils/ipc/include \

@@ -17,7 +17,6 @@
 #include "logger.h"
 #include "manager.h"
 #include "token.h"
-#include "cost.h"
 
 #define TEST_ASSERT(condition, message) \
     do { \
@@ -61,15 +60,7 @@ static int test_full_workflow(void) {
         airy_token_counter_destroy(counter);
     }
     
-    printf("  Step 4: Create cost estimator...\n");
-    airy_cost_estimator_t* estimator = airy_cost_estimator_create(NULL);
-    if (estimator) {
-        double cost = airy_cost_estimator_estimate(estimator, "gpt-4", 100, 50);
-        printf("    Estimated cost: $%.6f\n", cost);
-        airy_cost_estimator_destroy(estimator);
-    }
-    
-    printf("  Step 5: Error handling...\n");
+    printf("  Step 4: Error handling...\n");
     airy_error_t err = AIRY_ERR_INVALID_PARAM;
     airy_error_push_ex(err, __FILE__, __LINE__, __func__, "%s", "Test error");
     const char* err_str = airy_strerror(err);
