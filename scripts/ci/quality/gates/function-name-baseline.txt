@@ -108,9 +108,6 @@ airy_cancel_token_is_canceled
 airy_cancel_token_register
 airy_cancel_token_reset
 airy_cancel_token_wait
-airy_cest_get_input_tokens
-airy_cest_get_output_tokens
-airy_cest_get_request_count
 airy_checkpoint_cleanup
 airy_checkpoint_create
 airy_checkpoint_default_dir
@@ -122,7 +119,6 @@ airy_checkpoint_set_auto_hook
 airy_checkpoint_shutdown
 airy_checkpoint_trigger_auto
 airy_checkpoint_verify
-airy_cogn_get_tool_service
 airy_cognition_create_ex_take
 airy_cognition_create_take
 airy_cognition_destroy
@@ -374,20 +370,11 @@ airy_runtime_dir_socket
 airy_sandbox_add_rule
 airy_sandbox_capability_check
 airy_sandbox_create_default
-airy_sandbox_exp_audit_json
 airy_sandbox_get_perf_stats
-airy_sandbox_get_sec_pol
-airy_sandbox_get_stats
-airy_sandbox_health_check
 airy_sandbox_manager_destroy
-airy_sandbox_manager_get_stats
 airy_sandbox_manager_init
 airy_sandbox_provider_register
 airy_sandbox_provider_unregister
-airy_sandbox_reset_perf_stats
-airy_sandbox_reset_quota
-airy_sandbox_set_in_sanit
-airy_sandbox_terminate
 airy_sandbox_update_sec_pol
 airy_sandbox_validate_syscall
 airy_sched_priority_inherit
@@ -431,7 +418,6 @@ airy_sys_skill_reg_exec
 airy_sys_skill_uninstall
 airy_sys_telemetry_metrics
 airy_sys_telemetry_traces
-airy_sys_telemetry_trace_save
 airy_task_desc_create
 airy_task_desc_validate
 airy_task_get_priority
@@ -568,10 +554,6 @@ binder_pending_call_create
 binder_pending_call_destroy
 binder_remove_pending_call_locked
 bridge_reload_callback
-budget_ctrl_mutex_destroy
-budget_ctrl_mutex_init
-budget_ctrl_mutex_lock
-budget_ctrl_mutex_unlock
 build_correction_prompt
 build_decomposition_prompt
 build_filepath_with_seq
@@ -604,7 +586,6 @@ channel_service_is_healthy
 channel_service_receive
 channel_service_set_callback
 channel_service_start
-check_and_reset_period
 check_budget_available
 checkpoint_vertices_deep_copy
 checkpoint_vertices_release
@@ -1086,7 +1067,6 @@ llm_svc_stream_is_frame_tag
 llm_svc_stream_on_chunk
 llm_svc_stream_store_reasoning
 llm_svc_stream_store_tool_calls
-load_config_from_file
 load_pricing_rules_from_yaml
 local_complete_stream
 log_contains_sensitive
@@ -1261,10 +1241,7 @@ mig_get_version_file_path
 migrate_v1_0_to_v1_1_agent_fields
 migrate_v1_1_to_v2_0_session_metadata
 mig_restore_data_file
-mock_compute_weighted_score
 mock_progress_callback
-mock_request_always_fail
-mock_request_fail_then_succeed
 monitor_service_check_loop
 monitor_service_create
 monitor_service_destroy
@@ -1476,7 +1453,6 @@ provider_stream_acc_free
 provider_stream_acc_init
 provider_stream_text_push
 provider_tool_args_add
-rec_update_cred_health
 register_builtin_tools
 register_router_endpoints
 register_service_internal
@@ -1502,7 +1478,6 @@ sandbox_permission_check
 sandbox_permission_create
 sandbox_permission_destroy
 sandbox_permission_destroy_all
-sandbox_quota_get_usage_ratio
 sandbox_quota_release
 sandbox_release_resource
 sc_correct_detect_repetition
@@ -1558,12 +1533,9 @@ scheduler_core_task_info_destroy
 scheduler_core_task_table_add
 scheduler_core_task_table_remove
 scheduler_platform_auto_init
-scheduler_platform_cleanup
-scheduler_platform_get_name
 scheduler_platform_get_ops
 scheduler_platform_get_posix_ops
 scheduler_platform_get_windows_ops
-scheduler_platform_is_initialized
 scheduler_platform_register_ops
 sc_intent_result_free
 sc_map_airy_type_to_sc
