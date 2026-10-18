@@ -15,40 +15,46 @@ add_compile_definitions(AIRY_COMPLIANCE_IMPL)
 # §254a：cupolas 叶子仓挂点已迁出核心树至 products 装配仓。源根优先取 core
 # 顶层下发的 CUPOLAS_SRC_DIR（SSoT，一源多态）；未下发时回退伞仓默认挂点，
 # 保证本文件脱离 core 变量亦可独立解析。
+# 0.1.19：tools 仓在 CI 取料时落 _tools，与 agentrt 的相对深度随布局变化；
+# RT 源根统一由 core 顶层下发 AIRY_INTEG_RT_ROOT，未下发时保留伞仓相对路径。
+if(NOT AIRY_INTEG_RT_ROOT)
+    get_filename_component(AIRY_INTEG_RT_ROOT
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt" ABSOLUTE)
+endif()
 if(NOT CUPOLAS_SRC_DIR)
     get_filename_component(CUPOLAS_SRC_DIR
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/products/cupolas" ABSOLUTE)
+        "${AIRY_INTEG_RT_ROOT}/../products/cupolas" ABSOLUTE)
 endif()
 
 set(INTEGRATION_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/syscall/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/memory/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/llm_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/tool_d/include
+    ${AIRY_INTEG_RT_ROOT}/atoms/coreloopthree/include
+    ${AIRY_INTEG_RT_ROOT}/atoms/corekern/include
+    ${AIRY_INTEG_RT_ROOT}/atoms/syscall/include
+    ${AIRY_INTEG_RT_ROOT}/atoms/memory
+    ${AIRY_INTEG_RT_ROOT}/atoms/memory/src
+    ${AIRY_INTEG_RT_ROOT}/daemons/llm_d/include
+    ${AIRY_INTEG_RT_ROOT}/daemons/tool_d/include
     # R3 (0.1.19): 审批域头内聚 src/approval/，C-L05 契约测试经域路径直连
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/tool_d/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/monit_d/include
+    ${AIRY_INTEG_RT_ROOT}/daemons/tool_d/src
+    ${AIRY_INTEG_RT_ROOT}/daemons/common/include
+    ${AIRY_INTEG_RT_ROOT}/daemons/monit_d/include
     # C-L10: Prometheus 导出域头内聚 src/export/，C-L10 契约测试经域路径直连
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/monit_d/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/gateway_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/market_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/config_unified
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/compat/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/network/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/ipc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/include
+    ${AIRY_INTEG_RT_ROOT}/daemons/monit_d/src
+    ${AIRY_INTEG_RT_ROOT}/daemons/gateway_d/include
+    ${AIRY_INTEG_RT_ROOT}/daemons/market_d/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/memory/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/error/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/config_unified
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/logging/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/sync/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/string/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/cache
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/compat/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/network/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/ipc/include
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/include
+    ${AIRY_INTEG_RT_ROOT}/commons/platform/include
+    ${AIRY_INTEG_RT_ROOT}/commons/include
     ${CUPOLAS_SRC_DIR}/include
     ${CUPOLAS_SRC_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -202,17 +208,17 @@ if(TARGET svc_common)
     add_executable(test_e2e_core test_e2e_core.c)
 
     target_include_directories(test_e2e_core PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/tests/unit
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/coreloopthree/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms/syscall/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/cache
+        ${AIRY_INTEG_RT_ROOT}/atoms/corekern/include
+        ${AIRY_INTEG_RT_ROOT}/atoms/coreloopthree/tests/unit
+        ${AIRY_INTEG_RT_ROOT}/atoms/coreloopthree/include
+        ${AIRY_INTEG_RT_ROOT}/daemons/common/include
+        ${AIRY_INTEG_RT_ROOT}/daemons/common/src
+        ${AIRY_INTEG_RT_ROOT}/atoms/syscall/include
+        ${AIRY_INTEG_RT_ROOT}/commons/utils/error/include
+        ${AIRY_INTEG_RT_ROOT}/commons/utils/memory/include
+        ${AIRY_INTEG_RT_ROOT}/commons/platform/include
+        ${AIRY_INTEG_RT_ROOT}/commons/utils/string/include
+        ${AIRY_INTEG_RT_ROOT}/commons/utils/cache
     )
 
     # --whole-archive/--start-group 为 GNU ld 专有：macOS ld64 / MSVC 不识别，
@@ -266,9 +272,9 @@ else()
 endif()
 
 # LLM Routing Integration Test (INT-15)
-set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/llm_d)
-set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons)
-set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/atoms)
+set(LLM_D_DIR ${AIRY_INTEG_RT_ROOT}/daemons/llm_d)
+set(COMMONS_DIR ${AIRY_INTEG_RT_ROOT}/commons)
+set(ATOMIC_DIR ${AIRY_INTEG_RT_ROOT}/atoms)
 set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
@@ -330,7 +336,7 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${COMMONS_DIR}/utils/compat/include
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
+    ${AIRY_INTEG_RT_ROOT}/daemons/common/include
 )
 
 target_link_libraries(test_llm_d_routing PRIVATE
