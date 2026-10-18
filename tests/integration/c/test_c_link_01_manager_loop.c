@@ -360,8 +360,7 @@ static void test_env_var_override(void) {
     config_env_source_options_t env_opts = {
         .prefix = "AIRY_",
         .case_sensitive = false,
-        .separator = "_",
-        .expand_vars = true
+        .separator = "_"
     };
     config_source_t *env_source = config_source_create_env(&env_opts);
     if (env_source) {
