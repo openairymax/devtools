@@ -1,7 +1,7 @@
-cache.h|daemons/mem_d/include/cache.h|daemons/tool_d/src/core/cache.h
+cache.h|daemons/mem_d/src/engine/cache.h|daemons/tool_d/src/core/cache.h
 error.h|commons/include/airymax/error.h|commons/utils/error/error.h
 protocol_router.h|protocols/core/router/include/protocol_router.h|protocols/include/protocol_router.h
 registry.h|daemons/llm_d/src/providers/core/registry.h|daemons/tool_d/src/core/registry.h
-service.h|daemons/a2a_d/src/service.h|daemons/agent_d/src/service.h|daemons/llm_d/src/rpc/service.h|daemons/mem_d/src/core/service.h|daemons/tool_d/src/rpc/service.h
+service.h|daemons/a2a_d/src/core/service.h|daemons/agent_d/src/service/service.h|daemons/llm_d/src/rpc/service.h|daemons/mem_d/src/core/service.h|daemons/tool_d/src/rpc/service.h
 syscalls.h|atoms/syscall/include/syscalls.h|commons/include/airymax/syscalls.h
 types.h|commons/utils/types/types.h|daemons/llm_d/src/config/types.h
