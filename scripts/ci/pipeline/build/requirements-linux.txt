@@ -14,7 +14,6 @@ curl
 
 # ===== 核心依赖 (Tier 2: REQUIRED) =====
 libcurl4-openssl-dev (=7.88.*) | libcurl4-openssl-dev
-libyaml-dev (=0.2.5.*) | libyaml-dev
 libcjson-dev (=1.7.15*) | libcjson-dev
 libssl-dev (=3.*) | libssl-dev
 
