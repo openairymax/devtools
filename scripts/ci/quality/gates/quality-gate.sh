@@ -56,6 +56,13 @@ print_header() {
 # ============================================================================
 # Gate 1: 编译检查 (0e0w)
 # ============================================================================
+dump_cmake_err() { # <阶段名> <日志>
+    log_err "cmake $1 失败，错误摘要（$2）："
+    grep -nE "error:|fatal error|CMake Error|Error [0-9]" "$2" | tail -40 || true
+    echo "---- 末 40 行 ----"
+    tail -40 "$2" || true
+}
+
 gate_compile() {
     section "Gate 1: Compilation Check"
     # 构建产物一律树外化：严禁在伞仓源码区落任何编译产物（工程铁律 a）。
@@ -68,17 +75,55 @@ gate_compile() {
         return
     fi
 
+    # 产品件根锚点由装配方显式持有（SSoT）：agentrt 的产品探测以
+    # CMAKE_CURRENT_SOURCE_DIR 做候选路径算术，在 CI 的 agentrt 符号链接
+    # 布局下 ".." 按物理目标解析，三个候选全部落空（cupolas 静默不装配，
+    # 进而 safety_guard.h 不可解析）。此处一次性把布局事实解析成显式 -D
+    # 锚点，不在 workflow 内复制环境变量形成双副本。
+    local _prod_root=""
+    if [ -d "${PROJECT_ROOT}/agent-workload/products" ]; then
+        _prod_root="${PROJECT_ROOT}/agent-workload/products"
+    elif [ -d "${PROJECT_ROOT}/products" ]; then
+        _prod_root="${PROJECT_ROOT}/products"
+    fi
+
+    local _anchor=""
+    local -a _prod_args=()
+    if [ -n "${_prod_root}" ]; then
+        for _anchor in \
+            "CUPOLAS_SRC_DIR:cupolas" \
+            "LANG_GW_SRC_DIR:lang_gateway" \
+            "COG_SRC_DIR:cognition" \
+            "GATEWAY_BIZ_SRC_DIR:gateway_biz"; do
+            local _var="${_anchor%%:*}"
+            local _dir="${_anchor#*:}"
+            if [ -f "${_prod_root}/${_dir}/CMakeLists.txt" ]; then
+                _prod_args+=("-D${_var}=${_prod_root}/${_dir}")
+            fi
+        done
+        log_info "Products anchors: ${_prod_root} (${#_prod_args[@]} 件)"
+    else
+        log_warn "Products root not found; product daemons may stay unassembled"
+    fi
+
     log_info "Out-of-source build dir: ${build_dir}"
     mkdir -p "$build_dir"
     cd "$build_dir"
 
-    if cmake -B . -S "${AGENTRT_SRC}" -DCMAKE_BUILD_TYPE=Debug 2>&1 | tail -5; then
-        if cmake --build . 2>&1 | tail -5; then
+    local _cfg_log="${build_dir}/configure.log"
+    local _bld_log="${build_dir}/build.log"
+    if cmake -B . -S "${AGENTRT_SRC}" -DCMAKE_BUILD_TYPE=Debug \
+        ${_prod_args[@]+"${_prod_args[@]}"} >"${_cfg_log}" 2>&1; then
+        tail -5 "${_cfg_log}"
+        if cmake --build . >"${_bld_log}" 2>&1; then
+            tail -5 "${_bld_log}"
             check_gate "Compile" 0
         else
+            dump_cmake_err "build" "${_bld_log}"
             check_gate "Compile" 1
         fi
     else
+        dump_cmake_err "configure" "${_cfg_log}"
         check_gate "Compile" 1
     fi
 }
