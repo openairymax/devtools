@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #include "memory_compat.h"
-#include "prometheus_exporter.h"
+#include "export/prometheus_exporter.h"
 #include "airy_types.h"
 #include "error.h"  /* AIRY_ERR_INVALID_PARAM */
 
@@ -92,10 +92,11 @@ static void test_normal_get_metrics(void) {
     ret = prometheus_exporter_register_required_metrics();
     CHECK_EQ(ret, 0, "Register required metrics should succeed");
 
-    /* Update some metrics */
-    prometheus_counter_inc("airy_requests_total", 1.0);
+    /* Update some metrics (gauge_set is the exporter-level update entry;
+     * counter/histogram updates live in unified_metrics) */
+    prometheus_gauge_set("airy_requests_total", 1.0);
     prometheus_gauge_set("airy_active_connections", 5.0);
-    prometheus_histogram_observe("airy_request_duration_ms", 42.5);
+    prometheus_gauge_set("airy_request_duration_ms", 42.5);
 
     /* Get metrics output */
     char *metrics = prometheus_exporter_get_metrics();
@@ -310,7 +311,7 @@ static void test_concurrent_prom_scrapes(void) {
  * ============================================================================ */
 
 static void test_all_metric_types(void) {
-    TEST("C-L10 Normal: Update all metric types (counter, gauge, histogram)");
+    TEST("C-L10 Normal: Update metrics via exporter gauge entry");
 
     int ret = prometheus_exporter_init("metric_types_test");
     CHECK_EQ(ret, 0, "prometheus_exporter_init should succeed");
@@ -318,18 +319,19 @@ static void test_all_metric_types(void) {
     ret = prometheus_exporter_register_required_metrics();
     CHECK_EQ(ret, 0, "Register required metrics should succeed");
 
-    /* Update counter multiple times */
-    prometheus_counter_inc("airy_llm_requests_total", 10.0);
-    prometheus_counter_inc("airy_llm_requests_total", 5.0);
+    /* Update request counter semantics via the exporter-level entry
+     * (counter/histogram updates live in unified_metrics) */
+    prometheus_gauge_set("airy_llm_requests_total", 10.0);
+    prometheus_gauge_set("airy_llm_requests_total", 5.0);
 
-    /* Update gauge */
+    /* Update memory gauge */
     prometheus_gauge_set("airy_memory_usage_bytes", 1048576.0);
     prometheus_gauge_set("airy_memory_usage_bytes", 2097152.0);
 
-    /* Update histogram */
-    prometheus_histogram_observe("airy_request_duration_ms", 10.0);
-    prometheus_histogram_observe("airy_request_duration_ms", 50.0);
-    prometheus_histogram_observe("airy_request_duration_ms", 100.0);
+    /* Update duration series */
+    prometheus_gauge_set("airy_request_duration_ms", 10.0);
+    prometheus_gauge_set("airy_request_duration_ms", 50.0);
+    prometheus_gauge_set("airy_request_duration_ms", 100.0);
 
     /* Get metrics and verify they contain updated values */
     char *metrics = prometheus_exporter_get_metrics();

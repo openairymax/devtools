@@ -32,6 +32,8 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/tool_d/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/monit_d/include
+    # C-L10: Prometheus 导出域头内聚 src/export/，C-L10 契约测试经域路径直连
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/monit_d/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/gateway_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/daemons/market_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../agent-workload/agentrt/commons/utils/memory/include
