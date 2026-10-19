@@ -34,6 +34,11 @@
 #           update --file 新版（python-free 离线路径）→ 断言版本升级 + 用户
 #           配置保留（config 兼容性）→ update --rollback → 断言版本回退 +
 #           配置仍在（D8：回滚回收运行中 daemon）。同版（prev==new）跳过。
+#           prev 工件缺陷分类：U9 以**新版安装器**装旧包，与真实旧版用户
+#           经旧版安装器落盘不同源；若旧版安装因工件缺运行时库被自检
+#           fail-closed 拒绝（三签名：已安装版本 / 安装自检未通过 / 未解析
+#           动态库依赖），属 prev 历史工件自身包缺陷（sha256 固定，与本次
+#           发布无关），::warning:: 降级继续升级路径验证；其余失败硬失败。
 #           离线自举：二进制安装的 bin/airymaxrt 为 thin 包装（仅前端入口），
 #           管理命令经 airymaxrt-full 委托（联网时从 agentrt 仓 latest/
 #           airymaxrt 拉取）。thin 对 update 命令强制重拉 full（每次刷新，
@@ -91,8 +96,20 @@ if [ -n "$PREV" ] && [ -f "$PREV" ]; then
         PREV_SHA="$PREV.sha256"
         [ -f "$PREV_SHA" ] || fail "U9: 缺 prev sha256 校验件: $PREV_SHA"
         [ -f "$TARBALL.sha256" ] || fail "U9: 缺 new sha256 校验件: $TARBALL.sha256"
-        # U9a：安装旧版 + 写入用户侧配置（config 兼容性判据）
-        bash "$INSTALLER" --from-file "$PREV" || fail "U9: 旧版离线安装失败"
+        # U9a：安装旧版 + 写入用户侧配置（config 兼容性判据）。失败时按
+        # 三签名分类（见头注释）：仅「落盘完整 + 自检拒绝 + 缺库诊断」同时
+        # 命中才判定为 prev 工件自身包缺陷，::warning:: 带痕降级；其余仍
+        # fail-closed 硬失败。
+        if ! PREV_OUT="$(bash "$INSTALLER" --from-file "$PREV" 2>&1)"; then
+            if printf '%s\n' "$PREV_OUT" | grep -q "已安装版本" \
+                && printf '%s\n' "$PREV_OUT" | grep -q "安装自检未通过" \
+                && printf '%s\n' "$PREV_OUT" | grep -q "未解析动态库依赖"; then
+                echo "::warning::U9: prev 工件自身包缺陷（sha256 固定，与本次发布无关），降级继续升级路径验证"
+                printf '%s\n' "$PREV_OUT" | sed 's/^/    /' | tail -15
+            else
+                fail "U9: 旧版离线安装失败"
+            fi
+        fi
         CUR="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | tr -d '"')"
         [ -n "$CUR" ] || fail "U9: 旧版安装后 install.env 无 AIRY_VERSION"
         echo "u9-user-marker: $(date +%s)" > "$AH/config/user-marker.cfg"
