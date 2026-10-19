@@ -104,11 +104,17 @@ pkg_stage_config() {
     cp -f "$root/tools/scripts/ops/templates/permission_rules.yaml" "$out/config/" 2>/dev/null || true
 }
 
-# daemon 启动编排脚本（install.sh 部署依赖，缺失则 daemon 群无法拉起）
+# daemon 启动编排脚本 + 管理面 full 启动器（install.sh 部署依赖）
 pkg_stage_bootstrap() {
     local out="$1" root="$2"
     cp -f "$root/tools/scripts/ops/bin/agentrt-bootstrap.sh" "$out/bin/" 2>/dev/null \
         || echo "warn: agentrt-bootstrap.sh 未找到"
+    # full 启动器随包内置（0.1.19 洁净环境 e2e 根因）：缺此文件时 install.sh
+    # 生成的 thin 包装只能用 curl 下载 latest/airymaxrt，离线/无 curl 环境
+    # status 门禁恒失败。sdk 为发布必需数据，缺失即打包源不完整 → fail-closed。
+    cp -f "$root/agent-workload/sdk/tui/scripts/airymaxrt" "$out/bin/airymaxrt-full" \
+        || { echo "[FAIL] full 启动器（管理面 SSoT）缺失，包不完整"; return 1; }
+    chmod +x "$out/bin/airymaxrt-full"
 }
 
 # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖）
