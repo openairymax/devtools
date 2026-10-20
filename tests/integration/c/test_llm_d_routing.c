@@ -262,8 +262,8 @@ static void test_int15_2_find_provider(void)
     printf("\n--- [INT-15.2] find_provider: 查找与错误处理 ---\n");
 
     provider_config_t prov_cfg[] = {
-        {"openai",    NULL, NULL, NULL, 30.0, 3, NULL, NULL},
-        {"anthropic", NULL, NULL, NULL, 30.0, 3, NULL, NULL},
+        {.name = "openai",    .timeout_sec = 30.0, .max_retries = 3},
+        {.name = "anthropic", .timeout_sec = 30.0, .max_retries = 3},
     };
 
     service_config_t cfg = {
@@ -591,8 +591,8 @@ static void test_int15_5_provider_health_check(void)
 
     /* Step 6: 健康提供商的模型仍可通过 registry 查找 */
     provider_config_t prov_cfg[] = {
-        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL, NULL},
-        {"local",    NULL, NULL, NULL, 60.0, 1, NULL, NULL},
+        {.name = "deepseek", .timeout_sec = 30.0, .max_retries = 3},
+        {.name = "local",    .timeout_sec = 60.0, .max_retries = 1},
     };
 
     service_config_t cfg = {
@@ -631,8 +631,8 @@ static void test_int15_6_e2e_routing_pipeline(void)
 
     /* Step 1: 创建服务配置与注册表 */
     provider_config_t prov_cfg[] = {
-        {"openai",   NULL, NULL, NULL, 30.0, 3, NULL, NULL},
-        {"deepseek", NULL, NULL, NULL, 30.0, 3, NULL, NULL},
+        {.name = "openai",   .timeout_sec = 30.0, .max_retries = 3},
+        {.name = "deepseek", .timeout_sec = 30.0, .max_retries = 3},
     };
 
     service_config_t cfg = {
