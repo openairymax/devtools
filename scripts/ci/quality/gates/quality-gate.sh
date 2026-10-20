@@ -930,6 +930,35 @@ gate_g30_experience() {
 }
 
 # ============================================================================
+# Gate 29: 0.1.19 G37 性能预算门禁（方案 §3.6.4 / §3.6.6）
+# 三档 TTFT 预算 + 本地 GPU SYCL decode >= 35 tok/s；证据只读、禁止估算。
+# 退出码: 0=通过 1=性能预算违例 2=环境错误(告警，--strict 视为失败)
+# ============================================================================
+gate_perf_g37() {
+    section "Gate 29: G37 Performance Budget (0.1.19)"
+
+    local g37_script="${SCRIPT_DIR}/g37-perf-budget-gate.sh"
+    if [ ! -f "$g37_script" ]; then
+        log_warn "g37 performance gate script not found: ${g37_script}"
+        check_gate "PerfBudgetG37" 2
+        return 0
+    fi
+
+    log_info "Running G37 performance-budget gate..."
+    local g37_out g37_rc=0
+    g37_out=$(bash "$g37_script" 2>&1) || g37_rc=$?
+    echo "$g37_out"
+    if [ "$g37_rc" -eq 0 ]; then
+        check_gate "PerfBudgetG37" 0
+    elif [ "$g37_rc" -eq 2 ]; then
+        log_warn "g37 performance gate: evidence unavailable, manual review required"
+        check_gate "PerfBudgetG37" 2
+    else
+        check_gate "PerfBudgetG37" 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -956,6 +985,7 @@ main() {
     local skip_symbol=false
     local skip_logic_g38=false
     local skip_g30=false
+    local skip_g37=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1052,12 +1082,16 @@ main() {
                 skip_g30=true
                 shift
                 ;;
+            --skip-g37)
+                skip_g37=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1088,6 +1122,7 @@ main() {
                 echo "  26. Symbol Conservation Check (G1, AIRY_API public surface)"
                 echo "  27. G38 Logic Completeness (0.1.19, five checklists)"
                 echo "  28. G30 Experience Gate (0.1.19, TUI + CLI surface)"
+                echo "  29. G37 Performance Budget (0.1.19, three-tier TTFT + SYCL throughput)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1113,6 +1148,7 @@ main() {
                 echo "  --skip-symbol         Skip G1 public-surface symbol conservation check"
                 echo "  --skip-logic-g38      Skip G38 logic-completeness (0.1.19, five checklists) check"
                 echo "  --skip-g30            Skip G30 experience gate (0.1.19, TUI + CLI surface) check"
+                echo "  --skip-g37            Skip G37 performance budget (0.1.19, three-tier TTFT) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1156,6 +1192,7 @@ main() {
         $skip_symbol || gate_symbol_conservation
         $skip_logic_g38 || gate_logic_g38
         $skip_g30 || gate_g30_experience
+        $skip_g37 || gate_perf_g37
     fi
 
     # 输出结果

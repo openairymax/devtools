@@ -1,0 +1,15 @@
+# 0.1.19 G37 性能预算 SSoT（方案 §3.6.4 / §3.6.6；证伪修正 F5）
+#
+# 字段: tier|ttft_max_ms|decode_min_tps|backend|perf_mode|note
+#   ttft_max_ms     首字延迟上限（毫秒）。客户端口径：请求发出 → 首个非空
+#                   delta.content；prefill 与排队时间均计入。
+#   decode_min_tps  解码吞吐下限（tok/s）；0 = 不设吞吐判据。
+#   backend         达标后端；any = 不限。local_gpu 只认 sycl：Vulkan(22.0)
+#                   与纯 CPU(11.5) 实测不达标，不得作为 G37 达标口径（§3.6.6）。
+#   perf_mode       测量时必须生效的运行模式；any = 不限。local 两档必须为
+#                   lightweight（D1：AIRY_PERF_MODE / model.yaml 顶层键）。
+#
+# 改表即改门禁：G37 以本文件为唯一判据来源，禁止在脚本内硬编码阈值。
+cloud|2000|0|any|any|云端 API 首字 <2s（不回归）
+local_gpu|5000|35|sycl|lightweight|本地 GPU 7B Q4_K_M 全显存；SYCL 唯一达标后端
+local_cpu|40000|0|cpu|lightweight|本地纯 CPU 7B；status 附换 1.5B/3B 建议
