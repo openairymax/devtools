@@ -901,6 +901,35 @@ gate_logic_g38() {
 }
 
 # ============================================================================
+# Gate 28: 0.1.19 G30 体验门禁（TUI 建设方案 §10.3）
+# TUI golden / §6 69 条 / budget 有界 / 主题三级 / 纯投影 / 六域锚点 /
+# 命令面带 / 三 venue 共用 command 层 / 单文件行数基线 / 十二机制 golden。
+# 退出码: 0=通过 1=判据违例 2=环境告警
+# ============================================================================
+gate_g30_experience() {
+    section "Gate 28: G30 Experience Gate (0.1.19)"
+
+    local g30_script="${SCRIPT_DIR}/g30-experience-gate.sh"
+    if [ ! -f "$g30_script" ]; then
+        log_warn "g30 experience gate script not found: ${g30_script}"
+        check_gate "ExperienceG30" 2
+        return 0
+    fi
+
+    log_info "Running G30 experience gate..."
+    local g30_out g30_rc=0
+    g30_out=$(bash "$g30_script" 2>&1) || g30_rc=$?
+    echo "$g30_out"
+    if [ "$g30_rc" -eq 0 ]; then
+        check_gate "ExperienceG30" 0
+    elif [ "$g30_rc" -eq 2 ]; then
+        check_gate "ExperienceG30" 2
+    else
+        check_gate "ExperienceG30" 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -926,6 +955,7 @@ main() {
     local skip_fanout=false
     local skip_symbol=false
     local skip_logic_g38=false
+    local skip_g30=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1018,12 +1048,16 @@ main() {
                 skip_logic_g38=true
                 shift
                 ;;
+            --skip-g30)
+                skip_g30=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1053,6 +1087,7 @@ main() {
                 echo "  25. Fan-out Check (G13, header load <= 5 + target fan ratchet)"
                 echo "  26. Symbol Conservation Check (G1, AIRY_API public surface)"
                 echo "  27. G38 Logic Completeness (0.1.19, five checklists)"
+                echo "  28. G30 Experience Gate (0.1.19, TUI + CLI surface)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1077,6 +1112,7 @@ main() {
                 echo "  --skip-fanout         Skip G13 fan-out (header load <= 5 + target fan ratchet) check"
                 echo "  --skip-symbol         Skip G1 public-surface symbol conservation check"
                 echo "  --skip-logic-g38      Skip G38 logic-completeness (0.1.19, five checklists) check"
+                echo "  --skip-g30            Skip G30 experience gate (0.1.19, TUI + CLI surface) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1119,6 +1155,7 @@ main() {
         $skip_fanout || gate_fanout
         $skip_symbol || gate_symbol_conservation
         $skip_logic_g38 || gate_logic_g38
+        $skip_g30 || gate_g30_experience
     fi
 
     # 输出结果
