@@ -1,0 +1,6 @@
+# 0.1.19 G30 TUI 单文件行数基线（<= 800 行/文件）
+# 路径相对 agent-workload/sdk/tui/src/；基线外新增超限文件即 FAIL。
+app/mod.rs
+app/tests.rs
+keys.rs
+present.rs
