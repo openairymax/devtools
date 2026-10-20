@@ -34,7 +34,8 @@ benchmark/
 ├── statistics_engine.py                   # 统计计算引擎（分布拟合/显著性检验/回归分析）
 ├── report_generator.py                    # 报告生成器（HTML/Markdown/PDF/JSON/Console）
 ├── history_comparator.py                  # 历史比较器（版本对比/回归检测/趋势分析）
-└── example_coreloopthree_benchmark.py     # CoreLoopThree 基准测试示例
+├── example_coreloopthree_benchmark.py     # CoreLoopThree 基准测试示例
+└── ttft_probe.py                          # G37 端到端首字延迟/解码吞吐探针（真实 SSE）
 ```
 
 ## 核心组件说明
@@ -133,6 +134,29 @@ python scripts/ops/benchmark/benchmark_core.py --rounds 100 --report html,json -
 # CoreLoopThree 基准测试示例
 python scripts/ops/benchmark/example_coreloopthree_benchmark.py
 ```
+
+### G37 性能证据探针（真实端到端）
+
+`ttft_probe.py` 面向 OpenAI 兼容的 `/chat/completions` SSE 端点，测量首字延迟（TTFT）与解码吞吐，产出 `airy.g37.perf/1` 证据供 `ci/quality/gates/g37-perf-budget-gate.sh` 校验。它与 `example_coreloopthree_benchmark.py` 的模拟框架无关，不做任何插桩或估算。
+
+```bash
+# 云端档（首字 <2s）
+OPENAI_API_KEY=... python scripts/ops/benchmark/ttft_probe.py \
+  --base-url https://api.example.com/v1 --model gpt-4o-mini \
+  --tier cloud --backend openai --runs 5
+
+# 本地 GPU 档（SYCL，decode ≥35 tok/s）
+python scripts/ops/benchmark/ttft_probe.py \
+  --base-url http://127.0.0.1:11434/v1 --model qwen2.5-7b-instruct-q4_k_m \
+  --tier local_gpu --backend sycl --perf-mode lightweight --runs 5
+
+# 本地 CPU 档（首字 <40s）
+python scripts/ops/benchmark/ttft_probe.py \
+  --base-url http://127.0.0.1:8080/v1 --model qwen2.5-7b-instruct-q4_k_m \
+  --tier local_cpu --backend cpu --perf-mode lightweight --runs 5
+```
+
+证据默认写入 `ci/quality/gates/g37-perf-evidence.json`（可用 `--evidence` 覆盖），同档位重复测量会合并而非覆盖其他档位。三档阈值定义见 `ci/quality/gates/g37-perf-budget.txt`。
 
 ### 历史对比分析
 
