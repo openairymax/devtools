@@ -287,6 +287,10 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/config/service_config_yaml_pricing.c
     ${LLM_D_DIR}/src/rpc/service_providers.c
     ${LLM_D_DIR}/src/rpc/service_request.c
+    # 调用级链式切换：链定义/链执行/候选查找（与 llm_d 主目标同步）
+    ${LLM_D_DIR}/src/rpc/service_chain.c
+    # routing 段解析（与 llm_d 主目标同步）
+    ${LLM_D_DIR}/src/rpc/service_route.c
     ${LLM_D_DIR}/src/accounting/metrics.c
     ${LLM_D_DIR}/src/accounting/semantic_cache.c
     ${LLM_D_DIR}/src/rpc/response.c
@@ -309,6 +313,10 @@ set(LLM_IMPL_SOURCES
     # B16-S3 c7：适配器装配 SSoT（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/adapters/adapter_table.c
     ${LLM_D_DIR}/src/router/core/llm_router.c
+    # 0.1.19 §3.8.4：可切换类错误分类（健康面迁移判据的唯一来源）
+    ${LLM_D_DIR}/src/router/core/llm_failover.c
+    # 0.1.19 §3.8.2：选择路径经 llm_ep_state() 排除熔断 OPEN 端点
+    ${LLM_D_DIR}/src/router/core/llm_health.c
     # sec44-D：四策略母件化合一（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/router/strategy/router_strategy.c
 )
