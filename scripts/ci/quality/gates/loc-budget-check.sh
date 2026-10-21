@@ -27,6 +27,10 @@
 #   不得带入下一梯级。子账棘轮只降不升，任一子账超出其 pin 亦 FAIL。
 #   实测已达下一梯级时以 --advance 推进 pin（子账 pin 同步收敛为实测值）。
 # 基线：v16-loc-budget-baseline.txt —— 每行 <键>=<值>；current=<K#>; facade=<N>; cupolas=<N>。
+#   facade pin 裁定（2026-10-21）：由 60,990 恢复为方案 §1.2 丙 声明的形态面基线
+#   61,426。该增量仅承担 CCN 长尾批次（main/tui_read_key/cli_* 等 8 项）拆分产生的
+#   结构性开销（上下文结构体 + static 阶段函数样板，预计 +250~350 行），每批次完成
+#   后在收敛台账公示实测值；M10 终局再统一棘轮收敛为实测值，不得长期停留于基线。
 # 用法: loc-budget-check.sh [--advance]
 # 退出码: 0 = 通过；1 = 机制核超限 / 子账增长；2 = 环境错误（树/基线缺失）
 set -euo pipefail
