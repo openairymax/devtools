@@ -64,9 +64,6 @@ agent_run_gen_session_id
 agent_run_is_cancelled
 agent_run_orchestrate
 agent_run_orch_reason
-agent_run_record_event
-agent_run_spec_from_file
-agent_run_think_process
 agent_service_destroy
 agent_service_get_perf
 agent_service_invoke_begin
