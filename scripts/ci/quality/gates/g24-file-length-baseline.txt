@@ -1,3 +1,2 @@
 atoms/coreloopthree/src/dispatch/roadmap/rs_semantic_cache.c
 commons/utils/error/handler.c
-tools/airy_cli/src/cmd/airy_cli_cmd_system.c
