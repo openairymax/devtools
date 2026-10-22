@@ -1166,7 +1166,6 @@ mem_persist_repair_utf8
 mem_persist_rewrite_all
 mem_recent_items_free
 mem_record_build_vector
-mem_record_free_vector
 mem_service_kb_delete
 mem_service_kb_ingest
 mem_service_kb_search
@@ -1664,13 +1663,11 @@ unified_message_create
 unified_message_destroy
 unregister_service_internal
 update_stats_for_path
-utf8_decode_code_point
 validate_jsonrpc_request
 validate_loop_parameters
 validate_required_fields
 validate_single_param
 validate_string_input
-validate_type_mismatch
 web_fetch_via_network
 web_search_is_dict_hit
 web_search_results_degraded
