@@ -355,6 +355,13 @@ PYEOF
     if [ -n "$miss2" ]; then
         log_fail "包内缺少能力组件（半成品）: $(basename "$f"):$miss2"; PREFAIL=1
     fi
+    # 版本自述断言（0.1.19 解包即用态）：包根 VERSION 是解包态的版本 SSoT，
+    # 启动器据此自述版本。缺它则 status --json 在无 install.env 的解包态
+    # 无法自证版本（v0.1.19 首版制品即因此半失能）→ fail-closed。
+    # 只认包根（tar: ./VERSION；zip: <包目录>/VERSION），嵌套同名不计。
+    if ! printf '%s\n' "$listing" | tr '\\' '/' | grep -Eq '^(\./)?VERSION$|^[^/]+/VERSION$'; then
+        log_fail "包根缺少版本 SSoT（VERSION）: $(basename "$f")"; PREFAIL=1
+    fi
     tmpext="$(mktemp -d)"
     if echo "$listing" | grep -q 'bin/agentrt-bootstrap.sh'; then
         if tar -xzf "$f" -C "$tmpext" --wildcards '*/bin/agentrt-bootstrap.sh' 2>/dev/null; then
