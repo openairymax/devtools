@@ -251,16 +251,17 @@ log_info "制品目录: ${DIST_DIR}  目标: ${GITHUB_REPO} (GitHub) + ${GITEE_R
 mirror_bootstrap() {
     [ "$FETCH_MISSING" = "1" ] || return 1
     mkdir -p "$DIST_DIR"
-    local api name resp=""
+    local api name code resp
     api="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases/tags/${VERSION}"
-    # 匿名可读的仓库在 CI 侧可能被判为不同来源而受限，有令牌即带上。
-    if [ -n "${ATOMGIT_TOKEN:-}" ]; then
-        resp="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
-            -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" "$api" 2>/dev/null || true)"
-    else
-        resp="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" "$api" 2>/dev/null || true)"
+    # 空令牌等价匿名（实测 200），故单次请求按令牌是否就位取值，不分支。
+    resp="$(curl -sS --connect-timeout 20 "${CURL_STALL[@]}" \
+        -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN:-}" -w '\n%{http_code}' "$api" 2>/dev/null || true)"
+    code="${resp##*$'\n'}"
+    resp="${resp%$'\n'*}"
+    if [ "$code" != "200" ]; then
+        log_warn "atomgit Release 查询失败（HTTP ${code:-000}）：${api}"
+        return 1
     fi
-    [ -n "$resp" ] || { log_warn "atomgit Release 查询失败：${api}"; return 1; }
     local -a names=()
     while IFS= read -r name; do
         case "$name" in
@@ -271,7 +272,10 @@ mirror_bootstrap() {
 try: d=json.load(sys.stdin)
 except Exception: d={}
 for a in d.get("assets") or []: print(a.get("name") or "")' 2>/dev/null || true)
-    [ "${#names[@]}" -gt 0 ] || return 1
+    if [ "${#names[@]}" -eq 0 ]; then
+        log_warn "atomgit Release 无平台包可回填：${api}（响应 ${#resp} 字节）"
+        return 1
+    fi
     ARTIFACTS=("${names[@]}")
     log_info "dist 无平台包，回填引导自 atomgit：${#ARTIFACTS[@]} 个"
 }
