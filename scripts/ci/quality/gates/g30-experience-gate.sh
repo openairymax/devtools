@@ -303,9 +303,11 @@ check_file_length() {
         {
             echo "# 0.1.19 G30 TUI single-file length baseline (<= ${MAX_TUI_FILE_LINES} lines/file)"
             echo "# Paths relative to agent-workload/sdk/tui/src/; new over-limit files outside this list FAIL."
-            echo "$cur" | awk '{ print $1 }' | sort -u
+            if [ -n "$cur" ]; then
+                echo "$cur" | awk '{ print $1 }' | sort -u
+            fi
         } > "$BASELINE"
-        log_info "baseline updated: $(grep -vc '^#' "$BASELINE") entries (g30-tui-filelen-baseline.txt)"
+        log_info "baseline updated: $(grep -cvE '^[[:space:]]*(#|$)' "$BASELINE") entries (g30-tui-filelen-baseline.txt)"
         exit 0
     fi
     if [ ! -f "$BASELINE" ]; then
