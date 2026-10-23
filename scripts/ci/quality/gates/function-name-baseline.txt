@@ -1172,7 +1172,6 @@ mem_service_kb_search
 mem_service_search_filtered
 mem_test_clean_persist
 mem_vec_ensure_capacity
-mem_write_file_atomic
 merge_provider_configs
 method_dispatcher_create
 method_dispatcher_destroy
@@ -1672,7 +1671,6 @@ web_fetch_via_network
 web_search_is_dict_hit
 web_search_results_degraded
 web_search_rewrite_query
-web_search_strip_intent
 wh_auth_caps_for_handler
 wh_auth_revoke_execution
 wh_auth_revoke_id_locked
