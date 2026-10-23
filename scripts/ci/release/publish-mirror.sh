@@ -251,16 +251,23 @@ log_info "制品目录: ${DIST_DIR}  目标: ${GITHUB_REPO} (GitHub) + ${GITEE_R
 mirror_bootstrap() {
     [ "$FETCH_MISSING" = "1" ] || return 1
     mkdir -p "$DIST_DIR"
-    local name
+    local api name resp=""
+    api="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases/tags/${VERSION}"
+    # 匿名可读的仓库在 CI 侧可能被判为不同来源而受限，有令牌即带上。
+    if [ -n "${ATOMGIT_TOKEN:-}" ]; then
+        resp="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+            -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" "$api" 2>/dev/null || true)"
+    else
+        resp="$(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" "$api" 2>/dev/null || true)"
+    fi
+    [ -n "$resp" ] || { log_warn "atomgit Release 查询失败：${api}"; return 1; }
     local -a names=()
     while IFS= read -r name; do
         case "$name" in
             agentrt-"$VERSION"-*.tar.gz|agentrt-"$VERSION"-*.zip)
                 names+=("$DIST_DIR/$name") ;;
         esac
-    done < <(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
-        "https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases/tags/${VERSION}" 2>/dev/null \
-        | python3 -c 'import json,sys
+    done < <(printf '%s' "$resp" | python3 -c 'import json,sys
 try: d=json.load(sys.stdin)
 except Exception: d={}
 for a in d.get("assets") or []: print(a.get("name") or "")' 2>/dev/null || true)
