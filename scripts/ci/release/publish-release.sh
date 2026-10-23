@@ -949,34 +949,66 @@ fi
 # 不可倒置：版本 tag 附件校验 → latest 入口面终验 → 树快照提交，客户端
 # 永不看到"指针已新、附件未齐"。仓库侧不留任何 latest git tag：下载面按
 # release tag_name 经平台别名解析，git tag 与其无关，自建反有劫持风险。
+#
+# 快照推送与远端拉齐重放：本阶段之前存在数十分钟的签名与上传窗口（atomgit
+# 单次发布上传约 100 分钟），主分支若在窗口内前进，直接 push 必被
+# non-fast-forward 拒绝，快照静默丢失（v0.1.19 实证：37 分钟内 main 前进
+# 两次）。根修不是盲目重试 push，而是先拉齐远端再重放快照：reset 到远端
+# 顶点、只回填 latest/ 子树后重新提交，他人的改动不受影响。返回 0=首推
+# 成功，2=拉齐后重放成功，1=仍失败（fail-soft，不阻断发布主链路）。
+latest_sync() {
+    local remote="$1" snap="$2" logfile="$3" msg="$4"
+    git -C "$LATEST_DIR" push "$remote" HEAD:main >"$logfile" 2>&1 && return 0
+    git -C "$LATEST_DIR" fetch --depth 1 "$remote" main >>"$logfile" 2>&1 || return 1
+    git -C "$LATEST_DIR" reset --hard FETCH_HEAD >>"$logfile" 2>&1 || return 1
+    git -C "$LATEST_DIR" rm -r -q -f --ignore-unmatch latest/ >>"$logfile" 2>&1 || true
+    git -C "$LATEST_DIR" checkout "$snap" -- latest/ >>"$logfile" 2>&1 || return 1
+    git -C "$LATEST_DIR" add -A -f latest/ >>"$logfile" 2>&1 || return 1
+    git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
+        commit -m "$msg" >>"$logfile" 2>&1 || return 1
+    git -C "$LATEST_DIR" push "$remote" HEAD:main >>"$logfile" 2>&1 || return 1
+    return 2
+}
+
 if [ "$LATEST_READY" = "1" ]; then
+    SNAP_MSG="release: update manifest.${CHANNEL}.json for ${VERSION}"
     # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
     # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
     git -C "$LATEST_DIR" add -A -f latest/
     if git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
-        commit -m "release: update manifest.${CHANNEL}.json for ${VERSION}" >/dev/null 2>&1; then
+        commit -m "$SNAP_MSG" >/dev/null 2>&1; then
         log_info "latest/ 归档快照已提交"
     else
-        log_warn "latest/ 无变更或提交失败"
+        log_warn "latest/ 无变更（快照沿用当前 HEAD）"
     fi
-    if git -C "$LATEST_DIR" push origin HEAD:main >/dev/null 2>&1; then
-        log_info "latest/ 归档快照已推送 main"
-    else
-        log_warn "latest/ push 失败（可手动同步）"
-    fi
+    SNAP_SHA="$(git -C "$LATEST_DIR" rev-parse HEAD)"
+    SNAP_LOG="$TMP/latest-push.log"
+    set +e
+    latest_sync origin "$SNAP_SHA" "$SNAP_LOG" "$SNAP_MSG"
+    SNAP_RC=$?
+    set -e
+    case "$SNAP_RC" in
+        0) log_info "latest/ 归档快照已推送 main" ;;
+        2) log_ok "latest/ 快照已拉齐远端并重放（发布窗口内 main 前进）" ;;
+        *) log_warn "latest/ push 失败（可直接同步）：$(tail -n 1 "$SNAP_LOG" 2>/dev/null | redact)" ;;
+    esac
     # P23 根修：manifest commit 双端同步。历史缺陷（6186a5cd1 实证）：
     # 本阶段只 clone/push atomgit，GitHub main 永远收不到 manifest 更新
     # commit，双端分叉只能手动 merge（cef8f277 补丁）。两仓为同一提交图
-    # 的镜像，此处向 GitHub main 补推同一 commit（fail-soft：失败仅告警，
-    # 不阻断 atomgit 发布主链路）。
+    # 的镜像，此处向 GitHub main 补推同一快照（同样拉齐重放；fail-soft：
+    # 失败仅告警，不阻断 atomgit 发布主链路）。
     if [ -n "${GITHUB_REPO:-}" ] && [ -n "${GITHUB_PAT:-}" ]; then
-        if git -C "$LATEST_DIR" push \
-            "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git" \
-            HEAD:main >/dev/null 2>&1; then
-            log_ok "latest/ manifest 已同步 GitHub main"
-        else
-            log_warn "latest/ manifest 同步 GitHub 失败（双端分叉时 non-fast-forward，需手动 merge）"
-        fi
+        GH_LOG="$TMP/latest-push-github.log"
+        set +e
+        latest_sync "https://x-access-token:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git" \
+            "$SNAP_SHA" "$GH_LOG" "$SNAP_MSG"
+        GH_RC=$?
+        set -e
+        case "$GH_RC" in
+            0) log_ok "latest/ manifest 已同步 GitHub main" ;;
+            2) log_ok "latest/ manifest 已拉齐 GitHub main 并重放" ;;
+            *) log_warn "latest/ manifest 同步 GitHub 失败：$(tail -n 1 "$GH_LOG" 2>/dev/null | redact)" ;;
+        esac
     else
         log_warn "GITHUB_REPO/GITHUB_PAT 未设置，跳过 GitHub manifest 同步"
     fi
