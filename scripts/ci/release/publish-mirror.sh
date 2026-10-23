@@ -245,12 +245,39 @@ log_info "AgentRT 发布镜像 ${VERSION}（通道: ${CHANNEL}）"
 log_info "制品目录: ${DIST_DIR}  目标: ${GITHUB_REPO} (GitHub) + ${GITEE_REPO} (Gitee)"
 
 # ─── 收集附件（与 publish-release.sh 上传清单完全同口径）───────────────────
+# 回填引导：历史版本在 CI 侧没有 release-dist 工件，dist 天然为空。此时若
+# 直接判空退出，FETCH_MISSING 永远不可达（v0.1.18 实证）。故先以 atomgit
+# （SSoT）Release 的附件名为准枚举平台包，再交给下方回填循环下载。
+mirror_bootstrap() {
+    [ "$FETCH_MISSING" = "1" ] || return 1
+    mkdir -p "$DIST_DIR"
+    local name
+    local -a names=()
+    while IFS= read -r name; do
+        case "$name" in
+            agentrt-"$VERSION"-*.tar.gz|agentrt-"$VERSION"-*.zip)
+                names+=("$DIST_DIR/$name") ;;
+        esac
+    done < <(curl -fsS --connect-timeout 20 "${CURL_STALL[@]}" \
+        "https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases/tags/${VERSION}" 2>/dev/null \
+        | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d={}
+for a in d.get("assets") or []: print(a.get("name") or "")' 2>/dev/null || true)
+    [ "${#names[@]}" -gt 0 ] || return 1
+    ARTIFACTS=("${names[@]}")
+    log_info "dist 无平台包，回填引导自 atomgit：${#ARTIFACTS[@]} 个"
+}
+
 ARTIFACTS=()
 for f in "$DIST_DIR"/agentrt-${VERSION}-*.tar.gz "$DIST_DIR"/agentrt-${VERSION}-*.zip; do
     [ -e "$f" ] || continue
     ARTIFACTS+=("$f")
 done
-[ "${#ARTIFACTS[@]}" -gt 0 ] || { log_fail "dist 无平台包（agentrt-${VERSION}-*）"; exit 1; }
+if [ "${#ARTIFACTS[@]}" -eq 0 ]; then
+    mirror_bootstrap \
+        || { log_fail "dist 无平台包（agentrt-${VERSION}-*）且 atomgit 无可回填附件"; exit 1; }
+fi
 
 MANIFEST="$DIST_DIR/manifest.${CHANNEL}.json"
 declare -a ASSETS=()
