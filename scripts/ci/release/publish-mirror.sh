@@ -50,7 +50,12 @@ log_fail() { echo -e "${RED}[FAIL]${NC} $*" >&2; }
 VERSION="${1:-}"
 DIST_DIR="${2:-}"
 DRY_RUN="${DRY_RUN:-0}"
-FETCH_MISSING="${FETCH_MISSING:-0}"
+# 布尔开关归一：调用方可能传 shell 惯用值（1/true）或 CI 的 JSON 布尔
+# 字面量（true/false）。只在此处判定，下游一律按 0/1 比较。
+case "${FETCH_MISSING:-}" in
+    1|true|TRUE|yes|on) FETCH_MISSING=1 ;;
+    *)                  FETCH_MISSING=0 ;;
+esac
 GITHUB_REPO="${GITHUB_REPO:-openairymax/agentrt}"
 GITEE_REPO="${GITEE_REPO:-openairymax/agentrt}"
 ATOMGIT_REPO="${ATOMGIT_REPO:-openairymax/agentrt}"
