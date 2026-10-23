@@ -358,8 +358,12 @@ PYEOF
     # 版本自述断言（0.1.19 解包即用态）：包根 VERSION 是解包态的版本 SSoT，
     # 启动器据此自述版本。缺它则 status --json 在无 install.env 的解包态
     # 无法自证版本（v0.1.19 首版制品即因此半失能）→ fail-closed。
-    # 只认包根（tar: ./VERSION；zip: <包目录>/VERSION），嵌套同名不计。
-    if ! printf '%s\n' "$listing" | tr '\\' '/' | grep -Eq '^(\./)?VERSION$|^[^/]+/VERSION$'; then
+    # 只认包根，嵌套同名不计。三种归档根形态并存：tar 由 `-C pkg .` 产生
+    # `./agentrt-<ver>/VERSION`；zip 由 Compress-Archive 产生
+    # `agentrt-<ver>/VERSION`（Windows 腿）或 `VERSION`（pkg 内容直打）。
+    # 首版断言漏了 tar 的 `./<dir>/VERSION`，把完整包判成缺件（v0.1.19
+    # 重发实证），故前缀 `./` 与单层包目录都必须可选。
+    if ! printf '%s\n' "$listing" | tr '\\' '/' | grep -Eq '^(\./)?([^/]+/)?VERSION$'; then
         log_fail "包根缺少版本 SSoT（VERSION）: $(basename "$f")"; PREFAIL=1
     fi
     tmpext="$(mktemp -d)"
