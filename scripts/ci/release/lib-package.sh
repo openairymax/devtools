@@ -115,6 +115,10 @@ pkg_stage_bootstrap() {
     cp -f "$root/agent-workload/sdk/tui/scripts/airymaxrt" "$out/bin/airymaxrt-full" \
         || { echo "[FAIL] full 启动器（管理面 SSoT）缺失，包不完整"; return 1; }
     chmod +x "$out/bin/airymaxrt-full"
+    # 版本 SSoT 随包落地：解包即用态 launcher 读包根 VERSION（无安装根
+    # install.env 时的唯一事实源），缺失即包不完整 → fail-closed。
+    cp -f "$root/agent-workload/agentrt/VERSION" "$out/VERSION" \
+        || { echo "[FAIL] 版本 SSoT（agentrt/VERSION）缺失，包不完整"; return 1; }
 }
 
 # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖）
