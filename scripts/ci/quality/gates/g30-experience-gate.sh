@@ -177,11 +177,30 @@ check_theme() {
     log_ok "ColorDepth{TrueColor,Color256,Basic} + to_256/to_basic present"
 }
 
+# 模块路径解析：src/x.rs 与 src/x/mod.rs 等价（模块可按职责拆成目录）
+mod_path() {
+    local rel="$1"
+    if [ -f "$TUI_DIR/src/$rel.rs" ]; then
+        echo "$TUI_DIR/src/$rel.rs"
+    elif [ -f "$TUI_DIR/src/$rel/mod.rs" ]; then
+        echo "$TUI_DIR/src/$rel/mod.rs"
+    fi
+}
+
 # [T5] TUI = fold(events) 纯投影
+# 取证面为「投影单元全集」：模块拆分成目录后，任一子文件混入 client
+# 依赖都算违规，不得因拆分而缩窄检查范围。
 check_purity() {
     section "T5 pure projection (present + fold)"
-    local f hit
-    for f in "$TUI_DIR/src/present.rs" "$TUI_DIR/src/engine/fold.rs"; do
+    local f hit files=()
+    if [ -d "$TUI_DIR/src/present" ]; then
+        while IFS= read -r f; do files+=("$f"); done \
+            < <(find "$TUI_DIR/src/present" -name '*.rs' | sort)
+    else
+        files+=("$TUI_DIR/src/present.rs")
+    fi
+    files+=("$TUI_DIR/src/engine/fold.rs")
+    for f in "${files[@]}"; do
         if [ ! -f "$f" ]; then
             fail "projection file not found: ${f}"
             continue
@@ -192,7 +211,7 @@ check_purity() {
             echo "$hit" | sed 's/^/    /'
         fi
     done
-    log_ok "present.rs / engine/fold.rs carry no client dependency"
+    log_ok "present/ + engine/fold.rs carry no client dependency (${#files[@]} files)"
 }
 
 # [T6] 六域锚点
@@ -204,10 +223,11 @@ check_domains() {
             fail "domain anchor missing: src/${d}/"
         fi
     done
-    local f
-    for f in keys.rs engine/probe.rs engine/notify.rs engine/sanitize.rs \
-             engine/term.rs style/depth.rs; do
-        if [ ! -f "$TUI_DIR/src/$f" ]; then
+    local f p
+    for f in keys engine/probe engine/notify engine/sanitize \
+             engine/term style/depth; do
+        p=$(mod_path "$f")
+        if [ -z "$p" ]; then
             fail "domain anchor missing: src/${f}"
         fi
     done
