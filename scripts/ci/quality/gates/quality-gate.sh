@@ -959,6 +959,36 @@ gate_perf_g37() {
 }
 
 # ============================================================================
+# Gate 30: 0.1.19 G16/G17 全队列户形态计数（方案 §6.3 五件套机械执法）
+# resident C daemon 五件套逐户断言 + scripts 户登记断言；户数与入口行数
+# 预算取 thresholds.conf SSoT（FORM_DAEMON_COUNT / FORM_MAIN_MAX）。
+# 退出码: 0=通过 1=形态违例 2=环境错误(告警，--strict 视为失败)
+# ============================================================================
+gate_form_count() {
+    section "Gate 30: Fleet Form Count G16/G17 (0.1.19)"
+
+    local fc_script="${SCRIPT_DIR}/form-count-check.sh"
+    if [ ! -f "$fc_script" ]; then
+        log_warn "form-count gate script not found: ${fc_script}"
+        check_gate "FleetFormCount" 2
+        return 0
+    fi
+
+    log_info "Running fleet form-count gate..."
+    local fc_out fc_rc=0
+    fc_out=$(bash "$fc_script" 2>&1) || fc_rc=$?
+    echo "$fc_out" | tail -25
+    if [ "$fc_rc" -eq 0 ]; then
+        check_gate "FleetFormCount" 0
+    elif [ "$fc_rc" -eq 2 ]; then
+        log_warn "form-count gate: environment error, manual review required"
+        check_gate "FleetFormCount" 2
+    else
+        check_gate "FleetFormCount" 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -973,6 +1003,7 @@ main() {
     local skip_header_shadow=false
     local skip_adapter_registry=false
     local skip_sample_form=false
+    local skip_form_count=false
     local skip_version_consistency=false
     local skip_loc_budget=false
     local skip_stub_scan=false
@@ -1032,6 +1063,9 @@ main() {
                 ;;
             --skip-sample-form)
                 skip_sample_form=true
+                ;;
+            --skip-form-count)
+                skip_form_count=true
                 shift
                 ;;
             --skip-version-consistency)
@@ -1136,6 +1170,7 @@ main() {
                 echo "  --skip-header-shadow  Skip header shadow check"
                 echo "  --skip-adapter-registry  Skip llm_d adapter registry check"
                 echo "  --skip-sample-form    Skip llm_d sample form check"
+                echo "  --skip-form-count     Skip fleet form-count check (G16/G17)"
                 echo "  --skip-version-consistency  Skip version consistency check (SSoT)"
                 echo "  --skip-loc-budget     Skip G2 LOC budget (milestone ladder) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
@@ -1180,6 +1215,7 @@ main() {
         $skip_header_shadow || gate_header_shadow
         $skip_adapter_registry || gate_adapter_registry
         $skip_sample_form || gate_sample_form
+        $skip_form_count || gate_form_count
         $skip_version_consistency || gate_version_consistency
         $skip_loc_budget || gate_loc_budget
         $skip_stub_scan || gate_stub_scan
