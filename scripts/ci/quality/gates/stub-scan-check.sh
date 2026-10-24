@@ -5,9 +5,12 @@
 #   应用壳层按 §1.3 迁出至 products 装配仓，§254c 起纳入本门禁扫描域（独立根、
 #   同一零容忍标准）。
 # 判据：生产码内零未竟标记——TODO / FIXME / XXX / HACK / STUB（大写约定、
-#   词边界）与 `#if 0` 死码块，任一命中即 FAIL（零容忍，无基线放宽）。
+#   词边界）、字面 `(stub)` 肯定式桩标注、与 `#if 0` 死码块，任一命中即
+#   FAIL（零容忍，无基线放宽）。
 #   仅匹配大写标记：小写 `xxx` 系文档占位符（如 `builtin:xxx`），非桩标记；
-#   注释内的 "not a stub" 等说明性小写用法亦不误伤。
+#   注释内的 "not a stub" 等说明性小写用法亦不误伤。小写盲区以字面
+#   `(stub)` 括注形回收：该写法是注释中宣告"此为桩"的肯定式标记，
+#   实测全树仅此形态为肯定式（否定式 "not a stub" 不含括注，不误伤）。
 # 用法: stub-scan-check.sh
 # 退出码: 0 = 通过；1 = 存在桩标记；2 = 环境错误（树缺失）
 set -euo pipefail
@@ -19,7 +22,7 @@ CUPOLAS_DIR="${PROJECT_ROOT}/agent-workload/products/cupolas"
 
 MODULES=(atoms commons daemons gateway heapstore protocols tools)
 
-PATTERN='\b(TODO|FIXME|XXX|HACK|STUB)\b|^[[:space:]]*#[[:space:]]*if[[:space:]]+0([^[:alnum:]_]|$)'
+PATTERN='\b(TODO|FIXME|XXX|HACK|STUB)\b|\(stub\)|^[[:space:]]*#[[:space:]]*if[[:space:]]+0([^[:alnum:]_]|$)'
 
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
