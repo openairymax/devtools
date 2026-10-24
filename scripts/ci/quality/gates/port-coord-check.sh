@@ -282,9 +282,13 @@ fi
 section "E. codegen manifest rpc.tcp symbolic"
 
 E_HITS=0
+E_COUNT=0
 for mf in "$AGENTRT"/daemons/*/.manifest; do
     [ -f "$mf" ] || continue
+    dir_name="$(basename "$(dirname "$mf")")"
+    [ "$dir_name" = "scripts" ] && continue  # 登记型户（G16）：无 rpc 面
     rel="${mf#$PROJECT_ROOT/}"
+    E_COUNT=$((E_COUNT + 1))
     tcp="$(sed -nE 's/.*"tcp"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$mf" | head -n1)"
     if [ -z "$tcp" ]; then
         log_err "E. ${rel} 未声明 rpc.tcp"
@@ -297,7 +301,7 @@ for mf in "$AGENTRT"/daemons/*/.manifest; do
     fi
 done
 if [ "$E_HITS" -eq 0 ]; then
-    log_ok "E. 15 户 manifest rpc.tcp 均为 SSoT 符号"
+    log_ok "E. ${E_COUNT} 户 manifest rpc.tcp 均为 SSoT 符号"
 fi
 
 ###############################################################################
