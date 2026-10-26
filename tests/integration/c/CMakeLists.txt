@@ -307,6 +307,8 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/core/adapter.c
     ${LLM_D_DIR}/src/providers/adapters/chat.c
     ${LLM_D_DIR}/src/providers/core/rate_limit.c
+    # 0.1.20 B1-d：上游失败线程局域诊断槽（与 llm_d 主目标同步）
+    ${LLM_D_DIR}/src/providers/core/prov_diag.c
     ${LLM_D_DIR}/src/providers/adapters/messages.c
     # B16-S4：deepseek.c / google.c 清理（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/adapters/local.c
