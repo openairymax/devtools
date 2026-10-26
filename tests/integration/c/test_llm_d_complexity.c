@@ -390,7 +390,7 @@ TEST(int16_4_override_routing)
     TEST_ASSERT(ct != NULL, "成本追踪器创建成功");
 
     /* SIMPLE 输入被覆盖到 claude-sonnet (更贵) */
-    cost_tracker_add(ct, "claude-sonnet", 100, 200);
+    cost_tracker_add(ct, "claude-sonnet", 100, 200, 0);
     /* 成本: (100/1000)*3.00 + (200/1000)*15.00 = 0.3 + 3.0 = 3.3 */
 
     cJSON *report = cost_tracker_export(ct);
@@ -550,7 +550,7 @@ TEST(int16_5_fallback_chain)
     TEST_ASSERT(ct != NULL, "回退成本追踪器创建成功");
 
     /* 回退到 gpt-4o 的成本 */
-    cost_tracker_add(ct, "gpt-4o", 200, 500);
+    cost_tracker_add(ct, "gpt-4o", 200, 500, 0);
     /* 成本: (200/1000)*2.50 + (500/1000)*10.00 = 0.5 + 5.0 = 5.5 */
 
     cJSON *report = cost_tracker_export(ct);

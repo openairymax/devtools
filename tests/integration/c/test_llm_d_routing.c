@@ -717,7 +717,8 @@ static void test_int15_6_e2e_routing_pipeline(void)
         TEST_ASSERT_NOT_NULL(ct, "Step 6: 成本追踪器创建成功");
 
         cost_tracker_add(ct, "gpt-4o",
-                         resp->prompt_tokens, resp->completion_tokens);
+                         resp->prompt_tokens, resp->completion_tokens,
+                         resp->cached_tokens);
         /* 成本: (25/1000)*2.50 + (50/1000)*10.00 = 0.0625 + 0.5 = 0.5625 */
 
         cJSON *report = cost_tracker_export(ct);
