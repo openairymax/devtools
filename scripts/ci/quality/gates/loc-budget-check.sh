@@ -34,6 +34,10 @@
 #   facade pin 裁定（2026-10-26，0.1.20 B1-c）：61,426 -> 实测 61,502（+76）。增量系
 #   方案 D0 测量面（llm_rtr_meas EWMA 回填 + router/measurement stats 导出，G47/G60/G62
 #   判据）落点全在 daemons 口径，属方案 §10 账一施工量，批次配减（§10.2）合入后回吐。
+#   facade pin 裁定（2026-10-26，0.1.20 B1-d）：61,502 -> 实测 61,576（+74）。增量系
+#   方案 P2-2 残余收口（prov_diag 线程诊断槽 + adapter/sse/rate_limit 写点 + llm_d
+#   三处 RPC 错误面上游 detail 透传 + tools 集成测试源列表同步），复用 ErrorModel v1
+#   语义未另建错误体，属方案 §10 账一施工量，批次配减（§10.2）合入后回吐。
 # 用法: loc-budget-check.sh [--advance]
 # 退出码: 0 = 通过；1 = 机制核超限 / 子账增长；2 = 环境错误（树/基线缺失）
 set -euo pipefail
