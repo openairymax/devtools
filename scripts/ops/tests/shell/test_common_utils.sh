@@ -135,6 +135,15 @@ test_config_set() {
     rm -f "$test_config"
 }
 
+test_config_set_update() {
+    local test_config="/tmp/airy_test_config3_$$"
+    airy_config_set "$test_config" "key" "old"
+    airy_config_set "$test_config" "key" "new"
+    assert_equal "new" "$(airy_config_get "$test_config" "key")" "config_set should update existing key"
+    assert_equal "1" "$(wc -l < "$test_config" | tr -d ' ')" "config_set should not duplicate lines"
+    rm -f "$test_config"
+}
+
 ###############################################################################
 # 测试：用户交�?
 ###############################################################################
@@ -165,6 +174,7 @@ run_all_tests() {
         "test_in_array"
         "test_config_get"
         "test_config_set"
+        "test_config_set_update"
     )
 
     echo "=========================================="

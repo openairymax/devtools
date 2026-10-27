@@ -316,7 +316,8 @@ airy_config_set() {
     fi
 
     if grep -q "^${key}=" "$file" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+        awk -v k="$key" -v v="$value" 'BEGIN{FS=OFS="="} $1==k{$0=k"="v} {print}' "$file" > "${file}.tmp"
+        mv -f "${file}.tmp" "$file"
     else
         echo "${key}=${value}" >> "$file"
     fi
