@@ -1,0 +1,37 @@
+# 0.1.20 Gate 43 形态面归属登记表（SSoT）
+#
+# 用途：facade-attribution-check.sh 的唯一数据源。纲领 §5.1（G-W6-1）：
+#   每个能力格（ops 族）必须显式登记所属形态面，未登记即红——形态面归属
+#   是准入项，不是文档装饰。新增 *_ops_t 族，先在此登记归属再实现挂载。
+#
+# 判据（双向闭合，任一方向破坏即红）：
+#   A1 树内实存（agentrt/ + products/ 全树 `static const <fam>_ops_t` 实例
+#      提取的族集合）中每个族都必须在本表登记；
+#   A2 本表每行族名必须在树内实存（无幽灵条目）；
+#   A3 归属字段仅限四值：user / platform / policy / evolution。
+#
+# 口径说明：历史第 18 族 airy_review_semantic_ops_t 已消亡（树内零实例，
+#   语义评审由第 17 族 cog_review_ops_t 承载），除名；第 21 族为 0.1.20
+#   新增金丝雀治理格。归属依据 0.1.20 方案 §2.2 能力格坐标系总表。
+#
+# 格式：<族名>|<形态面>；'#' 起始行为注释。
+airy_orch_ops_t|platform
+airy_llm_ops_t|platform
+airy_tool_ops_t|platform
+airy_grad_ops_t|evolution
+airy_gccp_ops_t|evolution
+airy_plan_ops_t|evolution
+airy_mc_ops_t|evolution
+airy_tc_ops_t|platform
+airy_ipc_ops_t|platform
+airy_hook_ops_t|platform
+airy_safety_ops_t|policy
+airy_persist_ops_t|platform
+airy_checkpoint_ops_t|platform
+airy_heapstore_ops_t|platform
+airy_lang_gw_ops_t|platform
+airy_intent_ops_t|user
+cog_review_ops_t|evolution
+gateway_ops_t|platform
+scheduler_platform_ops_t|platform
+dpolicy_canary_ops_t|evolution
