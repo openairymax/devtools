@@ -302,6 +302,8 @@ set(LLM_IMPL_SOURCES
     ${LLM_D_DIR}/src/providers/core/sse.c
     # B16-S3 c8：退避重试循环壳（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/core/retry.c
+    # 0.1.20 D2-9：传输超时分类计数与自动预算（与 llm_d 主目标同步）
+    ${LLM_D_DIR}/src/providers/core/prov_stat.c
     ${LLM_D_DIR}/src/providers/core/toolstream.c
     # B16-S3.3：通用 completion driver（与 llm_d 主目标同步）
     ${LLM_D_DIR}/src/providers/core/adapter.c
