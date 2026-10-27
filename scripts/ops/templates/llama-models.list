@@ -1,0 +1,12 @@
+# AirymaxRT 模型 pin 清单（llama.cpp 自托管推理链，策略数据层）
+# 格式：
+#   version|<清单版本>
+#   model|<name>|<asset>|<size>|<sha256>
+#   mirror|<name>|<url-template>
+# sha256 实测来源：hf-mirror.com API lfs.oid（Git LFS oid 即内容 sha256，
+# 与 GitHub API digest 同法零下载核验）。
+# 交付通道硬约束（0.1.19 同款）：huggingface.co 直连在目标网段超时实测，
+# 与 GitHub 直连同理不入序列；日常路径 = 离线 bundle + hf-mirror 镜像。
+version|1
+model|qwen3-0.6b-q8_0|Qwen3-0.6B-Q8_0.gguf|639446688|9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031
+mirror|hf-mirror|https://hf-mirror.com/Qwen/Qwen3-0.6B-GGUF/resolve/main/{asset}
