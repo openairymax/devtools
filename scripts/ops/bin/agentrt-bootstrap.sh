@@ -364,15 +364,47 @@ declare -A DAEMON_HEALTH_TIMEOUT=(
     [gateway_d]=30
 )
 
-# daemon 默认 TCP 端口 (0 = Unix Socket)。取值须与 SSoT
+# daemon 默认 TCP 端口 (0 = Unix Socket)。取值与 SSoT
 # agentrt/commons/include/airy_defaults.h 的 AIRY_PORT_* 登记表一致
 # （gateway_d = AIRY_PORT_GATEWAY_HTTP = 2027），禁止复刻端口字面量。
+# 此处登记的是「二进制缺省值」；实际监听端口可能被安装器的 launch 声明
+# 覆盖（见下方 gateway_d 端口解析）。
 # 注意: tool_d 仅监听 Unix Socket，历史遗留的 TCP 端口映射会使健康检查
 # nc -z 挂起（连接被 DROP 而非 REFUSE）后才回退 socket，每次启动延迟
 # 30s+，已移除。
 declare -A DAEMON_PORT=(
     [gateway_d]=2027
 )
+
+# gateway_d 健康检查端口以「实际 launch 声明」为准：安装器在
+# $AIRY_CONFIG_DIR/profile.env 写入
+# AIRYRT_LAUNCH_ARGS_gateway_d="-h 127.0.0.1 -p 8080"（run/gateway.port
+# 同为 8080），而本表登记的是二进制缺省值 2027。二者不一致时健康检查
+# 探测错误端口——gateway 已在 8080 监听（日志 probe ok）仍判
+# FAILED after 30s → abort 回滚整个 daemon 群（B50 实测根因）。
+gw_decl_port() {
+    local decl="${AIRY_CONFIG_DIR}/profile.env"
+    local argline="" p=""
+    if [[ -f "$decl" ]]; then
+        argline="$(sed -n 's/^AIRYRT_LAUNCH_ARGS_gateway_d=//p' "$decl" | head -1)"
+        argline="${argline%\"}"
+        argline="${argline#\"}"
+    fi
+    case " ${argline} " in
+        *" -p "*) p="${argline##* -p }"; p="${p%% *}" ;;
+    esac
+    if [[ ! "$p" =~ ^[0-9]+$ && -f "${AIRY_RUNTIME_DIR}/gateway.port" ]]; then
+        p="$(sed -n '1s/[^0-9]//gp' "${AIRY_RUNTIME_DIR}/gateway.port" 2>/dev/null | head -1)"
+    fi
+    if [[ "$p" =~ ^[0-9]+$ ]]; then
+        printf '%s' "$p"
+    fi
+}
+# 显式 if 而非 `[[ ]] && ...`：set -e 下空判定为非零状态会直接终止脚本。
+_GW_DECL_PORT="$(gw_decl_port)" || _GW_DECL_PORT=""
+if [[ -n "$_GW_DECL_PORT" ]]; then
+    DAEMON_PORT[gateway_d]="$_GW_DECL_PORT"
+fi
 
 # daemon 二进制名称映射 (daemon_name -> binary_name)
 # CMake 构建产出使用 agentrt-<name>-d 命名，channel_d/gateway_d 例外
