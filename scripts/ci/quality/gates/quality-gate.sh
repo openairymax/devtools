@@ -989,6 +989,37 @@ gate_form_count() {
 }
 
 # ============================================================================
+# Gate 43: 形态面归属（0.1.20 G-W6-1 演化面归属登记机械执法）
+# 新增 *_ops_t 必须登记所属形态面；未登记即红。判据与登记表 SSoT：
+# facade-attribution.txt；双向闭合检查见 facade-attribution-check.sh。
+# fail-closed（§9.2）：缺脚本与门禁自身异常一律映射为红，不得映射为跳过。
+# 退出码: 0=通过 1=归属违例/缺脚本/环境错误（一律红）
+# ============================================================================
+gate_facade_attribution() {
+    section "Gate 43: Facade Attribution (0.1.20)"
+
+    local fa_script="${SCRIPT_DIR}/facade-attribution-check.sh"
+    if [ ! -f "$fa_script" ]; then
+        log_err "facade-attribution gate script not found: ${fa_script}"
+        check_gate "FacadeAttribution" 1
+        return 1
+    fi
+
+    log_info "Running facade-attribution gate..."
+    local fa_out fa_rc=0
+    fa_out=$(bash "$fa_script" 2>&1) || fa_rc=$?
+    echo "$fa_out" | tail -20
+    if [ "$fa_rc" -eq 0 ]; then
+        check_gate "FacadeAttribution" 0
+    else
+        # 环境错误（rc=2）与归属违例（rc=1）同罪：无法判断时按失败处理
+        log_err "facade-attribution gate failed (rc=${fa_rc})"
+        check_gate "FacadeAttribution" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1017,6 +1048,7 @@ main() {
     local skip_logic_g38=false
     local skip_g30=false
     local skip_g37=false
+    local skip_facade=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1120,6 +1152,10 @@ main() {
                 skip_g37=true
                 shift
                 ;;
+            --skip-facade)
+                skip_facade=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
@@ -1184,6 +1220,7 @@ main() {
                 echo "  --skip-logic-g38      Skip G38 logic-completeness (0.1.19, five checklists) check"
                 echo "  --skip-g30            Skip G30 experience gate (0.1.19, TUI + CLI surface) check"
                 echo "  --skip-g37            Skip G37 performance budget (0.1.19, three-tier TTFT) check"
+                echo "  --skip-facade         Skip Gate 43 facade-attribution (0.1.20, ops family registry) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1229,6 +1266,7 @@ main() {
         $skip_logic_g38 || gate_logic_g38
         $skip_g30 || gate_g30_experience
         $skip_g37 || gate_perf_g37
+        $skip_facade || gate_facade_attribution
     fi
 
     # 输出结果
