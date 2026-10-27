@@ -1,0 +1,21 @@
+# llama.cpp 自托管 pin 清单（0.1.20 / B-A7 环境部署层）
+# 版本钉扎：b11712，全部条目取自 GitHub API digest 字段实测（零猜测、零下载）。
+# 格式：
+#   pin|key|asset|size|sha256        key 为 os-arch[-variant]；size 为字节尺寸
+#   version|<tag>                    组件版本
+#   mirror|<name>|<url-template>     {asset} 为占位符，按序列依序尝试
+# 镜像序列纪律：GitHub 直连不入序列（0.1.19 交付通道硬约束——目标网段
+# GitHub 直连 6~18KB/s 且频繁断流，禁依赖直连）。
+# atomgit 镜像在发版时由 release 流程上传对应资产后生效，未上传时自动落到下家。
+version|b11712
+pin|linux-x64-sycl|llama-b11712-bin-ubuntu-sycl-fp16-x64.tar.gz|57726316|74f611a1ec6842d56d655d02205a6294d6ce94b25d2ef12adab6a3c0cce04999
+pin|linux-x64-cpu|llama-b11712-bin-ubuntu-x64.tar.gz|17917933|b665b58cd5c0aa488f118247a0b7514912d7e75019c774d7974d1c10fc482cef
+pin|linux-arm64-cpu|llama-b11712-bin-ubuntu-arm64.tar.gz|13968778|c50da921e878cf323d9e61655c790937fe17fc33213471ec366b82813970361f
+pin|macos-arm64|llama-b11712-bin-macos-arm64.tar.gz|12251212|fc2bdadcefee39c6b652707667d22ec8c959eaf7bf143e97a6d30226824852c1
+pin|macos-x64|llama-b11712-bin-macos-x64.tar.gz|11738039|72155b245d2fadf488c27eb47416fa21d23a4be3add532cb0c2e880fd032965e
+pin|win-x64-sycl|llama-b11712-bin-win-sycl-x64.zip|149133988|5ef12afeb5bbeb49e3dd99b4c5112553d10c2a1c6a9dfd42927a5fd63a0a9a83
+pin|win-x64-cpu|llama-b11712-bin-win-cpu-x64.zip|19613101|cc8454164d885e6826a06abd6100aa040b5b5139d527ae49058ec7c449011b68
+pin|win-arm64-cpu|llama-b11712-bin-win-cpu-arm64.zip|12502793|84f9332248b6a0aa6894da6dd3f207f821e7eb70d6b23efc337898702c01be0a
+mirror|atomgit|https://atomgit.com/openairymax/agentrt/releases/download/llamacpp-b11712/{asset}
+mirror|ghfast|https://ghfast.top/https://github.com/ggml-org/llama.cpp/releases/download/b11712/{asset}
+mirror|ghproxy|https://gh-proxy.com/https://github.com/ggml-org/llama.cpp/releases/download/b11712/{asset}

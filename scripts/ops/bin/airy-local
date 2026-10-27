@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+# AgentRT 本地组件策略 CLI
+# 职责：自托管组件（llama.cpp）的安装/状态/卸载编排——pin 解析、
+# 变体回退链、来源序列组装、落位布局与注册表管理。
+# 机制与策略分离：取件、续传与双校验机制由 lib/fetch.sh 提供，
+# 本文件不感知任何网络与哈希实现细节；pin 数据独立于 templates/。
+# 用法：airy-local install|status|remove [--variant cpu|sycl] [--pin <file>]
+
+set -euo pipefail
+
+AIRY_LOCAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=../lib/common.sh
+source "${AIRY_LOCAL_DIR}/../lib/common.sh"
+# shellcheck source=../lib/fetch.sh
+source "${AIRY_LOCAL_DIR}/../lib/fetch.sh"
+
+AIRY_LOCAL_COMPONENT="llamacpp"
+
+###############################################################################
+# 路径解析
+###############################################################################
+
+airy_local_home() {
+    echo "${AIRY_HOME:-${HOME}/.airymaxrt}"
+}
+
+airy_local_component_dir() {
+    echo "$(airy_local_home)/local/${AIRY_LOCAL_COMPONENT}"
+}
+
+airy_local_registry_file() {
+    echo "$(airy_local_component_dir)/installed.env"
+}
+
+airy_local_pin_file() {
+    if [[ -n "${_AIRY_LOCAL_PIN_OVERRIDE:-}" ]]; then
+        echo "$_AIRY_LOCAL_PIN_OVERRIDE"
+    else
+        echo "${AIRY_LOCAL_PIN:-${AIRY_LOCAL_DIR}/../templates/llama-pin.list}"
+    fi
+}
+
+###############################################################################
+# pin 清单解析
+###############################################################################
+
+# 查一条 pin 记录：输出 "asset|size|sha256"，未命中返回 1
+airy_local_pin_lookup() {
+    local pin_file="$1" key="$2"
+    local f0 f1 f2 f3 f4
+    while IFS='|' read -r f0 f1 f2 f3 f4; do
+        if [[ "$f0" == "pin" && "$f1" == "$key" ]]; then
+            printf '%s|%s|%s\n' "$f2" "$f3" "$f4"
+            return 0
+        fi
+    done < "$pin_file"
+    return 1
+}
+
+airy_local_pin_version() {
+    awk -F'|' '$1 == "version" { print $2; exit }' "$1"
+}
+
+# 输出某资产的镜像 URL 序列（{asset} 占位符替换）
+airy_local_pin_mirrors() {
+    local pin_file="$1" asset="$2"
+    local f0 name tpl
+    while IFS='|' read -r f0 name tpl; do
+        if [[ "$f0" == "mirror" ]]; then
+            printf '%s\n' "${tpl//\{asset\}/$asset}"
+        fi
+    done < "$pin_file"
+}
+
+###############################################################################
+# 平台归一与变体回退链
+# 三步链：os-arch-variant → os-arch-cpu（变体非 cpu 时）→ os-arch
+# 覆盖全部 pin 键形态（含 macos/win 的裸键与 linux 的 -cpu 键）
+###############################################################################
+
+airy_local_resolve_key() {
+    local pin_file="$1" variant="$2"
+    local plat arch key
+
+    case "$(airy_platform_detect)" in
+        linux|wsl) plat="linux" ;;
+        macos)     plat="macos" ;;
+        windows)   plat="win" ;;
+        *)
+            airy_log_error "Unsupported platform: $(airy_platform_detect)"
+            return 1
+            ;;
+    esac
+
+    case "$(airy_arch_detect)" in
+        x86_64)        arch="x64" ;;
+        arm64|aarch64) arch="arm64" ;;
+        *)
+            airy_log_error "Unsupported arch: $(airy_arch_detect)"
+            return 1
+            ;;
+    esac
+
+    for key in "${plat}-${arch}-${variant}" "${plat}-${arch}-cpu" "${plat}-${arch}"; do
+        if airy_local_pin_lookup "$pin_file" "$key" &> /dev/null; then
+            echo "$key"
+            return 0
+        fi
+    done
+
+    airy_log_error "No pin for ${plat}-${arch} (variant: ${variant})"
+    return 1
+}
+
+###############################################################################
+# install：下载校验先行（失败保旧安装），落位与注册表后置
+###############################################################################
+
+airy_local_cmd_install() {
+    local pin_file
+    pin_file="$(airy_local_pin_file)"
+    if [[ ! -f "$pin_file" ]]; then
+        airy_log_fatal "Pin list not found: $pin_file"
+    fi
+
+    local key
+    key="$(airy_local_resolve_key "$pin_file" "${_AIRY_LOCAL_VARIANT:-sycl}")"
+
+    local record asset size sha
+    record="$(airy_local_pin_lookup "$pin_file" "$key")"
+    IFS='|' read -r asset size sha <<< "$record"
+
+    local version
+    version="$(airy_local_pin_version "$pin_file")"
+
+    local comp_dir registry tmp_dir models_dir bin_dir lib_dir
+    comp_dir="$(airy_local_component_dir)"
+    registry="$(airy_local_registry_file)"
+    tmp_dir="$(airy_local_home)/local/tmp"
+    models_dir="$(airy_local_home)/local/models"
+    bin_dir="${comp_dir}/bin"
+    lib_dir="${comp_dir}/lib"
+    airy_mkdir "$tmp_dir"
+    airy_mkdir "$models_dir"
+
+    local server="${bin_dir}/llama-server"
+    # 幂等：注册表与 pin 记录全一致（key+size+sha256）且 server 可执行即早退；
+    # pin 任一字段漂移即重新对账（声明式收敛），失败时保旧安装
+    if [[ -x "$server" ]] \
+       && [[ "$(airy_config_get "$registry" sha256)" == "$sha" ]] \
+       && [[ "$(airy_config_get "$registry" key)" == "$key" ]] \
+       && [[ "$(airy_config_get "$registry" size)" == "$size" ]]; then
+        airy_log_info "Already installed: ${AIRY_LOCAL_COMPONENT} ${version} (${key})"
+        return 0
+    fi
+
+    # 来源序列：离线 bundle 优先，镜像序列兜底（GitHub 直连不入序列）
+    local -a sources=()
+    local bundle_dir="${AIRY_LOCAL_BUNDLE:-}"
+    if [[ -n "$bundle_dir" && -f "${bundle_dir}/${asset}" ]]; then
+        sources+=("${bundle_dir}/${asset}")
+    fi
+    local url
+    while IFS= read -r url; do
+        sources+=("$url")
+    done < <(airy_local_pin_mirrors "$pin_file" "$asset")
+
+    if [[ ${#sources[@]} -eq 0 ]]; then
+        airy_log_fatal "No source available for asset: $asset"
+    fi
+
+    local dest="${tmp_dir}/${asset}"
+    local rc=0
+    fetch_file_verified "$dest" "$size" "$sha" "${sources[@]}" || rc=$?
+    if [[ $rc -eq 2 ]]; then
+        airy_log_fatal "Refusing install: poisoned artifact for ${asset}"
+    elif [[ $rc -ne 0 ]]; then
+        airy_log_fatal "Install aborted: no verified source for ${asset}"
+    fi
+
+    local stage="${tmp_dir}/stage.$$"
+    rm -rf "$stage"
+    airy_mkdir "$stage"
+
+    local unpack_ok=0
+    case "$asset" in
+        *.tar.gz|*.tgz)
+            if tar -xzf "$dest" -C "$stage"; then unpack_ok=1; fi
+            ;;
+        *.zip)
+            if unzip -oq "$dest" -d "$stage"; then unpack_ok=1; fi
+            ;;
+    esac
+    if [[ $unpack_ok -ne 1 ]]; then
+        rm -rf "$stage" "$dest"
+        airy_log_fatal "Unpack failed or unsupported format: $asset"
+    fi
+
+    local -a all_files=()
+    local f
+    while IFS= read -r f; do
+        all_files+=("$f")
+    done < <(find "$stage" -type f)
+
+    if [[ ${#all_files[@]} -eq 0 ]]; then
+        rm -rf "$stage" "$dest"
+        airy_log_fatal "Empty archive: $asset"
+    fi
+
+    # 校验全通过后才 wipe 旧安装并落位：
+    # llama-server* 进 bin/（保留原名，兼容 .exe）；库/数据文件进 lib/；
+    # 其余可执行进 bin/
+    rm -rf "$comp_dir"
+    airy_mkdir "$bin_dir"
+    airy_mkdir "$lib_dir"
+
+    local name target placed_server=""
+    for f in "${all_files[@]}"; do
+        name="$(basename "$f")"
+        case "$name" in
+            llama-server*)
+                target="${bin_dir}/${name}"
+                mv -f "$f" "$target"
+                placed_server="$target"
+                ;;
+            *.so|*.so.*|*.dylib|*.dll|*.a)
+                mv -f "$f" "${lib_dir}/${name}"
+                ;;
+            *)
+                if [[ -x "$f" ]]; then
+                    mv -f "$f" "${bin_dir}/${name}"
+                else
+                    mv -f "$f" "${lib_dir}/${name}"
+                fi
+                ;;
+        esac
+    done
+    rm -rf "$stage"
+
+    if [[ -z "$placed_server" ]]; then
+        rm -rf "$comp_dir" "$dest"
+        airy_log_fatal "llama-server not found in archive: $asset"
+    fi
+
+    local bin_f
+    for bin_f in "${bin_dir}"/*; do
+        if [[ -f "$bin_f" ]]; then
+            chmod 0755 "$bin_f"
+        fi
+    done
+
+    # 冒烟：二进制必须能自报版本
+    if ! "$placed_server" --version &> /dev/null; then
+        rm -rf "$comp_dir" "$dest"
+        airy_log_fatal "Smoke check failed: ${placed_server} --version"
+    fi
+
+    airy_config_set "$registry" "component" "$AIRY_LOCAL_COMPONENT"
+    airy_config_set "$registry" "version" "$version"
+    airy_config_set "$registry" "key" "$key"
+    airy_config_set "$registry" "asset" "$asset"
+    airy_config_set "$registry" "size" "$size"
+    airy_config_set "$registry" "sha256" "$sha"
+    airy_config_set "$registry" "server" "$placed_server"
+    airy_config_set "$registry" "installed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    rm -f "$dest"
+    airy_log_info "Installed: ${AIRY_LOCAL_COMPONENT} ${version} (${key}) -> ${comp_dir}"
+}
+
+###############################################################################
+# status：注册表 + 实际二进制状态
+###############################################################################
+
+airy_local_cmd_status() {
+    local comp_dir registry
+    comp_dir="$(airy_local_component_dir)"
+    registry="$(airy_local_registry_file)"
+
+    echo "component: ${AIRY_LOCAL_COMPONENT}"
+    if [[ ! -f "$registry" ]]; then
+        echo "status: not installed"
+        return 0
+    fi
+
+    local version key sha server_path
+    version="$(airy_config_get "$registry" version)"
+    key="$(airy_config_get "$registry" key)"
+    sha="$(airy_config_get "$registry" sha256)"
+    server_path="$(airy_config_get "$registry" server)"
+
+    local status="broken"
+    if [[ -x "$server_path" ]] && "$server_path" --version &> /dev/null; then
+        status="installed"
+    fi
+
+    local models_dir models_count=0
+    models_dir="$(airy_local_home)/local/models"
+    if [[ -d "$models_dir" ]]; then
+        models_count="$(find "$models_dir" -type f | wc -l | tr -d ' ')"
+    fi
+
+    echo "version: ${version}"
+    echo "key: ${key}"
+    echo "server: ${server_path}"
+    echo "sha256: ${sha}"
+    echo "status: ${status}"
+    echo "models: ${models_count} file(s) in ${models_dir}"
+}
+
+###############################################################################
+# remove：净退（组件目录 + 暂存区），models 目录保留给模型层
+###############################################################################
+
+airy_local_cmd_remove() {
+    local comp_dir tmp_dir
+    comp_dir="$(airy_local_component_dir)"
+    tmp_dir="$(airy_local_home)/local/tmp"
+
+    if [[ ! -d "$comp_dir" ]]; then
+        airy_log_info "Not installed: ${AIRY_LOCAL_COMPONENT}"
+        return 0
+    fi
+
+    rm -rf "$comp_dir" "$tmp_dir"
+    airy_log_info "Removed: ${AIRY_LOCAL_COMPONENT} (models kept: $(airy_local_home)/local/models)"
+}
+
+###############################################################################
+# 入口
+###############################################################################
+
+airy_local_usage() {
+    cat << 'EOF'
+airy-local - AgentRT self-hosted component manager
+
+Usage:
+  airy-local install  [--variant cpu|sycl] [--pin <file>]
+  airy-local status
+  airy-local remove
+
+Options:
+  --variant <name>  backend variant (default: sycl, cpu as fallback)
+  --pin <file>      pin list override
+  -h, --help        show this help
+
+Environment:
+  AIRY_HOME         install root (default: ~/.airymaxrt)
+  AIRY_LOCAL_BUNDLE offline asset directory (takes precedence over mirrors)
+  AIRY_LOCAL_PIN    pin list path
+EOF
+}
+
+airy_local_main() {
+    _AIRY_LOCAL_VARIANT="${AIRY_LOCAL_VARIANT:-sycl}"
+
+    local cmd=""
+    while [[ ${#} -gt 0 ]]; do
+        case "$1" in
+            install|status|remove)
+                cmd="$1"
+                shift
+                ;;
+            --variant)
+                _AIRY_LOCAL_VARIANT="${2:?--variant requires a value}"
+                shift 2
+                ;;
+            --pin)
+                _AIRY_LOCAL_PIN_OVERRIDE="${2:?--pin requires a value}"
+                shift 2
+                ;;
+            -h|--help)
+                airy_local_usage
+                return 0
+                ;;
+            *)
+                airy_log_error "Unknown argument: $1"
+                airy_local_usage >&2
+                return 1
+                ;;
+        esac
+    done
+
+    case "$cmd" in
+        install) airy_local_cmd_install ;;
+        status)  airy_local_cmd_status ;;
+        remove)  airy_local_cmd_remove ;;
+        *)
+            airy_local_usage >&2
+            return 1
+            ;;
+    esac
+}
+
+export -f airy_local_home airy_local_component_dir airy_local_registry_file
+export -f airy_local_pin_file airy_local_pin_lookup airy_local_pin_version
+export -f airy_local_pin_mirrors airy_local_resolve_key
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    airy_local_main "$@"
+fi
