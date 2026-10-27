@@ -2,8 +2,8 @@
 # shellcheck shell=bash
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
 # AgentRT 本地组件策略 CLI
-# 职责：自托管组件（llama.cpp）的安装/状态/卸载编排——pin 解析、
-# 变体回退链、来源序列组装、落位布局与注册表管理。
+# 职责：自托管组件（llama.cpp）与模型工件（gguf）的安装/状态/卸载编排
+# ——pin 解析、变体回退链、来源序列组装、落位布局与注册表管理。
 # 机制与策略分离：取件、续传与双校验机制由 lib/fetch.sh 提供，
 # 本文件不感知任何网络与哈希实现细节；pin 数据独立于 templates/。
 # 用法：airy-local install|status|remove [--variant cpu|sycl] [--pin <file>]
@@ -43,6 +43,22 @@ airy_local_pin_file() {
     fi
 }
 
+airy_local_models_dir() {
+    echo "$(airy_local_home)/local/models"
+}
+
+airy_local_model_registry() {
+    echo "$(airy_local_models_dir)/installed.env"
+}
+
+airy_local_model_pin_file() {
+    if [[ -n "${_AIRY_LOCAL_MODEL_PIN_OVERRIDE:-}" ]]; then
+        echo "$_AIRY_LOCAL_MODEL_PIN_OVERRIDE"
+    else
+        echo "${AIRY_LOCAL_MODEL_PIN:-${AIRY_LOCAL_DIR}/../templates/llama-models.list}"
+    fi
+}
+
 ###############################################################################
 # pin 清单解析
 ###############################################################################
@@ -62,6 +78,19 @@ airy_local_pin_lookup() {
 
 airy_local_pin_version() {
     awk -F'|' '$1 == "version" { print $2; exit }' "$1"
+}
+
+# 查一条模型 pin：输出 "asset|size|sha256"，未命中返回 1
+airy_local_model_lookup() {
+    local pin_file="$1" name="$2"
+    local f0 f1 f2 f3 f4
+    while IFS='|' read -r f0 f1 f2 f3 f4; do
+        if [[ "$f0" == "model" && "$f1" == "$name" ]]; then
+            printf '%s|%s|%s\n' "$f2" "$f3" "$f4"
+            return 0
+        fi
+    done < "$pin_file"
+    return 1
 }
 
 # 输出某资产的镜像 URL 序列（{asset} 占位符替换）
@@ -276,39 +305,49 @@ airy_local_cmd_install() {
 ###############################################################################
 
 airy_local_cmd_status() {
-    local comp_dir registry
-    comp_dir="$(airy_local_component_dir)"
+    local registry
     registry="$(airy_local_registry_file)"
 
+    # 组件面与模型面是两个独立维度：组件未装不得挡住模型条目
     echo "component: ${AIRY_LOCAL_COMPONENT}"
     if [[ ! -f "$registry" ]]; then
         echo "status: not installed"
-        return 0
-    fi
+    else
+        local version key sha server_path
+        version="$(airy_config_get "$registry" version)"
+        key="$(airy_config_get "$registry" key)"
+        sha="$(airy_config_get "$registry" sha256)"
+        server_path="$(airy_config_get "$registry" server)"
 
-    local version key sha server_path
-    version="$(airy_config_get "$registry" version)"
-    key="$(airy_config_get "$registry" key)"
-    sha="$(airy_config_get "$registry" sha256)"
-    server_path="$(airy_config_get "$registry" server)"
+        local status="broken"
+        if [[ -x "$server_path" ]] && "$server_path" --version &> /dev/null; then
+            status="installed"
+        fi
 
-    local status="broken"
-    if [[ -x "$server_path" ]] && "$server_path" --version &> /dev/null; then
-        status="installed"
+        echo "version: ${version}"
+        echo "key: ${key}"
+        echo "server: ${server_path}"
+        echo "sha256: ${sha}"
+        echo "status: ${status}"
     fi
 
     local models_dir models_count=0
-    models_dir="$(airy_local_home)/local/models"
+    models_dir="$(airy_local_models_dir)"
     if [[ -d "$models_dir" ]]; then
         models_count="$(find "$models_dir" -type f | wc -l | tr -d ' ')"
     fi
-
-    echo "version: ${version}"
-    echo "key: ${key}"
-    echo "server: ${server_path}"
-    echo "sha256: ${sha}"
-    echo "status: ${status}"
     echo "models: ${models_count} file(s) in ${models_dir}"
+
+    # 模型条目（注册过的逐条列出，未注册仅计数）
+    local model_registry mkey mname
+    model_registry="$(airy_local_model_registry)"
+    if [[ -f "$model_registry" ]]; then
+        while IFS= read -r mkey; do
+            mname="${mkey#model.}"
+            mname="${mname%.asset}"
+            echo "model: ${mname} ($(airy_config_get "$model_registry" "$mkey"))"
+        done < <(grep '^model\..*\.asset=' "$model_registry" | cut -d'=' -f1)
+    fi
 }
 
 ###############################################################################
@@ -330,6 +369,140 @@ airy_local_cmd_remove() {
 }
 
 ###############################################################################
+# model：模型拉取层（gguf 下载/校验/注册，复用 fetch 机制与 mirror 语义）
+###############################################################################
+
+airy_local_model_sources() {
+    local pin_file="$1" asset="$2"
+    local -a sources=()
+
+    local bundle_dir="${AIRY_LOCAL_MODEL_BUNDLE:-}"
+    if [[ -n "$bundle_dir" && -f "${bundle_dir}/${asset}" ]]; then
+        sources+=("${bundle_dir}/${asset}")
+    fi
+    local url
+    while IFS= read -r url; do
+        sources+=("$url")
+    done < <(airy_local_pin_mirrors "$pin_file" "$asset")
+
+    if [[ ${#sources[@]} -eq 0 ]]; then
+        airy_log_fatal "No source available for model asset: $asset"
+    fi
+    printf '%s\n' "${sources[@]}"
+}
+
+airy_local_cmd_model_install() {
+    local name="$1"
+    local pin_file
+    pin_file="$(airy_local_model_pin_file)"
+    if [[ ! -f "$pin_file" ]]; then
+        airy_log_fatal "Model pin list not found: $pin_file"
+    fi
+
+    local record asset size sha
+    if ! record="$(airy_local_model_lookup "$pin_file" "$name")"; then
+        airy_log_fatal "Unknown model: $name (not pinned)"
+    fi
+    IFS='|' read -r asset size sha <<< "$record"
+
+    local models_dir registry tmp_dir target
+    models_dir="$(airy_local_models_dir)"
+    registry="$(airy_local_model_registry)"
+    tmp_dir="$(airy_local_home)/local/tmp"
+    target="${models_dir}/${asset}"
+    airy_mkdir "$models_dir"
+    airy_mkdir "$tmp_dir"
+
+    # 幂等：注册表与 pin 一致（size+sha256）且工件在位即早退；
+    # pin 任一字段漂移即重新对账，下载失败保旧工件
+    if [[ -f "$target" ]] \
+       && [[ "$(airy_config_get "$registry" "model.${name}.sha256")" == "$sha" ]] \
+       && [[ "$(airy_config_get "$registry" "model.${name}.size")" == "$size" ]]; then
+        airy_log_info "Already installed: model ${name} (${asset})"
+        return 0
+    fi
+
+    local -a sources=()
+    local src
+    while IFS= read -r src; do
+        sources+=("$src")
+    done < <(airy_local_model_sources "$pin_file" "$asset")
+
+    local dest="${tmp_dir}/${asset}"
+    local rc=0
+    fetch_file_verified "$dest" "$size" "$sha" "${sources[@]}" || rc=$?
+    if [[ $rc -eq 2 ]]; then
+        airy_log_fatal "Refusing install: poisoned model artifact for ${asset}"
+    elif [[ $rc -ne 0 ]]; then
+        airy_log_fatal "Install aborted: no verified source for ${asset}"
+    fi
+
+    # 校验通过才落位：同盘 mv 原子替换，旧工件保留到新件就位
+    mv -f "$dest" "$target"
+    airy_config_set "$registry" "model.${name}.asset" "$asset"
+    airy_config_set "$registry" "model.${name}.size" "$size"
+    airy_config_set "$registry" "model.${name}.sha256" "$sha"
+    airy_config_set "$registry" "model.${name}.installed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    airy_log_info "Installed model: ${name} (${asset}) -> ${models_dir}"
+}
+
+airy_local_cmd_model_list() {
+    local pin_file registry
+    pin_file="$(airy_local_model_pin_file)"
+    if [[ ! -f "$pin_file" ]]; then
+        airy_log_fatal "Model pin list not found: $pin_file"
+    fi
+    registry="$(airy_local_model_registry)"
+
+    local f0 name asset state
+    while IFS='|' read -r f0 name asset; do
+        [[ "$f0" == "model" ]] || continue
+        if [[ -n "$(airy_config_get "$registry" "model.${name}.sha256")" ]]; then
+            state="installed"
+        else
+            state="pinned"
+        fi
+        echo "${name} [${state}] ${asset}"
+    done < "$pin_file"
+}
+
+airy_local_cmd_model_remove() {
+    local name="$1"
+    local models_dir registry asset
+    models_dir="$(airy_local_models_dir)"
+    registry="$(airy_local_model_registry)"
+
+    asset="$(airy_config_get "$registry" "model.${name}.asset")"
+    if [[ -z "$asset" ]]; then
+        airy_log_info "Not installed: model ${name}"
+        return 0
+    fi
+
+    rm -f "${models_dir}/${asset}"
+    airy_config_del "$registry" "model.${name}.asset"
+    airy_config_del "$registry" "model.${name}.size"
+    airy_config_del "$registry" "model.${name}.sha256"
+    airy_config_del "$registry" "model.${name}.installed_at"
+    airy_log_info "Removed model: ${name} (${asset})"
+}
+
+airy_local_cmd_model() {
+    local sub="${1:-}"
+    shift || true
+    case "$sub" in
+        install) airy_local_cmd_model_install "${1:?model install requires a name}" ;;
+        remove)  airy_local_cmd_model_remove "${1:?model remove requires a name}" ;;
+        list)    airy_local_cmd_model_list ;;
+        *)
+            airy_log_error "Unknown model subcommand: ${sub:-<empty>}"
+            echo "usage: airy-local model install|remove <name>" >&2
+            echo "       airy-local model list" >&2
+            return 1
+            ;;
+    esac
+}
+
+###############################################################################
 # 入口
 ###############################################################################
 
@@ -341,6 +514,8 @@ Usage:
   airy-local install  [--variant cpu|sycl] [--pin <file>]
   airy-local status
   airy-local remove
+  airy-local model install|remove <name>
+  airy-local model list
 
 Options:
   --variant <name>  backend variant (default: sycl, cpu as fallback)
@@ -348,9 +523,11 @@ Options:
   -h, --help        show this help
 
 Environment:
-  AIRY_HOME         install root (default: ~/.airymaxrt)
-  AIRY_LOCAL_BUNDLE offline asset directory (takes precedence over mirrors)
-  AIRY_LOCAL_PIN    pin list path
+  AIRY_HOME              install root (default: ~/.airymaxrt)
+  AIRY_LOCAL_BUNDLE      offline asset directory (takes precedence over mirrors)
+  AIRY_LOCAL_PIN         pin list path
+  AIRY_LOCAL_MODEL_BUNDLE offline model directory (takes precedence over mirrors)
+  AIRY_LOCAL_MODEL_PIN   model pin list path
 EOF
 }
 
@@ -363,6 +540,10 @@ airy_local_main() {
             install|status|remove)
                 cmd="$1"
                 shift
+                ;;
+            model)
+                airy_local_cmd_model "${@:2}"
+                return $?
                 ;;
             --variant)
                 _AIRY_LOCAL_VARIANT="${2:?--variant requires a value}"
@@ -398,6 +579,10 @@ airy_local_main() {
 export -f airy_local_home airy_local_component_dir airy_local_registry_file
 export -f airy_local_pin_file airy_local_pin_lookup airy_local_pin_version
 export -f airy_local_pin_mirrors airy_local_resolve_key
+export -f airy_local_models_dir airy_local_model_registry airy_local_model_pin_file
+export -f airy_local_model_lookup airy_local_model_sources
+export -f airy_local_cmd_model_install airy_local_cmd_model_list
+export -f airy_local_cmd_model_remove airy_local_cmd_model
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     airy_local_main "$@"

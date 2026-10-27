@@ -144,6 +144,18 @@ test_config_set_update() {
     rm -f "$test_config"
 }
 
+test_config_del_removes_key() {
+    local test_config="/tmp/airy_test_config4_$$"
+    airy_config_set "$test_config" "alpha" "1"
+    airy_config_set "$test_config" "beta" "2"
+    airy_config_del "$test_config" "alpha"
+    assert_equal "" "$(airy_config_get "$test_config" "alpha")" "config_del should remove the key"
+    assert_equal "2" "$(airy_config_get "$test_config" "beta")" "config_del must keep sibling keys"
+    airy_config_del "$test_config" "alpha"
+    assert_equal "1" "$(wc -l < "$test_config" | tr -d ' ')" "config_del on missing key must stay idempotent"
+    rm -f "$test_config"
+}
+
 ###############################################################################
 # 测试：用户交�?
 ###############################################################################
@@ -175,6 +187,7 @@ run_all_tests() {
         "test_config_get"
         "test_config_set"
         "test_config_set_update"
+        "test_config_del_removes_key"
     )
 
     echo "=========================================="
