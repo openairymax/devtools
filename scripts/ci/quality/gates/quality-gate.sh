@@ -800,11 +800,13 @@ gate_policy_payload() {
 # 两条不变量：层界单向（不出现反向依赖，G21）；跨进程唯一通道 = IPC / syscall
 # （零进程内符号引用，G23）。判据 = 链接图断言（白名单面）+ 相对 include 反
 # 向边（代码面）；SSoT 输入为 agentrt/link-whitelist.txt（构建期 linkgate 同源）。
+# E 段（0.1.20 P1-10）：corekern binder 为进程内总线，其 API 仅 corekern 自持，
+# 且禁止以 ".rpc" 后缀派生通道名（跨进程按名寻址 SSoT = socket 路径）。
 # 棘轮基线 layer-baseline.txt，只降不升。
 # 退出码: 0=通过 1=硬违例或超基线(阻断) 2=高于水位(告警) 3=环境错误
 # ============================================================================
 gate_layer() {
-    section "Gate 24: Layer Boundary Check (G21/G23, one-way + zero cross-process symbol)"
+    section "Gate 24: Layer Boundary Check (G21/G23 + in-process bus boundary)"
 
     local lb_script="${SCRIPT_DIR}/layer-check.sh"
     if [ -f "$lb_script" ]; then

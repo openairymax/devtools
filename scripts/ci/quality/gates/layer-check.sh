@@ -27,6 +27,12 @@
 #      层序（自底向上）= commons < atoms < heapstore < gateway <
 #      protocols < daemons；反向边 = 0。（cupolas 已按方案 §1.3 迁出
 #      agentrt 树至 products，不再参与层序。）
+#   E. 进程内通道总线语义（P1-10，0.1.20 方案 §3.7p）：corekern binder 是
+#      进程内总线（按名查本进程注册表 + 同线程回调），不是传输层。故
+#      airy_ipc_connect/create_channel/send/call 仅允许出现在 corekern 自身；
+#      跨进程按名寻址唯一实现 = socket 能力格（daemon_rpc_*，名字即路径）。
+#      E1 越界引用、E2 以 ".rpc" 后缀派生通道名（8fcd6dd 已删除的第二套
+#      命名方案）均 fail-closed，使「再造一条进程内命名通路」不可复发。
 #
 # 范围界定（按设计排除，非遗漏）：
 #   - tests/ 、third_party/ 、构建区：非生产码，不构成层界断言对象。
@@ -45,7 +51,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
+# LAYER_ROOT：自检用隔离树根（selfcheck/layer-check.sh），不改变生产语义。
+PROJECT_ROOT="${LAYER_ROOT:-$(cd "$SCRIPT_DIR/../../../../.." && pwd)}"
 AGENTRT="$PROJECT_ROOT/agent-workload/agentrt"
 WL="$AGENTRT/link-whitelist.txt"
 BASELINE="$SCRIPT_DIR/layer-baseline.txt"
@@ -136,9 +143,11 @@ fi
 # （§255 起 cupolas_d 亦于顶层挂载），其 CMake 目标（airy_cupolas_service /
 # cupolas_d 等）合法出现在白名单值侧。gateway_biz 为 0.1.19 刀H 迁出的
 # 业务面产品件（daemons 侧嵌入式装配），其目标 airy_gateway_biz 同属外户。
+# canary 为 0.1.20 金丝雀治理面外户件，cupolas_d 以 PRIVATE 直链 airy_canary。
+#
 # 源根缺席（standalone 平铺布局）即跳过，等价该外户未挂载。
 CMAKE_SCAN_ROOTS=("$AGENTRT")
-for _ext in cupolas lang_gateway cognition gateway_biz; do
+for _ext in cupolas lang_gateway cognition gateway_biz canary; do
     _ext_dir="$PROJECT_ROOT/agent-workload/products/$_ext"
     if [ -d "$_ext_dir" ]; then
         CMAKE_SCAN_ROOTS+=("$_ext_dir")
@@ -312,15 +321,53 @@ if [ "$D_VIOL" -eq 0 ]; then
 fi
 
 ###############################################################################
-# 结果汇总（A/B/C 零容忍；D 棘轮基线）
+# E. 进程内通道总线语义（P1-10）：binder 总线不承担跨进程传输
+###############################################################################
+section "E. In-process channel bus boundary (P1-10)"
+
+E_SCOPE=("$AGENTRT")
+PRODUCTS="$PROJECT_ROOT/agent-workload/products"
+if [ -d "$PRODUCTS" ]; then E_SCOPE+=("$PRODUCTS"); fi
+
+E1="$(grep -rnE '(^|[^A-Za-z0-9_])airy_ipc_(connect|create_channel|send|call)[[:space:]]*\(' \
+    --include='*.c' --include='*.h' "${E_SCOPE[@]}" 2>/dev/null \
+    | grep -vE '/(tests|third_party|build)/' \
+    | grep -v "^${AGENTRT}/atoms/corekern/" || true)"
+if [ -n "$E1" ]; then
+    while IFS= read -r hit; do
+        [ -n "$hit" ] || continue
+        log_err "E1. 进程内总线 API 越界引用：${hit#"$PROJECT_ROOT"/}"
+        note_hard
+    done <<< "$E1"
+else
+    log_ok "E1. 进程内总线 API 仅存于 corekern（跨界必须走 socket 能力格）"
+fi
+
+# E2 只判「把 .rpc 拼进通道名」的构造语法，日志/注释中的字样不在此列。
+E2="$(grep -rnE '\.rpc"' --include='*.c' "${E_SCOPE[@]}" 2>/dev/null \
+    | grep -vE '/(tests|third_party|build)/' \
+    | awk -F: '{ body = $0; sub(/^[^:]*:[0-9]+:/, "", body)
+                 if (body ~ /(MEMCPY|memcpy|COPY|copy|snprintf|strcat|STRCAT|strncat|strlcpy)/) print $0 }' || true)"
+if [ -n "$E2" ]; then
+    while IFS= read -r hit; do
+        [ -n "$hit" ] || continue
+        log_err "E2. 以 .rpc 后缀派生通道名（第二套命名方案）：${hit#"$PROJECT_ROOT"/}"
+        note_hard
+    done <<< "$E2"
+else
+    log_ok "E2. 生产源零 .rpc 通道名派生（通道名 SSoT = socket 路径）"
+fi
+
+###############################################################################
+# 结果汇总（A/B/C/E 零容忍；D 棘轮基线）
 ###############################################################################
 TOTAL=$((HARD + D_VIOL))
 section "Layer boundary gate summary"
-printf '  白名单目标: %s\n  CMake 目标: %s\n  A/B/C 硬违例: %s\n  D 反向边: %s\n  违例总数: %s\n' \
+printf '  白名单目标: %s\n  CMake 目标: %s\n  A/B/C/E 硬违例: %s\n  D 反向边: %s\n  违例总数: %s\n' \
     "$TARGET_N" "$CMAKE_N" "$HARD" "$D_VIOL" "$TOTAL"
 
 if [ "$HARD" -gt 0 ]; then
-    log_err "层界硬违例 ${HARD} 处（G21/G23 零容忍，fail-closed 阻断）"
+    log_err "层界硬违例 ${HARD} 处（G21/G23/P1-10 零容忍，fail-closed 阻断）"
     exit 1
 fi
 
@@ -332,7 +379,7 @@ if [ "$UPDATE_BASELINE" -eq 1 ]; then
 fi
 
 if [ "$D_VIOL" -eq 0 ]; then
-    log_ok "层界门禁通过（层界单向 + 跨进程零符号引用）"
+    log_ok "层界门禁通过（层界单向 + 跨进程零符号引用 + 进程内总线边界）"
     exit 0
 fi
 
