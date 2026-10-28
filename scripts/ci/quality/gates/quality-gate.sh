@@ -1240,6 +1240,37 @@ gate_cost37() {
 }
 
 # ============================================================================
+# Gate 33: 裁决往返（0.1.20 §9.1 Gate 33，C 面）
+# 静态四臂（写出侧在场 / 规范形定序 / 空值省键 / 出参契约）+ 用例两臂
+# （100 次迭代与字节比对写在源码里 / 已注册进构建）+ 运行臂（构建树中
+# cognition_grad_tests 真实通过）。静态臂守判据未被写弱，运行臂守判据
+# 此刻成立。fail-closed：缺脚本/缺构建树/缺受审文件一律红。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_roundtrip33() {
+    section "Gate 33: Verdict Roundtrip (0.1.20)"
+
+    local g33_script="${SCRIPT_DIR}/g33-verdict-roundtrip.sh"
+    if [ ! -f "$g33_script" ]; then
+        log_err "verdict roundtrip gate script not found: ${g33_script}"
+        check_gate "Verdict33" 1
+        return 1
+    fi
+
+    log_info "Running verdict roundtrip audit..."
+    local g33_out g33_rc=0
+    g33_out=$(bash "$g33_script" 2>&1) || g33_rc=$?
+    echo "$g33_out" | tail -14
+    if [ "$g33_rc" -eq 0 ]; then
+        check_gate "Verdict33" 0
+    else
+        log_err "verdict roundtrip audit failed (rc=${g33_rc})"
+        check_gate "Verdict33" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1275,6 +1306,7 @@ main() {
     local skip_doc45=false
     local skip_t36=false
     local skip_hotpath=false
+    local skip_g33=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1406,12 +1438,16 @@ main() {
                 skip_hotpath=true
                 shift
                 ;;
+            --skip-g33)
+                skip_g33=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1449,6 +1485,7 @@ main() {
                 echo "  33. Doc-Code Consistency (0.1.20, Gate 45 self-referential audit)"
                 echo "  34. Terminal-State Completeness (0.1.20, Gate 36 success/fail/unknown)"
                 echo "  35. Cost Hot-Path Two-Arm (0.1.20, Gate 37 single-request fsync + p99)"
+                echo "  36. Verdict Roundtrip (0.1.20, Gate 33 100x byte-identical)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1483,6 +1520,7 @@ main() {
                 echo "  --skip-doc45          Skip Gate 45 doc-code consistency (0.1.20, file:line audit) check"
                 echo "  --skip-t36            Skip Gate 36 terminal-state completeness (0.1.20, success/fail/unknown) check"
                 echo "  --skip-hotpath        Skip Gate 37 cost hot-path two-arm (0.1.20, single-request fsync + p99) check"
+                echo "  --skip-g33            Skip Gate 33 verdict roundtrip (0.1.20, 100x byte-identical) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1535,6 +1573,7 @@ main() {
         $skip_doc45 || gate_doc_consistency
         $skip_t36 || gate_terminal36
         $skip_hotpath || gate_cost37
+        $skip_g33 || gate_roundtrip33
     fi
 
     # 输出结果
