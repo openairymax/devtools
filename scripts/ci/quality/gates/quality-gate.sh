@@ -1685,6 +1685,12 @@ main() {
 
     print_header
 
+    # 门禁编排区关闭 errexit：门禁函数以 return 1 报告红项（Gate 42/44 等），
+    # 若在此区开启 errexit，首个红项会中断其后全部门禁，"全量"退化为"首个红为止"，
+    # 且三次输出不可逐行比对（B8-②）。每个门禁内部以显式 rc 捕获判定，
+    # 失败必须走 check_gate 登记（fail-closed 由 Gate 44 静态审计保证）。
+    set +e
+
     if $security_only; then
         gate_security
     else
@@ -1731,6 +1737,8 @@ main() {
         $skip_g35 || gate_partial35
         $skip_g31 || gate_verifier31
     fi
+
+    set -e
 
     # 输出结果
     section "Quality Gate Results"
