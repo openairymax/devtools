@@ -604,14 +604,14 @@ gate_version_consistency() {
 }
 
 # ============================================================================
-# Gate 18: 体积硬门禁 + 里程碑阶梯 (G2 ★, 方案 §0.2 / §1.2 丙)
-# 三层分账（台账 §258 裁定，§1.2 丙口径终裁）：机制核 =
-# atoms+commons+heapstore+gateway+cmake/（硬门禁 <80,000 有效行）；形态面 =
-# daemons+protocols+tools、应用壳 = products/cupolas 为独立子账（棘轮只降不升）。
+# Gate 18: 体积硬门禁（三本账数值棘轮，方案 §7.5 / §9 Gate 18）
+# 三层分账（台账 §258 裁定，§1.2 丙口径终裁）：账一 机制核 =
+# atoms+commons+heapstore+gateway+cmake/；账三 形态面 = daemons+protocols+tools；
+# 账三 应用壳 = products/cupolas；账二 products 由产品侧独立预算，不入本门禁。
 # 各账 *.c+*.h（排除 tests/ 与 third_party/，再扣空行与整行注释）计 SLOC 有效行；
-# 机制核实测须 ≤ 当前 pin 梯级上限（K 阶梯对接方案 §6.2 甲段 ★ 锚点），超出即停线整改。
-# --advance 达标时推进 pin。
-# 退出码: 0=通过 1=机制核超限/子账增长 2=树/基线缺失(告警)
+# 三账各自与 baseline 数值 pin 比较，实测 > pin 即停线整改；target 为里程碑方向约束。
+# pin 只降不升，上升由 Gate 41 审计；pin 滞后由 Gate 42 判红。
+# 退出码: 0=通过 1=某账超 pin 2=树/基线缺失(告警)
 # ============================================================================
 gate_loc_budget() {
     section "Gate 18: LOC Budget Check (G2, milestone ladder)"
@@ -1084,6 +1084,38 @@ gate_ratchet() {
 }
 
 # ============================================================================
+# Gate 42: 账本三表一致（0.1.20 §9 Gate 42 / §4.2 A5）
+# 判据：三表加总 == baseline 记录值，差异必须为 0。
+#   Gate 18 判「不得超过」（允许 pin 滞后），Gate 42 判「不许滞后」：pin 与代码
+#   必须逐数对齐，减重后须 --converge 落账，否则账本不再是代码的真实体量。
+# fail-closed（§9.2）：缺脚本与审计自身异常一律映射为红。
+# 退出码: 0=通过 1=差异非零/缺脚本/环境错误（一律红）
+# ============================================================================
+gate_ledger() {
+    section "Gate 42: Ledger Consistency (0.1.20)"
+
+    local lg_script="${SCRIPT_DIR}/g42-ledger-consistency.sh"
+    if [ ! -f "$lg_script" ]; then
+        log_err "ledger consistency script not found: ${lg_script}"
+        check_gate "LedgerConsistency" 1
+        return 1
+    fi
+
+    log_info "Running ledger consistency audit..."
+    local lg_out lg_rc=0
+    lg_out=$(bash "$lg_script" 2>&1) || lg_rc=$?
+    echo "$lg_out" | tail -20
+    if [ "$lg_rc" -eq 0 ]; then
+        check_gate "LedgerConsistency" 0
+    else
+        # 环境错误（rc=2）与差异违例（rc=1）同罪：无法判断时按失败处理
+        log_err "ledger consistency gate failed (rc=${lg_rc})"
+        check_gate "LedgerConsistency" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # Gate 44: 元门禁审计（0.1.20 §9 Gate 44，门禁审计门禁）
 # selfcheck/gate-44.sh 静态审计全部 gate_* 函数的 fail-closed 不变量：
 # R1=无法判定消息后无 check_gate 红映射；R2=窗口内无任何判定（静默降级）。
@@ -1176,6 +1208,7 @@ main() {
     local skip_g37=false
     local skip_facade=false
     local skip_ratchet=false
+    local skip_g42=false
     local skip_meta44=false
     local skip_doc45=false
     local strict_mode=false
@@ -1289,6 +1322,10 @@ main() {
                 skip_ratchet=true
                 shift
                 ;;
+            --skip-g42)
+                skip_g42=true
+                shift
+                ;;
             --skip-meta44)
                 skip_meta44=true
                 shift
@@ -1302,7 +1339,7 @@ main() {
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-meta44] [--skip-doc45] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1367,6 +1404,7 @@ main() {
                 echo "  --skip-g37            Skip G37 performance budget (0.1.19, three-tier TTFT) check"
                 echo "  --skip-facade         Skip Gate 43 facade-attribution (0.1.20, ops family registry) check"
                 echo "  --skip-ratchet        Skip Gate 41 ratchet drift audit (0.1.20, pin history) check"
+                echo "  --skip-g42            Skip Gate 42 ledger consistency (0.1.20, three-ledger parity) check"
                 echo "  --skip-meta44         Skip Gate 44 meta fail-closed (0.1.20, gate-the-gates) check"
                 echo "  --skip-doc45          Skip Gate 45 doc-code consistency (0.1.20, file:line audit) check"
                 echo "  --strict              Treat warnings as failures"
@@ -1416,6 +1454,7 @@ main() {
         $skip_g37 || gate_perf_g37
         $skip_facade || gate_facade_attribution
         $skip_ratchet || gate_ratchet
+        $skip_g42 || gate_ledger
         $skip_meta44 || gate_meta_failclosed
         $skip_doc45 || gate_doc_consistency
     fi

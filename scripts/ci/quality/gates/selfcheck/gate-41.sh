@@ -45,7 +45,7 @@ new_repo() {
     git init -q "$dir"
     git -C "$dir" config user.email selfcheck@g41.local
     git -C "$dir" config user.name g41-selfcheck
-    printf 'current=K1\nfacade=100\ncupolas=50\n' > "$dir/v16-loc-budget-baseline.txt"
+    printf 'core=200\nfacade=100\ncupolas=50\n' > "$dir/v16-loc-budget-baseline.txt"
     git -C "$dir" add -A
     git -C "$dir" commit -qm "c1: seed baseline"
     git -C "$dir" rev-parse HEAD
@@ -64,7 +64,7 @@ run_gate() {
 # ── V1: 锚点后上升无 justify → 红 ───────────────────────────
 section "V1: pin rise without RATCHET-JUSTIFY must be red"
 R1="$(new_repo "$TMP/v1")"
-printf 'current=K1\nfacade=120\ncupolas=50\n' > "$TMP/v1/v16-loc-budget-baseline.txt"
+printf 'core=200\nfacade=120\ncupolas=50\n' > "$TMP/v1/v16-loc-budget-baseline.txt"
 git -C "$TMP/v1" add -A && git -C "$TMP/v1" commit -qm "c2: raise facade"
 rc="$(run_gate "$TMP/v1" "$R1")"
 expect_rc "V1 unjustified rise" 1 "$rc"
@@ -72,7 +72,7 @@ expect_rc "V1 unjustified rise" 1 "$rc"
 # ── C1: 上升但带 justify → 绿 ───────────────────────────────
 section "C1: justified rise must stay green"
 C1="$(new_repo "$TMP/c1")"
-printf 'current=K1\nfacade=120\ncupolas=50\n' > "$TMP/c1/v16-loc-budget-baseline.txt"
+printf 'core=200\nfacade=120\ncupolas=50\n' > "$TMP/c1/v16-loc-budget-baseline.txt"
 git -C "$TMP/c1" add -A
 git -C "$TMP/c1" commit -qm "c2: raise facade for the transport batch
 
@@ -83,7 +83,7 @@ expect_rc "C1 justified rise" 0 "$rc"
 # ── C2: pin 下降 → 绿 ───────────────────────────────────────
 section "C2: pin decrease must stay green"
 C2="$(new_repo "$TMP/c2")"
-printf 'current=K1\nfacade=80\ncupolas=50\n' > "$TMP/c2/v16-loc-budget-baseline.txt"
+printf 'core=200\nfacade=80\ncupolas=50\n' > "$TMP/c2/v16-loc-budget-baseline.txt"
 git -C "$TMP/c2" add -A && git -C "$TMP/c2" commit -qm "c2: shrink facade"
 rc="$(run_gate "$TMP/c2" "$C2")"
 expect_rc "C2 decrease" 0 "$rc"
@@ -91,10 +91,10 @@ expect_rc "C2 decrease" 0 "$rc"
 # ── C3: 锚点之前的漂移豁免 → 绿 ──────────────────────────────
 section "C3: drift before the anchor must be exempt"
 C3="$(new_repo "$TMP/c3")"
-printf 'current=K1\nfacade=140\ncupolas=50\n' > "$TMP/c3/v16-loc-budget-baseline.txt"
+printf 'core=200\nfacade=140\ncupolas=50\n' > "$TMP/c3/v16-loc-budget-baseline.txt"
 git -C "$TMP/c3" add -A && git -C "$TMP/c3" commit -qm "c2: legacy untracked rise"
 LEGACY="$(git -C "$TMP/c3" rev-parse HEAD)"
-printf 'current=K1\nfacade=140\ncupolas=50\n# c3 audit touch\n' > "$TMP/c3/v16-loc-budget-baseline.txt"
+printf 'core=200\nfacade=140\ncupolas=50\n# c3 audit touch\n' > "$TMP/c3/v16-loc-budget-baseline.txt"
 git -C "$TMP/c3" add -A && git -C "$TMP/c3" commit -qm "c3: post-anchor touch without rise"
 rc="$(run_gate "$TMP/c3" "$LEGACY")"
 expect_rc "C3 pre-anchor exemption" 0 "$rc"
