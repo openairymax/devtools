@@ -13,8 +13,8 @@
 #      基线不被静默重建（删除基线不得成为绕过门禁的退路）
 #   T4 突变红自证：构造退化突变体（判定翻 WARN / 判定移除），
 #      断言 T1 审计器必须检出——审计器失明等于元门禁失效
-#   T5 selfcheck 清单完整性：gate-38/39/40/41/42/43/44/45 与
-#      layer-check（Gate 24 E 段）必须在册
+#   T5 selfcheck 清单完整性：gate-31/32/33/34/35/36/37/38/39/40/41/42/
+#      43/44/45 与 layer-check（Gate 24 E 段）必须在册
 #
 # 用法: selfcheck/gate-44.sh
 # 退出码: 0 = 全部断言符合预期；1 = 元审计失败
@@ -184,7 +184,7 @@ expect_rc "T4b verdict-removal mutation flagged" 1 "$rc"
 
 # ── T5: selfcheck 清单完整性 ────────────────────────────────
 section "T5: selfcheck checklist completeness"
-for s in gate-32.sh gate-33.sh gate-34.sh gate-35.sh gate-36.sh gate-37.sh gate-38.sh gate-39.sh gate-40.sh gate-41.sh gate-42.sh gate-43.sh gate-44.sh gate-45.sh layer-check.sh; do
+for s in gate-31.sh gate-32.sh gate-33.sh gate-34.sh gate-35.sh gate-36.sh gate-37.sh gate-38.sh gate-39.sh gate-40.sh gate-41.sh gate-42.sh gate-43.sh gate-44.sh gate-45.sh layer-check.sh; do
     if [ -f "${GATES_DIR}/selfcheck/$s" ]; then
         log_ok "T5: selfcheck/$s present"
     else
