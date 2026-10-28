@@ -70,9 +70,9 @@ gate_compile() {
     local build_dir="${QUALITY_GATE_BUILD_DIR:-${TMPDIR:-/tmp}/agentrt-quality-gate-build}"
 
     if [ ! -f "${AGENTRT_SRC}/CMakeLists.txt" ]; then
-        log_warn "CMakeLists.txt not found, skipping compilation check"
-        check_gate "Compile" 2
-        return
+        log_err "CMakeLists.txt not found: compilation gate cannot judge (fail-closed)"
+        check_gate "Compile" 1
+        return 1
     fi
 
     # 产品件根锚点由装配方显式持有（SSoT）：agentrt 的产品探测以
@@ -143,8 +143,9 @@ gate_ban() {
             check_gate "BAN-Rules" 1
         fi
     else
-        log_warn "BAN scan script not found: ${ban_script}"
-        check_gate "BAN-Rules" 2
+        log_err "BAN scan script not found: ${ban_script}"
+        check_gate "BAN-Rules" 1
+        return 1
     fi
 
     # BAN-191: 禁止 head -z 管道（POSIX 兼容性）
@@ -183,9 +184,9 @@ gate_security() {
     section "Gate 3: Security Scan (10 Items)"
 
     if [ "${SKIP_SECURITY:-0}" = "1" ]; then
-        log_warn "Security scan skipped (SKIP_SECURITY=1)"
-        check_gate "Security" 2
-        return
+        log_err "Security scan skipped (SKIP_SECURITY=1): skip is not a verdict (fail-closed)"
+        check_gate "Security" 1
+        return 1
     fi
 
     local sec_script="${SCRIPT_DIR}/../../verify/security/security-scan.sh"
@@ -203,8 +204,9 @@ gate_security() {
             fi
         fi
     else
-        log_warn "Security scan script not found: ${sec_script}"
-        check_gate "Security" 2
+        log_err "Security scan script not found: ${sec_script}"
+        check_gate "Security" 1
+        return 1
     fi
 }
 
@@ -223,8 +225,9 @@ gate_contract() {
             check_gate "Contract" 1
         fi
     else
-        log_warn "Contract version check not found"
-        check_gate "Contract" 2
+        log_err "Contract version check not found"
+        check_gate "Contract" 1
+        return 1
     fi
 }
 
@@ -243,8 +246,9 @@ gate_cross_repo() {
             check_gate "CrossRepo" 1
         fi
     else
-        log_warn "Cross-repo verification script not found"
-        check_gate "CrossRepo" 2
+        log_err "Cross-repo verification script not found"
+        check_gate "CrossRepo" 1
+        return 1
     fi
 }
 
@@ -273,8 +277,9 @@ gate_complexity() {
             fi
         fi
     else
-        log_warn "Complexity check script not found: ${complexity_script}"
-        check_gate "Complexity" 2
+        log_err "Complexity check script not found: ${complexity_script}"
+        check_gate "Complexity" 1
+        return 1
     fi
 }
 
@@ -296,8 +301,9 @@ gate_ssot() {
             check_gate "SSoT-Validate" 1
         fi
     else
-        log_warn "SSoT validation script not found: ${ssot_script}"
-        check_gate "SSoT-Validate" 2
+        log_err "SSoT validation script not found: ${ssot_script}"
+        check_gate "SSoT-Validate" 1
+        return 1
     fi
 }
 
@@ -316,8 +322,9 @@ gate_header_duplication() {
             check_gate "HeaderDup" 1
         fi
     else
-        log_warn "Header duplication script not found: ${hdr_script}"
-        check_gate "HeaderDup" 2
+        log_err "Header duplication script not found: ${hdr_script}"
+        check_gate "HeaderDup" 1
+        return 1
     fi
 }
 
@@ -343,8 +350,9 @@ gate_abi_frozen() {
             fi
         fi
     else
-        log_warn "ABI frozen check script not found: ${abi_script}"
-        check_gate "ABI-Frozen" 2
+        log_err "ABI frozen check script not found: ${abi_script}"
+        check_gate "ABI-Frozen" 1
+        return 1
     fi
 }
 
@@ -377,8 +385,9 @@ gate_corekern_runtime() {
             fi
         fi
     else
-        log_warn "corekern runtime check script not found: ${ckrt_script}"
-        check_gate "CorekernRuntime" 2
+        log_err "corekern runtime check script not found: ${ckrt_script}"
+        check_gate "CorekernRuntime" 1
+        return 1
     fi
 }
 
@@ -405,8 +414,9 @@ gate_name_length() {
             check_gate "NameLength" 1
         fi
     else
-        log_warn "function-name check script not found: ${fn_script}"
-        check_gate "NameLength" 2
+        log_err "function-name check script not found: ${fn_script}"
+        check_gate "NameLength" 1
+        return 1
     fi
 }
 
@@ -433,8 +443,9 @@ gate_loc_ceiling() {
             check_gate "LocCeiling" 1
         fi
     else
-        log_warn "loc-ceiling check script not found: ${loc_script}"
-        check_gate "LocCeiling" 2
+        log_err "loc-ceiling check script not found: ${loc_script}"
+        check_gate "LocCeiling" 1
+        return 1
     fi
 }
 
@@ -462,8 +473,9 @@ gate_propagation() {
             check_gate "Propagation" 1
         fi
     else
-        log_warn "propagation check script not found: ${prop_script}"
-        check_gate "Propagation" 2
+        log_err "propagation check script not found: ${prop_script}"
+        check_gate "Propagation" 1
+        return 1
     fi
 }
 
@@ -490,8 +502,9 @@ gate_header_shadow() {
             check_gate "HeaderShadow" 1
         fi
     else
-        log_warn "header-shadow check script not found: ${shadow_script}"
-        check_gate "HeaderShadow" 2
+        log_err "header-shadow check script not found: ${shadow_script}"
+        check_gate "HeaderShadow" 1
+        return 1
     fi
 }
 
@@ -518,8 +531,9 @@ gate_adapter_registry() {
             check_gate "AdapterRegistry" 1
         fi
     else
-        log_warn "adapter-registry check script not found: ${ad_script}"
-        check_gate "AdapterRegistry" 2
+        log_err "adapter-registry check script not found: ${ad_script}"
+        check_gate "AdapterRegistry" 1
+        return 1
     fi
 }
 
@@ -547,8 +561,9 @@ gate_sample_form() {
             check_gate "SampleForm" 1
         fi
     else
-        log_warn "sample-form check script not found: ${sf_script}"
-        check_gate "SampleForm" 2
+        log_err "sample-form check script not found: ${sf_script}"
+        check_gate "SampleForm" 1
+        return 1
     fi
 }
 
@@ -576,8 +591,9 @@ gate_version_consistency() {
             check_gate "VersionConsistency" 1
         fi
     else
-        log_warn "version-consistency check script not found: ${vc_script}"
-        check_gate "VersionConsistency" 2
+        log_err "version-consistency check script not found: ${vc_script}"
+        check_gate "VersionConsistency" 1
+        return 1
     fi
 }
 
@@ -609,8 +625,9 @@ gate_loc_budget() {
             check_gate "LocBudget" 1
         fi
     else
-        log_warn "loc-budget check script not found: ${lb_script}"
-        check_gate "LocBudget" 2
+        log_err "loc-budget check script not found: ${lb_script}"
+        check_gate "LocBudget" 1
+        return 1
     fi
 }
 
@@ -637,8 +654,9 @@ gate_stub_scan() {
             check_gate "StubScan" 1
         fi
     else
-        log_warn "stub scan check script not found: ${sb_script}"
-        check_gate "StubScan" 2
+        log_err "stub scan check script not found: ${sb_script}"
+        check_gate "StubScan" 1
+        return 1
     fi
 }
 
@@ -665,8 +683,9 @@ gate_file_length() {
             check_gate "FileLength" 1
         fi
     else
-        log_warn "file-length check script not found: ${fl_script}"
-        check_gate "FileLength" 2
+        log_err "file-length check script not found: ${fl_script}"
+        check_gate "FileLength" 1
+        return 1
     fi
 }
 
@@ -696,8 +715,9 @@ gate_clone() {
             check_gate "Clone" 1
         fi
     else
-        log_warn "clone check script not found: ${cl_script}"
-        check_gate "Clone" 2
+        log_err "clone check script not found: ${cl_script}"
+        check_gate "Clone" 1
+        return 1
     fi
 }
 
@@ -729,8 +749,9 @@ gate_port_coord() {
             check_gate "PortCoord" 1
         fi
     else
-        log_warn "port coord check script not found: ${pc_script}"
-        check_gate "PortCoord" 2
+        log_err "port coord check script not found: ${pc_script}"
+        check_gate "PortCoord" 1
+        return 1
     fi
 }
 
@@ -762,8 +783,9 @@ gate_policy_payload() {
             check_gate "PolicyPayload" 1
         fi
     else
-        log_warn "policy payload check script not found: ${pp_script}"
-        check_gate "PolicyPayload" 2
+        log_err "policy payload check script not found: ${pp_script}"
+        check_gate "PolicyPayload" 1
+        return 1
     fi
 }
 
@@ -796,8 +818,9 @@ gate_layer() {
             check_gate "LayerBoundary" 1
         fi
     else
-        log_warn "layer boundary check script not found: ${lb_script}"
-        check_gate "LayerBoundary" 2
+        log_err "layer boundary check script not found: ${lb_script}"
+        check_gate "LayerBoundary" 1
+        return 1
     fi
 }
 
@@ -830,8 +853,9 @@ gate_fanout() {
             check_gate "FanOut" 1
         fi
     else
-        log_warn "fan-out check script not found: ${fo_script}"
-        check_gate "FanOut" 2
+        log_err "fan-out check script not found: ${fo_script}"
+        check_gate "FanOut" 1
+        return 1
     fi
 }
 
@@ -859,8 +883,9 @@ gate_symbol_conservation() {
             check_gate "SymbolConservation" 1
         fi
     else
-        log_warn "symbol conservation check script not found: ${sc_script}"
-        check_gate "SymbolConservation" 2
+        log_err "symbol conservation check script not found: ${sc_script}"
+        check_gate "SymbolConservation" 1
+        return 1
     fi
 }
 
@@ -873,17 +898,19 @@ gate_symbol_conservation() {
 gate_logic_g38() {
     section "Gate 27: G38 Logic Completeness (0.1.19)"
 
+    # fail-closed（0.1.20 方案 §9.2 / P1-6）：缺脚本与缺构建树均为"无法判断"，
+    # 一律映射为红，不得映射为跳过——SKIP 参与全绿加总即假绿（Gate 27 假绿的根因）。
     local g38_script="${SCRIPT_DIR}/g38-logic-gate.sh"
     if [ ! -f "$g38_script" ]; then
-        log_warn "g38 logic gate script not found: ${g38_script}"
-        check_gate "LogicCompleteness" 2
-        return 0
+        log_err "g38 logic gate script not found: ${g38_script}"
+        check_gate "LogicCompleteness" 1
+        return 1
     fi
 
     if [ -z "${QUALITY_GATE_BUILD_DIR:-}" ]; then
-        log_warn "QUALITY_GATE_BUILD_DIR not set: G38 needs a built test tree"
-        check_gate "LogicCompleteness" 2
-        return 0
+        log_err "QUALITY_GATE_BUILD_DIR not set: G38 needs a built test tree"
+        check_gate "LogicCompleteness" 1
+        return 1
     fi
 
     log_info "Running G38 five-checklist gate..."
@@ -911,9 +938,9 @@ gate_g30_experience() {
 
     local g30_script="${SCRIPT_DIR}/g30-experience-gate.sh"
     if [ ! -f "$g30_script" ]; then
-        log_warn "g30 experience gate script not found: ${g30_script}"
-        check_gate "ExperienceG30" 2
-        return 0
+        log_err "g30 experience gate script not found: ${g30_script}"
+        check_gate "ExperienceG30" 1
+        return 1
     fi
 
     log_info "Running G30 experience gate..."
@@ -939,9 +966,9 @@ gate_perf_g37() {
 
     local g37_script="${SCRIPT_DIR}/g37-perf-budget-gate.sh"
     if [ ! -f "$g37_script" ]; then
-        log_warn "g37 performance gate script not found: ${g37_script}"
-        check_gate "PerfBudgetG37" 2
-        return 0
+        log_err "g37 performance gate script not found: ${g37_script}"
+        check_gate "PerfBudgetG37" 1
+        return 1
     fi
 
     log_info "Running G37 performance-budget gate..."
@@ -969,9 +996,9 @@ gate_form_count() {
 
     local fc_script="${SCRIPT_DIR}/form-count-check.sh"
     if [ ! -f "$fc_script" ]; then
-        log_warn "form-count gate script not found: ${fc_script}"
-        check_gate "FleetFormCount" 2
-        return 0
+        log_err "form-count gate script not found: ${fc_script}"
+        check_gate "FleetFormCount" 1
+        return 1
     fi
 
     log_info "Running fleet form-count gate..."
