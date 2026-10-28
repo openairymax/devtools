@@ -184,7 +184,7 @@ expect_rc "T4b verdict-removal mutation flagged" 1 "$rc"
 
 # ── T5: selfcheck 清单完整性 ────────────────────────────────
 section "T5: selfcheck checklist completeness"
-for s in gate-33.sh gate-36.sh gate-37.sh gate-38.sh gate-39.sh gate-40.sh gate-41.sh gate-42.sh gate-43.sh gate-44.sh gate-45.sh layer-check.sh; do
+for s in gate-32.sh gate-33.sh gate-36.sh gate-37.sh gate-38.sh gate-39.sh gate-40.sh gate-41.sh gate-42.sh gate-43.sh gate-44.sh gate-45.sh layer-check.sh; do
     if [ -f "${GATES_DIR}/selfcheck/$s" ]; then
         log_ok "T5: selfcheck/$s present"
     else
