@@ -1,0 +1,2 @@
+-p
+/rpc mem.cache_stats {}

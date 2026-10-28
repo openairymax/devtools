@@ -1,6 +1,0 @@
-# 0.1.19 G30 体验判据延期登记（fail-closed）
-# 格式: <id> <sunset-version> <出处>；# 起始为注释行。
-# 规则: G30 判据因上游依赖未就绪而后移时登记；sunset <= agentrt/VERSION 即过期并 FAIL。
-#       harness 落地后应删除对应条目，由 g30-experience-gate.sh 强制逐组 golden。
-
-cli-golden-twelve 0.1.20 0.1.20-架构改进完善和自演化方案§4.1-A2

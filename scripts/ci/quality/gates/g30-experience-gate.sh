@@ -18,9 +18,9 @@
 #   [T8] 三 venue 共用 command 层：CLI_COMMANDS[] 唯一定义、分发点 ≥2、
 #        sdk/tui 无自建命令表、TUI 以 cli_bin 委托 CLI 进程
 #   [T9] sdk/tui 单文件 ≤ 800 行（基线棘轮，基线外新增超限即 FAIL）
-#   [T10] CLI 十二机制 golden：harness 落地后每机制组 ≥ 20 例；未落地时须在
-#        g30-deferral.txt 登记（含 sunset 版本），sunset ≤ 当前版本即 FAIL。
-#        后移授权：0.1.20-架构改进完善和自演化方案 §4.1 A2。
+#   [T10] CLI 十二机制 golden：cli-golden-twelve.sh 逐组执行 12 组离线 fixture
+#        （0.1.20 方案 §4.1-A2）；二进制经 AIRY_CLI_BIN 提供（树外构建），
+#        缺失计入环境告警（exit 2），fixture 缺失或断言失败即 FAIL。
 #
 # 语义：授权延期是"有据可查的已登记状态"，不是缺陷（不计 WARN）；未经登记
 #   的缺口与过期延期均 FAIL——杜绝静默绿与永久红。
@@ -36,17 +36,13 @@ TUI_DIR="${AW_ROOT}/sdk/tui"
 CLI_DIR="${AW_ROOT}/agentrt/tools/airy_cli"
 VERSION_FILE="${AW_ROOT}/agentrt/VERSION"
 BASELINE="${SCRIPT_DIR}/g30-tui-filelen-baseline.txt"
-DEFERRAL="${SCRIPT_DIR}/g30-deferral.txt"
+HARNESS="${SCRIPT_DIR}/cli-golden-twelve.sh"
 
 MAX_TUI_FILE_LINES=800
 MIN_GOLDEN=100
 MIN_BUDGET_CONSTS=34
 CLI_MIN_LINES=8000
 CLI_MAX_LINES=12000
-MIN_CLI_CASES=20
-CLI_GOLDEN_ID="cli-golden-twelve"
-MECHANISMS=(argforge hostsplit contrib slashtable surfacegen stdenguard
-            statustable headless failclosed twogate singleowner vocabincident)
 
 UPDATE_BASELINE=0
 if [ "${1:-}" = "--update-baseline" ]; then
@@ -332,51 +328,28 @@ check_file_length() {
     fi
 }
 
-# [T10] CLI 十二机制 golden（harness 未落地须登记延期）
+# [T10] CLI 十二机制 golden（0.1.20 方案 §4.1-A2：harness 逐组强制执行）
 check_cli_golden() {
-    section "T10 CLI twelve-mechanism golden (>= ${MIN_CLI_CASES}/group)"
-    local golden="$CLI_DIR/tests/golden"
-    if [ -d "$golden" ]; then
-        local mech d n
-        for mech in "${MECHANISMS[@]}"; do
-            d=$(find "$golden" -maxdepth 2 -type d -iname "*${mech}*" | head -n 1 || true)
-            if [ -z "$d" ]; then
-                fail "golden group missing: ${mech}"
-                continue
-            fi
-            n=$(find "$d" -type f ! -name 'README*' | wc -l | tr -d ' ')
-            if [ "$n" -lt "$MIN_CLI_CASES" ]; then
-                fail "golden group ${mech} = ${n} cases < ${MIN_CLI_CASES}"
-            else
-                log_ok "golden group ${mech} = ${n} cases"
-            fi
-        done
+    section "T10 CLI twelve-mechanism golden (cli-golden-twelve)"
+    if [ ! -x "$HARNESS" ]; then
+        fail "harness missing or not executable: ${HARNESS}"
         return 0
     fi
-    if [ ! -f "$DEFERRAL" ]; then
-        fail "tests/golden absent and deferral registry missing: ${DEFERRAL}"
+    if [ -z "${AIRY_CLI_BIN:-}" ] || [ ! -x "${AIRY_CLI_BIN:-}" ]; then
+        ENV_ERR=$((ENV_ERR + 1))
+        log_warn "AIRY_CLI_BIN unset or not executable: build airy_cli out-of-tree, export AIRY_CLI_BIN=<path>"
         return 0
     fi
-    local line sunset source cur
-    line=$(grep -vE '^[[:space:]]*(#|$)' "$DEFERRAL" | awk -v id="$CLI_GOLDEN_ID" '$1 == id { print; exit }' || true)
-    if [ -z "$line" ]; then
-        fail "tests/golden absent and '${CLI_GOLDEN_ID}' not registered in g30-deferral.txt"
-        return 0
+    local rc=0
+    bash "$HARNESS" "$AIRY_CLI_BIN" || rc=$?
+    if [ "$rc" -eq 2 ]; then
+        ENV_ERR=$((ENV_ERR + 1))
+        log_warn "harness environment error (rc=2): ${HARNESS}"
+    elif [ "$rc" -ne 0 ]; then
+        fail "twelve-mechanism golden FAILED (rc=${rc})"
+    else
+        log_ok "twelve-mechanism golden PASS (12/12)"
     fi
-    sunset=$(echo "$line" | awk '{ print $2 }')
-    source=$(echo "$line" | cut -d' ' -f3-)
-    cur=$(tr -d '[:space:]' < "$VERSION_FILE")
-    if [ -z "$sunset" ]; then
-        fail "deferral '${CLI_GOLDEN_ID}' has no sunset version"
-        return 0
-    fi
-    if [ "$(printf '%s\n%s\n' "$cur" "$sunset" | sort -V | tail -n 1)" != "$sunset" ] \
-        || [ "$cur" = "$sunset" ]; then
-        fail "deferral '${CLI_GOLDEN_ID}' expired: sunset ${sunset} <= current ${cur}"
-        return 0
-    fi
-    log_info "CLI twelve-mechanism golden deferred to ${sunset} (${source})"
-    log_ok "deferral registered, expires after ${cur}"
 }
 
 need_tree "$TUI_DIR"

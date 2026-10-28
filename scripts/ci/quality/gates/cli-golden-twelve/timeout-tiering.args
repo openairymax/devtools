@@ -1,0 +1,2 @@
+-p
+/rpc llm.complete {"prompt":"hi"}

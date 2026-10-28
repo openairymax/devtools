@@ -1,0 +1,5 @@
+exit:0
+has:^online 0/14$
+has:^gateway offline$
+has:^sched offline$
+has:^cupolas offline$
