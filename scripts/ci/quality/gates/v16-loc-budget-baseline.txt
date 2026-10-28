@@ -1,3 +1,6 @@
+# 棘轮规则（Gate 41）：数字 pin 只许降不许升；上升必须在同一 commit 的
+# message 中携带一行 "RATCHET-JUSTIFY: <commit> <+N> <reason>"，否则红灯。
+# 本脚本入库锚点之前的漂移豁免（见 g41-ratchet-audit.sh）。
 current=K4
 facade=61576
 cupolas=17314
