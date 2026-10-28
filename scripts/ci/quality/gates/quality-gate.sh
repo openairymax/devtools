@@ -99,11 +99,17 @@ gate_compile() {
             local _dir="${_anchor#*:}"
             if [ -f "${_prod_root}/${_dir}/CMakeLists.txt" ]; then
                 _prod_args+=("-D${_var}=${_prod_root}/${_dir}")
+            else
+                log_err "product CMakeLists.txt not found: ${_prod_root}/${_dir} (fail-closed)"
+                check_gate "Compile" 1
+                return 1
             fi
         done
         log_info "Products anchors: ${_prod_root} (${#_prod_args[@]} 件)"
     else
-        log_warn "Products root not found; product daemons may stay unassembled"
+        log_err "Products root not found: compilation gate cannot judge product daemons (fail-closed)"
+        check_gate "Compile" 1
+        return 1
     fi
 
     log_info "Out-of-source build dir: ${build_dir}"
@@ -1078,6 +1084,37 @@ gate_ratchet() {
 }
 
 # ============================================================================
+# Gate 44: 元门禁审计（0.1.20 §9 Gate 44，门禁审计门禁）
+# selfcheck/gate-44.sh 静态审计全部 gate_* 函数的 fail-closed 不变量：
+# R1=无法判定消息后无 check_gate 红映射；R2=窗口内无任何判定（静默降级）。
+# 缺 selfcheck 脚本 = 审计器失明 = 元门禁失效，一律红。
+# 退出码: 0=通过 1=审计违例/缺脚本/环境错误（一律红）
+# ============================================================================
+gate_meta_failclosed() {
+    section "Gate 44: Meta Fail-Closed Audit (0.1.20)"
+
+    local mf_script="${SCRIPT_DIR}/selfcheck/gate-44.sh"
+    if [ ! -f "$mf_script" ]; then
+        log_err "meta fail-closed selfcheck not found: ${mf_script}"
+        check_gate "MetaFailClosed" 1
+        return 1
+    fi
+
+    log_info "Running meta fail-closed audit..."
+    local mf_out mf_rc=0
+    mf_out=$(bash "$mf_script" 2>&1) || mf_rc=$?
+    echo "$mf_out" | tail -20
+    if [ "$mf_rc" -eq 0 ]; then
+        check_gate "MetaFailClosed" 0
+    else
+        # 环境错误与审计违例同罪：无法判断时按失败处理
+        log_err "meta fail-closed audit failed (rc=${mf_rc})"
+        check_gate "MetaFailClosed" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1108,6 +1145,7 @@ main() {
     local skip_g37=false
     local skip_facade=false
     local skip_ratchet=false
+    local skip_meta44=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1219,12 +1257,16 @@ main() {
                 skip_ratchet=true
                 shift
                 ;;
+            --skip-meta44)
+                skip_meta44=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-meta44] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1257,6 +1299,8 @@ main() {
                 echo "  28. G30 Experience Gate (0.1.19, TUI + CLI surface)"
                 echo "  29. G37 Performance Budget (0.1.19, three-tier TTFT + SYCL throughput)"
                 echo "  30. Ratchet Drift Audit (0.1.20, Gate 41 pin history)"
+                echo "  31. Facade Attribution (0.1.20, Gate 43 ops family registry)"
+                echo "  32. Meta Fail-Closed Audit (0.1.20, Gate 44 gate-the-gates)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1286,6 +1330,7 @@ main() {
                 echo "  --skip-g37            Skip G37 performance budget (0.1.19, three-tier TTFT) check"
                 echo "  --skip-facade         Skip Gate 43 facade-attribution (0.1.20, ops family registry) check"
                 echo "  --skip-ratchet        Skip Gate 41 ratchet drift audit (0.1.20, pin history) check"
+                echo "  --skip-meta44         Skip Gate 44 meta fail-closed (0.1.20, gate-the-gates) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1333,6 +1378,7 @@ main() {
         $skip_g37 || gate_perf_g37
         $skip_facade || gate_facade_attribution
         $skip_ratchet || gate_ratchet
+        $skip_meta44 || gate_meta_failclosed
     fi
 
     # 输出结果
