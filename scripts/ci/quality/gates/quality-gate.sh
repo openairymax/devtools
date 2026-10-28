@@ -1020,6 +1020,37 @@ gate_facade_attribution() {
 }
 
 # ============================================================================
+# Gate 41: 棘轮漂移审计（0.1.20 §4.2 A4 / §9 Gate 41）
+# 审计 v16-loc-budget-baseline.txt 的 pin 历史：只降不升，
+# 上升 commit 必须带 RATCHET-JUSTIFY: 行，锚点前豁免。
+# fail-closed（§9.2）：缺脚本与审计自身异常一律映射为红。
+# 退出码: 0=通过 1=棘轮漂移违例/缺脚本/环境错误（一律红）
+# ============================================================================
+gate_ratchet() {
+    section "Gate 41: Ratchet Drift Audit (0.1.20)"
+
+    local ra_script="${SCRIPT_DIR}/g41-ratchet-audit.sh"
+    if [ ! -f "$ra_script" ]; then
+        log_err "ratchet audit script not found: ${ra_script}"
+        check_gate "RatchetDrift" 1
+        return 1
+    fi
+
+    log_info "Running ratchet drift audit..."
+    local ra_out ra_rc=0
+    ra_out=$(bash "$ra_script" 2>&1) || ra_rc=$?
+    echo "$ra_out" | tail -20
+    if [ "$ra_rc" -eq 0 ]; then
+        check_gate "RatchetDrift" 0
+    else
+        # 环境错误（rc=2）与漂移违例（rc=1）同罪：无法判断时按失败处理
+        log_err "ratchet audit gate failed (rc=${ra_rc})"
+        check_gate "RatchetDrift" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1049,6 +1080,7 @@ main() {
     local skip_g30=false
     local skip_g37=false
     local skip_facade=false
+    local skip_ratchet=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1156,6 +1188,10 @@ main() {
                 skip_facade=true
                 shift
                 ;;
+            --skip-ratchet)
+                skip_ratchet=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
@@ -1193,6 +1229,7 @@ main() {
                 echo "  27. G38 Logic Completeness (0.1.19, five checklists)"
                 echo "  28. G30 Experience Gate (0.1.19, TUI + CLI surface)"
                 echo "  29. G37 Performance Budget (0.1.19, three-tier TTFT + SYCL throughput)"
+                echo "  30. Ratchet Drift Audit (0.1.20, Gate 41 pin history)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1221,6 +1258,7 @@ main() {
                 echo "  --skip-g30            Skip G30 experience gate (0.1.19, TUI + CLI surface) check"
                 echo "  --skip-g37            Skip G37 performance budget (0.1.19, three-tier TTFT) check"
                 echo "  --skip-facade         Skip Gate 43 facade-attribution (0.1.20, ops family registry) check"
+                echo "  --skip-ratchet        Skip Gate 41 ratchet drift audit (0.1.20, pin history) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1267,6 +1305,7 @@ main() {
         $skip_g30 || gate_g30_experience
         $skip_g37 || gate_perf_g37
         $skip_facade || gate_facade_attribution
+        $skip_ratchet || gate_ratchet
     fi
 
     # 输出结果
