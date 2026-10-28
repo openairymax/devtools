@@ -278,109 +278,50 @@ set(ATOMIC_DIR ${AIRY_INTEG_RT_ROOT}/atoms)
 set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
-set(LLM_IMPL_SOURCES
-    ${LLM_D_DIR}/src/rpc/service.c
-    ${LLM_D_DIR}/src/config/service_config.c
-    ${LLM_D_DIR}/src/config/service_config_json.c
-    ${LLM_D_DIR}/src/config/service_config_yaml_models.c
-    ${LLM_D_DIR}/src/config/service_config_yaml_providers.c
-    ${LLM_D_DIR}/src/config/service_config_yaml_pricing.c
-    ${LLM_D_DIR}/src/rpc/service_providers.c
-    ${LLM_D_DIR}/src/rpc/service_request.c
-    # 调用级链式切换：链定义/链执行/候选查找（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/rpc/service_chain.c
-    # routing 段解析（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/rpc/service_route.c
-    ${LLM_D_DIR}/src/accounting/metrics.c
-    ${LLM_D_DIR}/src/accounting/semantic_cache.c
-    ${LLM_D_DIR}/src/rpc/response.c
-    ${LLM_D_DIR}/src/accounting/cost_tracker.c
-    ${LLM_D_DIR}/src/providers/core/registry.c
-    ${LLM_D_DIR}/src/providers/core/secrets.c
-    ${LLM_D_DIR}/src/providers/core/http.c
-    ${LLM_D_DIR}/src/providers/core/envelope.c
-    ${LLM_D_DIR}/src/providers/core/sse.c
-    # B16-S3 c8：退避重试循环壳（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/providers/core/retry.c
-    # 0.1.20 D2-9：传输超时分类计数与自动预算（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/providers/core/prov_stat.c
-    ${LLM_D_DIR}/src/providers/core/toolstream.c
-    # B16-S3.3：通用 completion driver（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/providers/core/adapter.c
-    ${LLM_D_DIR}/src/providers/adapters/chat.c
-    ${LLM_D_DIR}/src/providers/core/rate_limit.c
-    # 0.1.20 B1-d：上游失败线程局域诊断槽（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/providers/core/prov_diag.c
-    ${LLM_D_DIR}/src/providers/adapters/messages.c
-    # B16-S4：deepseek.c / google.c 清理（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/providers/adapters/local.c
-    # B16-S3 c7：适配器装配 SSoT（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/providers/adapters/adapter_table.c
-    ${LLM_D_DIR}/src/router/core/llm_router.c
-    # 0.1.19 §3.8.4：可切换类错误分类（健康面迁移判据的唯一来源）
-    ${LLM_D_DIR}/src/router/core/llm_failover.c
-    # 0.1.19 §3.8.2：选择路径经 llm_ep_state() 排除熔断 OPEN 端点
-    ${LLM_D_DIR}/src/router/core/llm_health.c
-    # sec44-D：四策略母件化合一（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/router/strategy/router_strategy.c
-)
+# 实现源集由主目标 airy_llm_service 单点持有（SSoT）。此处曾手抄一份源清单，
+# 与主目标漂移后链接期丢符号；改为直接链接该静态库，杜绝二次漂移。
+if(TARGET airy_llm_service)
+    add_executable(test_llm_d_routing test_llm_d_routing.c)
 
-add_executable(test_llm_d_routing test_llm_d_routing.c ${LLM_IMPL_SOURCES})
+    target_include_directories(test_llm_d_routing PRIVATE
+        ${LLM_D_DIR}/include
+        ${LLM_D_DIR}/src
+        ${LLM_D_DIR}/src/providers
+        # B16-S5 预置：五域归位后的头搜索路径（与 llm_d 主目标同步）
+        ${LLM_D_DIR}/src/bootstrap
+        ${LLM_D_DIR}/src/rpc
+        ${LLM_D_DIR}/src/config
+        ${LLM_D_DIR}/src/accounting
+        ${COMMONS_DIR}
+        ${COMMONS_DIR}/platform/include
+        ${COMMONS_DIR}/utils/error/include
+        ${COMMONS_DIR}/utils/logging/include
+        ${COMMONS_DIR}/utils/config_unified
+        ${COMMONS_DIR}/utils/memory/include
+        ${COMMONS_DIR}/utils/string/include
+        ${COMMONS_DIR}/utils/sync/include
+        ${COMMONS_DIR}/utils/cache
+        ${COMMONS_DIR}/utils/compat/include
+        ${SYSCALL_INCLUDE_DIR}
+        ${COREKERN_INCLUDE_DIR}
+        ${AIRY_INTEG_RT_ROOT}/daemons/common/include
+    )
 
-target_include_directories(test_llm_d_routing PRIVATE
-    ${LLM_D_DIR}/include
-    ${LLM_D_DIR}/src
-    ${LLM_D_DIR}/src/providers
-    # B16-S5 预置：五域归位后的头搜索路径（与 llm_d 主目标同步）
-    ${LLM_D_DIR}/src/bootstrap
-    ${LLM_D_DIR}/src/rpc
-    ${LLM_D_DIR}/src/config
-    ${LLM_D_DIR}/src/accounting
-    ${COMMONS_DIR}
-    ${COMMONS_DIR}/platform/include
-    ${COMMONS_DIR}/utils/error/include
-    ${COMMONS_DIR}/utils/logging/include
-    ${COMMONS_DIR}/utils/config_unified
-    ${COMMONS_DIR}/utils/memory/include
-    ${COMMONS_DIR}/utils/string/include
-    ${COMMONS_DIR}/utils/sync/include
-    ${COMMONS_DIR}/utils/cache
-    ${COMMONS_DIR}/utils/compat/include
-    ${SYSCALL_INCLUDE_DIR}
-    ${COREKERN_INCLUDE_DIR}
-    ${AIRY_INTEG_RT_ROOT}/daemons/common/include
-)
+    # 静态库 PUBLIC 传播 svc_common / curl / cjson，测试侧不再重复声明。
+    target_link_libraries(test_llm_d_routing PRIVATE
+        airy_llm_service
+        Threads::Threads
+    )
 
-target_link_libraries(test_llm_d_routing PRIVATE
-    svc_common
-    Threads::Threads
-)
+    target_compile_features(test_llm_d_routing PRIVATE c_std_11)
+    target_compile_options(test_llm_d_routing PRIVATE
+        -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
+    )
 
-if(AGENTRT_HAS_CJSON OR CJSON_FOUND)
-    target_link_libraries(test_llm_d_routing PRIVATE cjson)
+    add_test(NAME llm_d_routing COMMAND test_llm_d_routing
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+    airy_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")
+else()
+    airy_print_warn("  [integration] Skipping test_llm_d_routing: airy_llm_service not available (BUILD_DAEMON=OFF)")
 endif()
-
-if(AGENTRT_HAS_CURL)
-    if(CURL_INCLUDE_DIRS)
-        target_include_directories(test_llm_d_routing PRIVATE ${CURL_INCLUDE_DIRS})
-    endif()
-    if(CURL_LIBRARIES)
-        target_link_libraries(test_llm_d_routing PRIVATE ${CURL_LIBRARIES})
-    elseif(LIBCURL_LIBRARIES)
-        target_link_libraries(test_llm_d_routing PRIVATE ${LIBCURL_LIBRARIES})
-    elseif(PC_CURL_LIBRARIES)
-        target_link_libraries(test_llm_d_routing PRIVATE ${PC_CURL_LIBRARIES})
-    else()
-        target_link_libraries(test_llm_d_routing PRIVATE curl)
-    endif()
-endif()
-
-target_compile_features(test_llm_d_routing PRIVATE c_std_11)
-target_compile_options(test_llm_d_routing PRIVATE
-    -Wall -Wextra -g -Wno-unused-function -Wno-unused-variable
-)
-
-add_test(NAME llm_d_routing COMMAND test_llm_d_routing
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-
-airy_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")
