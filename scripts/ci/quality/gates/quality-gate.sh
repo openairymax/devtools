@@ -1178,6 +1178,36 @@ gate_doc_consistency() {
 }
 
 # ============================================================================
+# Gate 36: 三终态完备（0.1.20 §9.1 Gate 36 / §3.7l，C7 收口）
+# 成功 / 失败 / 未知三态各有构造用例；未知态不得并入成功；用例须注册
+# 且入构建目标；机制面事件须携带 stats.status。封闭世界：新增终态未分类
+# 即红。fail-closed：缺件/异常一律红，不出 WARN。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_terminal36() {
+    section "Gate 36: Terminal-State Completeness (0.1.20)"
+
+    local t36_script="${SCRIPT_DIR}/g36-terminal-gate.sh"
+    if [ ! -f "$t36_script" ]; then
+        log_err "terminal-state gate script not found: ${t36_script}"
+        check_gate "Terminal36" 1
+        return 1
+    fi
+
+    log_info "Running terminal-state completeness audit..."
+    local t36_out t36_rc=0
+    t36_out=$(bash "$t36_script" 2>&1) || t36_rc=$?
+    echo "$t36_out" | tail -12
+    if [ "$t36_rc" -eq 0 ]; then
+        check_gate "Terminal36" 0
+    else
+        log_err "terminal-state audit failed (rc=${t36_rc})"
+        check_gate "Terminal36" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1211,6 +1241,7 @@ main() {
     local skip_g42=false
     local skip_meta44=false
     local skip_doc45=false
+    local skip_t36=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1334,12 +1365,16 @@ main() {
                 skip_doc45=true
                 shift
                 ;;
+            --skip-t36)
+                skip_t36=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1375,6 +1410,7 @@ main() {
                 echo "  31. Facade Attribution (0.1.20, Gate 43 ops family registry)"
                 echo "  32. Meta Fail-Closed Audit (0.1.20, Gate 44 gate-the-gates)"
                 echo "  33. Doc-Code Consistency (0.1.20, Gate 45 self-referential audit)"
+                echo "  34. Terminal-State Completeness (0.1.20, Gate 36 success/fail/unknown)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1407,6 +1443,7 @@ main() {
                 echo "  --skip-g42            Skip Gate 42 ledger consistency (0.1.20, three-ledger parity) check"
                 echo "  --skip-meta44         Skip Gate 44 meta fail-closed (0.1.20, gate-the-gates) check"
                 echo "  --skip-doc45          Skip Gate 45 doc-code consistency (0.1.20, file:line audit) check"
+                echo "  --skip-t36            Skip Gate 36 terminal-state completeness (0.1.20, success/fail/unknown) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1457,6 +1494,7 @@ main() {
         $skip_g42 || gate_ledger
         $skip_meta44 || gate_meta_failclosed
         $skip_doc45 || gate_doc_consistency
+        $skip_t36 || gate_terminal36
     fi
 
     # 输出结果
