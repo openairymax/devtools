@@ -1208,6 +1208,36 @@ gate_terminal36() {
 }
 
 # ============================================================================
+# Gate 37: 计费热路径两臂门禁（0.1.20 §3.7l / §9.1.2，B3 收口）
+# 七条臂：单同步点 / 窗口 SSoT / 请求路径形态 / 测量臂在位 / 收尾隔离 /
+# 两臂证据 / p99 增量。证据只读：bench 实测 fsync 次数不得由门禁估算。
+# fail-closed（§9.2）：缺脚本/缺构建树/证据不可解析一律红，不出 WARN。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_cost37() {
+    section "Gate 37: Cost Hot-Path Two-Arm (0.1.20)"
+
+    local c37_script="${SCRIPT_DIR}/g37-cost-hotpath-gate.sh"
+    if [ ! -f "$c37_script" ]; then
+        log_err "cost hot-path gate script not found: ${c37_script}"
+        check_gate "CostHotpath37" 1
+        return 1
+    fi
+
+    log_info "Running cost hot-path two-arm audit..."
+    local c37_out c37_rc=0
+    c37_out=$(bash "$c37_script" 2>&1) || c37_rc=$?
+    echo "$c37_out" | tail -20
+    if [ "$c37_rc" -eq 0 ]; then
+        check_gate "CostHotpath37" 0
+    else
+        log_err "cost hot-path audit failed (rc=${c37_rc})"
+        check_gate "CostHotpath37" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1242,6 +1272,7 @@ main() {
     local skip_meta44=false
     local skip_doc45=false
     local skip_t36=false
+    local skip_hotpath=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1369,12 +1400,16 @@ main() {
                 skip_t36=true
                 shift
                 ;;
+            --skip-hotpath)
+                skip_hotpath=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1411,6 +1446,7 @@ main() {
                 echo "  32. Meta Fail-Closed Audit (0.1.20, Gate 44 gate-the-gates)"
                 echo "  33. Doc-Code Consistency (0.1.20, Gate 45 self-referential audit)"
                 echo "  34. Terminal-State Completeness (0.1.20, Gate 36 success/fail/unknown)"
+                echo "  35. Cost Hot-Path Two-Arm (0.1.20, Gate 37 single-request fsync + p99)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1444,6 +1480,7 @@ main() {
                 echo "  --skip-meta44         Skip Gate 44 meta fail-closed (0.1.20, gate-the-gates) check"
                 echo "  --skip-doc45          Skip Gate 45 doc-code consistency (0.1.20, file:line audit) check"
                 echo "  --skip-t36            Skip Gate 36 terminal-state completeness (0.1.20, success/fail/unknown) check"
+                echo "  --skip-hotpath        Skip Gate 37 cost hot-path two-arm (0.1.20, single-request fsync + p99) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1495,6 +1532,7 @@ main() {
         $skip_meta44 || gate_meta_failclosed
         $skip_doc45 || gate_doc_consistency
         $skip_t36 || gate_terminal36
+        $skip_hotpath || gate_cost37
     fi
 
     # 输出结果
