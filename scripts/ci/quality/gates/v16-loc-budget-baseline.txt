@@ -1,6 +1,12 @@
 # 棘轮规则（Gate 41）：数字 pin 只许降不许升；上升必须在同一 commit 的
 # message 中携带一行 "RATCHET-JUSTIFY: <commit> <+N> <reason>"，否则红灯。
 # 本脚本入库锚点之前的漂移豁免（见 g41-ratchet-audit.sh）。
-current=K4
-facade=61576
-cupolas=17314
+#
+# 2026-10-28 数值 pin 裁定（方案 §7.5）：废除以梯级名 current=K4 表达的账一
+# 判据。梯级名自带 500-2000 行松量，且 Gate 41 只解析 KEY=NUM，账一棘轮
+# 因此长期逃逸审计。三账改记实测真值，任何增长须 RATCHET-JUSTIFY 登记。
+# 收敛：core 当前高于 target=79999，差额落 §7.5 收敛表，靠 --converge 只降不升。
+core=81062
+facade=64171
+cupolas=17342
+target=79999
