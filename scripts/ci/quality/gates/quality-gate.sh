@@ -10,6 +10,12 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 AGENTRT_SRC="${PROJECT_ROOT}/agent-workload/agentrt"
 SCRIPTS_ROOT="${PROJECT_ROOT}/tools/scripts"
 
+# 构建树单一真相（SSoT）：Gate 1 在此建树，G32~G38 在同一路径上取证。
+# 未显式给出时在此定一次并导出——各门禁自行兜底会分裂成不同路径，且
+# 只认环境变量的门禁（G32/G33/G34/G35/G37/G38）会把"未导出"误判为环境
+# 错误，使全量结果取决于调用者的 shell 而非仓库状态。
+export QUALITY_GATE_BUILD_DIR="${QUALITY_GATE_BUILD_DIR:-${TMPDIR:-/tmp}/agentrt-quality-gate-build}"
+
 # 质量阈值唯一权威源（SSoT）：复杂度/重复率等策略数据统一由此读取
 if [ -f "${SCRIPT_DIR}/../thresholds.conf" ]; then
     # shellcheck source=../thresholds.conf
@@ -66,8 +72,7 @@ dump_cmake_err() { # <阶段名> <日志>
 gate_compile() {
     section "Gate 1: Compilation Check"
     # 构建产物一律树外化：严禁在伞仓源码区落任何编译产物（工程铁律 a）。
-    # 可用 QUALITY_GATE_BUILD_DIR 覆盖；默认落到系统临时区而非 ${PROJECT_ROOT}。
-    local build_dir="${QUALITY_GATE_BUILD_DIR:-${TMPDIR:-/tmp}/agentrt-quality-gate-build}"
+    local build_dir="$QUALITY_GATE_BUILD_DIR"
 
     if [ ! -f "${AGENTRT_SRC}/CMakeLists.txt" ]; then
         log_err "CMakeLists.txt not found: compilation gate cannot judge (fail-closed)"
@@ -374,7 +379,7 @@ gate_corekern_runtime() {
     local ckrt_script="${SCRIPT_DIR}/corekern-runtime-check.sh"
     if [ -f "$ckrt_script" ]; then
         # 复用 Gate 1 的树外构建目录（构建产物一律树外化，工程铁律 a）
-        local ckrt_build_dir="${QUALITY_GATE_BUILD_DIR:-${TMPDIR:-/tmp}/agentrt-quality-gate-build}"
+        local ckrt_build_dir="$QUALITY_GATE_BUILD_DIR"
         log_info "Probing production processes for runtime evidence (build: ${ckrt_build_dir})..."
         local ckrt_out
         if ckrt_out=$(bash "$ckrt_script" --build-dir "$ckrt_build_dir" 2>&1); then
