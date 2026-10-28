@@ -23,7 +23,8 @@
 # 基线：v16-loc-budget-baseline.txt，每行 <键>=<值>：core/facade/cupolas/target。
 #
 # 用法: loc-budget-check.sh [--report|--converge]
-#   --report    仅输出机器可读三账实测值（core=/facade=/cupolas=），供 Gate 42 复用
+#   --report    输出机器可读实测值：三账合计（core=/facade=/cupolas=）与逐模块
+#               明细（core.<模块>= / facade.<模块>=），供 Gate 42 复用
 #   --converge  把各账 pin 收敛为实测值（只降不升），里程碑 target 不动
 # 退出码: 0 = 通过；1 = 某账超 pin；2 = 环境错误（树/基线缺失）
 set -euo pipefail
@@ -109,6 +110,12 @@ cupolas=$(count_loc "$CUPOLAS_DIR")
 
 if [ "$MODE" = "report" ]; then
     printf 'core=%s\nfacade=%s\ncupolas=%s\n' "$core" "$facade" "$cupolas"
+    for m in "${CORE_MODULES[@]}" cmake; do
+        printf 'core.%s=%s\n' "$m" "$(count_loc "$AGENTRT/$m")"
+    done
+    for m in "${FACADE_MODULES[@]}"; do
+        printf 'facade.%s=%s\n' "$m" "$(count_loc "$AGENTRT/$m")"
+    done
     exit 0
 fi
 
