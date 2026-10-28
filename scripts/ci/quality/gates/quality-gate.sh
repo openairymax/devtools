@@ -1302,6 +1302,35 @@ gate_priority32() {
 }
 
 # ============================================================================
+# Gate 34: 非法计划 schema 拒绝（0.1.20 §9.1 Gate 34，C1 面）
+# 12 类拒绝原因码逐类取证：每码在实现中有定位写入、定位后立即拒绝（不得静默
+# 修复）、非对象节点单独定位；用例逐行断言 field+reason 双定位并注册进构建。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_plan34() {
+    section "Gate 34: Plan Schema Rejection (0.1.20)"
+
+    local g34_script="${SCRIPT_DIR}/g34-plan-schema-reject.sh"
+    if [ ! -f "$g34_script" ]; then
+        log_err "plan schema rejection gate script not found: ${g34_script}"
+        check_gate "Schema34" 1
+        return 1
+    fi
+
+    log_info "Running plan schema rejection audit..."
+    local g34_out g34_rc=0
+    g34_out=$(bash "$g34_script" 2>&1) || g34_rc=$?
+    echo "$g34_out" | tail -14
+    if [ "$g34_rc" -eq 0 ]; then
+        check_gate "Schema34" 0
+    else
+        log_err "plan schema rejection audit failed (rc=${g34_rc})"
+        check_gate "Schema34" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1339,6 +1368,7 @@ main() {
     local skip_hotpath=false
     local skip_g33=false
     local skip_g32=false
+    local skip_g34=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1478,12 +1508,16 @@ main() {
                 skip_g32=true
                 shift
                 ;;
+            --skip-g34)
+                skip_g34=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1523,6 +1557,7 @@ main() {
                 echo "  35. Cost Hot-Path Two-Arm (0.1.20, Gate 37 single-request fsync + p99)"
                 echo "  36. Verdict Roundtrip (0.1.20, Gate 33 100x byte-identical)"
                 echo "  37. Violation Priority (0.1.20, Gate 32 E-02 > E-05 > E-01 > E-03 > E-04)"
+                echo "  38. Plan Schema Rejection (0.1.20, Gate 34 12 reason classes)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1559,6 +1594,7 @@ main() {
                 echo "  --skip-hotpath        Skip Gate 37 cost hot-path two-arm (0.1.20, single-request fsync + p99) check"
                 echo "  --skip-g33            Skip Gate 33 verdict roundtrip (0.1.20, 100x byte-identical) check"
                 echo "  --skip-g32            Skip Gate 32 violation priority (0.1.20, E-02 > E-05 > E-01 > E-03 > E-04) check"
+                echo "  --skip-g34            Skip Gate 34 plan schema rejection (0.1.20, 12 reason classes) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1613,6 +1649,7 @@ main() {
         $skip_hotpath || gate_cost37
         $skip_g33 || gate_roundtrip33
         $skip_g32 || gate_priority32
+        $skip_g34 || gate_plan34
     fi
 
     # 输出结果
