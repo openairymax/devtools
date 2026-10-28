@@ -1115,6 +1115,37 @@ gate_meta_failclosed() {
 }
 
 # ============================================================================
+# Gate 45: 文档-代码一致性（0.1.20 §9.1.1，本文档自指门禁）
+# doc-consistency-check.sh 审计活跃 SSoT 文档的 file:line 引用可复现性
+# （±3 行窗口，EV-2）+ 证据文件非空（§8.7）+ 四级指针归拢（Q13）。
+# fail-closed：缺脚本/清单缺席/受辖文档缺席一律红。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_doc_consistency() {
+    section "Gate 45: Doc-Code Consistency (0.1.20)"
+
+    local dc_script="${SCRIPT_DIR}/doc-consistency-check.sh"
+    if [ ! -f "$dc_script" ]; then
+        log_err "doc-consistency gate script not found: ${dc_script}"
+        check_gate "DocConsistency" 1
+        return 1
+    fi
+
+    log_info "Running doc-code consistency audit..."
+    local dc_out dc_rc=0
+    dc_out=$(bash "$dc_script" 2>&1) || dc_rc=$?
+    echo "$dc_out" | tail -20
+    if [ "$dc_rc" -eq 0 ]; then
+        check_gate "DocConsistency" 0
+    else
+        # 环境错误（rc=2）与违例（rc=1）同罪：无法判断时按失败处理
+        log_err "doc-consistency audit failed (rc=${dc_rc})"
+        check_gate "DocConsistency" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1146,6 +1177,7 @@ main() {
     local skip_facade=false
     local skip_ratchet=false
     local skip_meta44=false
+    local skip_doc45=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1261,12 +1293,16 @@ main() {
                 skip_meta44=true
                 shift
                 ;;
+            --skip-doc45)
+                skip_doc45=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-meta44] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-meta44] [--skip-doc45] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1301,6 +1337,7 @@ main() {
                 echo "  30. Ratchet Drift Audit (0.1.20, Gate 41 pin history)"
                 echo "  31. Facade Attribution (0.1.20, Gate 43 ops family registry)"
                 echo "  32. Meta Fail-Closed Audit (0.1.20, Gate 44 gate-the-gates)"
+                echo "  33. Doc-Code Consistency (0.1.20, Gate 45 self-referential audit)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1331,6 +1368,7 @@ main() {
                 echo "  --skip-facade         Skip Gate 43 facade-attribution (0.1.20, ops family registry) check"
                 echo "  --skip-ratchet        Skip Gate 41 ratchet drift audit (0.1.20, pin history) check"
                 echo "  --skip-meta44         Skip Gate 44 meta fail-closed (0.1.20, gate-the-gates) check"
+                echo "  --skip-doc45          Skip Gate 45 doc-code consistency (0.1.20, file:line audit) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1379,6 +1417,7 @@ main() {
         $skip_facade || gate_facade_attribution
         $skip_ratchet || gate_ratchet
         $skip_meta44 || gate_meta_failclosed
+        $skip_doc45 || gate_doc_consistency
     fi
 
     # 输出结果
