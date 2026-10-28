@@ -43,25 +43,28 @@ expect_rc() {
     fi
 }
 
+# 突变红必须钉死为 exit 1（真实用例断言失败），编译/执行类基建
+# 失败（126/127）一律视为 selfcheck 自身异常——红要红得有正确原因。
 expect_nonzero() {
     local name="$1" rc="$2"
-    if [ "$rc" -ne 0 ]; then
-        log_ok "${name}: exit ${rc}（非零即红，符合预期）"
+    if [ "$rc" -eq 1 ]; then
+        log_ok "${name}: exit 1（断言红，符合预期）"
     else
-        log_err "${name}: exit 0，期望非零（用例丧失判别力）"
+        log_err "${name}: exit ${rc}，期望 1（基建失败非断言红）"
         exit 1
     fi
 }
 
-# 树外编译并运行用例套件：$1=被测源根 $2=产物名。
-# 用例永远取真实套件；突变只发生在实现侧（§9.3 判别力自检本意）。
+# 树外编译并运行用例套件：$1=被测源根 $2=产物名（加 .bin 后缀，
+# 避免与突变目录同名冲突）。用例永远取真实套件；突变只发生在
+# 实现侧（§9.3 判别力自检本意）。
 build_run() {
     gcc -std=gnu11 -Wall -Wextra -O2 \
         -I"$1/include" \
-        -o "$TMP/$2" \
+        -o "$TMP/$2.bin" \
         "$CANARY_SRC/tests/unit/test_canary.c" \
         "$1"/src/*.c >/dev/null 2>&1
-    "$TMP/$2" >/dev/null 2>&1
+    "$TMP/$2.bin" >/dev/null 2>&1
 }
 
 # 复制被测源并对 canary_admit 施注突变；$3=sed 脚本。
