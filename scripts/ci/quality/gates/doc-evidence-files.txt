@@ -1,0 +1,7 @@
+# Gate 45 证据清单（0.1.20 方案 §8.7：证据必须是文件，无文件即未验收）
+# 路径相对 airymaxhub 仓根；0 字节证据 = 未验收（子检查 B）。
+# 注意：计数型零容忍基线（如 g24-file-length-baseline.txt，空 = 零容忍水位）
+# 不得入列，空文件对其是合法状态。
+tools/scripts/ci/quality/gates/g37-perf-budget.txt
+tools/scripts/ci/quality/gates/v16-g38-defect-map.txt
+tools/scripts/ci/quality/gates/facade-attribution.txt

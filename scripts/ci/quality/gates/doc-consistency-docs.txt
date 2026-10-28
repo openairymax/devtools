@@ -1,0 +1,6 @@
+# Gate 45 受辖文档清单（0.1.20 方案 §9.1.1）
+# 审计范围 = 活跃 SSoT 文档集（机制-策略分离，清单驱动）；
+# docs-closed 历史封存文档为快照语义，不回溯审计。
+# 路径相对 airymaxhub 仓根；# 开头为注释；空清单 fail-closed。
+docs/docs-closed/agent-workload-dev/0.1.20-架构改进完善和自演化方案.md
+docs/docs-closed/agent-workload-dev/0.1.20-架构文档.md
