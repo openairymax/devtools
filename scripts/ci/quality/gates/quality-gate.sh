@@ -1240,6 +1240,38 @@ gate_cost37() {
 }
 
 # ============================================================================
+# Gate 31: 验证器隔离（0.1.20 §9.1 Gate 31 / §3.7l 第三表第 5 项）
+# 五臂：实现面/契约面 include 词根干净、确定性链单 TU 出树对象的 nm -u
+# 零 S2/LLM 符号、六入口定义在位（防空壳）、入口定义唯一（防双实现）。
+# 运行一侧的判据：单 TU 可独立成对象，即该链的外部契约真实为「零生成面
+# 依赖」。构建一律出树（mktemp），源码区零产物。
+# fail-closed：缺脚本/缺工具链/缺受审件/编译失败一律红，不出 WARN。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_verifier31() {
+    section "Gate 31: Verifier Isolation (0.1.20)"
+
+    local g31_script="${SCRIPT_DIR}/g31-verifier-isolation.sh"
+    if [ ! -f "$g31_script" ]; then
+        log_err "verifier isolation gate script not found: ${g31_script}"
+        check_gate "Isolation31" 1
+        return 1
+    fi
+
+    log_info "Running verifier isolation audit..."
+    local g31_out g31_rc=0
+    g31_out=$(bash "$g31_script" 2>&1) || g31_rc=$?
+    echo "$g31_out" | tail -14
+    if [ "$g31_rc" -eq 0 ]; then
+        check_gate "Isolation31" 0
+    else
+        log_err "verifier isolation audit failed (rc=${g31_rc})"
+        check_gate "Isolation31" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # Gate 33: 裁决往返（0.1.20 §9.1 Gate 33，C 面）
 # 静态四臂（写出侧在场 / 规范形定序 / 空值省键 / 出参契约）+ 用例两臂
 # （100 次迭代与字节比对写在源码里 / 已注册进构建）+ 运行臂（构建树中
@@ -1402,6 +1434,7 @@ main() {
     local skip_g32=false
     local skip_g34=false
     local skip_g35=false
+    local skip_g31=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1549,12 +1582,16 @@ main() {
                 skip_g35=true
                 shift
                 ;;
+            --skip-g31)
+                skip_g31=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1596,6 +1633,7 @@ main() {
                 echo "  37. Violation Priority (0.1.20, Gate 32 E-02 > E-05 > E-01 > E-03 > E-04)"
                 echo "  38. Plan Schema Rejection (0.1.20, Gate 34 12 reason classes)"
                 echo "  39. Partial-Failure Semantics (0.1.20, Gate 35 five combos + stage)"
+                echo "  40. Verifier Isolation (0.1.20, Gate 31 deterministic chain zero LLM symbols)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1634,6 +1672,7 @@ main() {
                 echo "  --skip-g32            Skip Gate 32 violation priority (0.1.20, E-02 > E-05 > E-01 > E-03 > E-04) check"
                 echo "  --skip-g34            Skip Gate 34 plan schema rejection (0.1.20, 12 reason classes) check"
                 echo "  --skip-g35            Skip Gate 35 partial-failure semantics (0.1.20, five combos + stage) check"
+                echo "  --skip-g31            Skip Gate 31 verifier isolation (0.1.20, deterministic chain zero LLM symbols) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1690,6 +1729,7 @@ main() {
         $skip_g32 || gate_priority32
         $skip_g34 || gate_plan34
         $skip_g35 || gate_partial35
+        $skip_g31 || gate_verifier31
     fi
 
     # 输出结果
