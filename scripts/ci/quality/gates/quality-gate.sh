@@ -1331,6 +1331,38 @@ gate_plan34() {
 }
 
 # ============================================================================
+# Gate 35: 部分失败语义（0.1.20 §9.1 Gate 35，C8 面）
+# 七臂：阶段域完备（8 值封闭世界）/ 生产者可达（7 个非 NONE 阶段均有赋值 +
+# 出口未收敛兜底申报 loop）/ 组合与阶段覆盖（≥5 组合、≥4 阶段）/ 三元组齐备
+# （返回码 + status + stage 同例断言）/ 用例在位 / 归因可观测（事件 + trace
+# 双路）/ 运行臂。静态臂守判据未被写弱，运行臂守判据此刻成立。
+# fail-closed：缺脚本/缺构建树/缺受审文件一律红。
+# 退出码: 0=通过 1=违例/环境错误（一律红）
+# ============================================================================
+gate_partial35() {
+    section "Gate 35: Partial-Failure Semantics (0.1.20)"
+
+    local g35_script="${SCRIPT_DIR}/g35-partial-failure.sh"
+    if [ ! -f "$g35_script" ]; then
+        log_err "partial-failure gate script not found: ${g35_script}"
+        check_gate "Partial35" 1
+        return 1
+    fi
+
+    log_info "Running partial-failure semantics audit..."
+    local g35_out g35_rc=0
+    g35_out=$(bash "$g35_script" 2>&1) || g35_rc=$?
+    echo "$g35_out" | tail -16
+    if [ "$g35_rc" -eq 0 ]; then
+        check_gate "Partial35" 0
+    else
+        log_err "partial-failure semantics audit failed (rc=${g35_rc})"
+        check_gate "Partial35" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1369,6 +1401,7 @@ main() {
     local skip_g33=false
     local skip_g32=false
     local skip_g34=false
+    local skip_g35=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1512,6 +1545,10 @@ main() {
                 skip_g34=true
                 shift
                 ;;
+            --skip-g35)
+                skip_g35=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
@@ -1558,6 +1595,7 @@ main() {
                 echo "  36. Verdict Roundtrip (0.1.20, Gate 33 100x byte-identical)"
                 echo "  37. Violation Priority (0.1.20, Gate 32 E-02 > E-05 > E-01 > E-03 > E-04)"
                 echo "  38. Plan Schema Rejection (0.1.20, Gate 34 12 reason classes)"
+                echo "  39. Partial-Failure Semantics (0.1.20, Gate 35 five combos + stage)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1595,6 +1633,7 @@ main() {
                 echo "  --skip-g33            Skip Gate 33 verdict roundtrip (0.1.20, 100x byte-identical) check"
                 echo "  --skip-g32            Skip Gate 32 violation priority (0.1.20, E-02 > E-05 > E-01 > E-03 > E-04) check"
                 echo "  --skip-g34            Skip Gate 34 plan schema rejection (0.1.20, 12 reason classes) check"
+                echo "  --skip-g35            Skip Gate 35 partial-failure semantics (0.1.20, five combos + stage) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1650,6 +1689,7 @@ main() {
         $skip_g33 || gate_roundtrip33
         $skip_g32 || gate_priority32
         $skip_g34 || gate_plan34
+        $skip_g35 || gate_partial35
     fi
 
     # 输出结果
