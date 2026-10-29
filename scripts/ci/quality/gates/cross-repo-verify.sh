@@ -374,10 +374,33 @@ check_product_layout() {
     local -a required_files=(CMakeLists.txt LICENSE README.md README_zh.md)
     local -a required_dirs=(include src)
 
+    # 宿主未供料的子模块（.gitmodules 声明 update = none）不适用于骨架判据：
+    # 其工作树按声明留空，若照常判骨架，等于把「宿主选择不拉」记成「产品件
+    # 缺陷」（run 40884260525 实证：memoryrovol 两条 issue 均由此产生）。
+    # 口径只从 .gitmodules 派生，不按产品名硬编码；工作树有料时仍全长判定。
+    declare -A DECLARED_ABSENT=()
+    local gm="${products_dir}/.gitmodules" declared
+    if [[ -f "$gm" ]]; then
+        while IFS= read -r declared; do
+            if [[ -n "$declared" ]]; then
+                DECLARED_ABSENT["$declared"]=1
+            fi
+        done < <(awk '
+            /^\[submodule "/ { if (path != "" && upd == "none") print path; path = ""; upd = "" }
+            /^[ \t]*path[ \t]*=/   { v = $0; sub(/^[ \t]*path[ \t]*=[ \t]*/, "", v); path = v }
+            /^[ \t]*update[ \t]*=/ { v = $0; sub(/^[ \t]*update[ \t]*=[ \t]*/, "", v); upd = v }
+            END { if (path != "" && upd == "none") print path }
+        ' "$gm")
+    fi
+
     local dir name f missing test_home host_home artifact bad=0
     for dir in "$products_dir"/*/; do
         [[ -d "$dir" ]] || continue
         name="$(basename "$dir")"
+        if [[ -n "${DECLARED_ABSENT[$name]:-}" ]] && [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
+            log_info "products/${name}: empty per .gitmodules (update = none), skeleton n/a"
+            continue
+        fi
         missing=""
         for f in "${required_files[@]}"; do
             [[ -f "${dir}${f}" ]] || missing+=" ${f}"
