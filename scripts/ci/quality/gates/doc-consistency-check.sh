@@ -64,9 +64,30 @@ RX = re.compile(
     r':(\d+)(?:-(\d+))?')
 
 # basename 索引：一次遍历建立 文件名 -> 全路径列表，跳过 .git
+#
+# followlinks=True 是必需的，不是优化：CI 的门禁数据集把 agentrt 装配成
+# 符号链接（quality-gate.yml 的 ln -s "$GITHUB_WORKSPACE"
+# "$UMB/agent-workload/agentrt"），而 os.walk 默认不进入符号链接目录，
+# 于是整个 agentrt 子树（含其 6 个叶子子模块）对索引不可见，agentrt 的
+# file:line 引用全数判为 file-not-found。判的是「审计器看不见」，不是
+# 「文档不一致」——假红，且本地真实目录树无法复现（run 40961445385 记
+# 66 处违例，同一份文档本地跑 160/160 全绿）。
+#
+# 跟随符号链接必须配环守卫：realpath 见过即剪空 dirnames 并跳过本层文件，
+# 否则 a->a/ 型自环会让遍历不终止。同一物理文件经不同路径重复入索引不影响
+# 判定（resolve 走 any()），但会让 TOTAL 计数随链接数膨胀，故按 realpath 去重。
 index = {}
-for dirpath, dirnames, filenames in os.walk(root):
+seen = set()
+for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
     dirnames[:] = [d for d in dirnames if d != '.git']
+    try:
+        real = os.path.realpath(dirpath)
+    except OSError:
+        real = dirpath
+    if real in seen:
+        dirnames[:] = []
+        continue
+    seen.add(real)
     for fn in filenames:
         index.setdefault(fn, []).append(os.path.join(dirpath, fn))
 
