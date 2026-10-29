@@ -105,13 +105,22 @@ if [ ! -x "$LAB" ]; then
     log_err "C1 lab 脚本缺失或不可执行: ${LAB}"
     exit 2
 fi
+# A2 已从 canary.h 读出回滚预算，C1 用它作 lab 的全链截止（单一契约源）；
+# lab 输出落临时文件，失败时回显尾部——`>/dev/null` 全吞会使 CI 只剩一句
+# 「语义不成立」，无法区分「链路超预算」与「语义真错」（run 40884260525 实证）。
+RB_SECS="$(grep -oE '^#define CANARY_RB_MAX_SECS +[0-9]+' "$HDR" 2>/dev/null | grep -oE '[0-9]+$' || true)"
+RB_SECS="${RB_SECS:-300}"
+LAB_LOG="$(mktemp)"
 rc=0
-bash "$LAB" "$BUILD_DIR" >/dev/null 2>&1 || rc=$?
+G40_RB_SECS="$RB_SECS" bash "$LAB" "$BUILD_DIR" >"$LAB_LOG" 2>&1 || rc=$?
 if [ "$rc" -eq 0 ]; then
-    log_ok "C1 lab T1/T2 全部符合预期"
+    log_ok "C1 lab T1/T2 全部符合预期（budget ${RB_SECS}s）"
 else
     fail "C1 lab 未通过（exit ${rc}）：四通道跨进程语义不成立"
+    log_err "lab 输出尾部（诊断用，完整日志见上）:"
+    tail -40 "$LAB_LOG" | sed 's/^/    /'
 fi
+rm -f "$LAB_LOG"
 
 # ── 裁决 ────────────────────────────────────────────────────
 section "Verdict"
