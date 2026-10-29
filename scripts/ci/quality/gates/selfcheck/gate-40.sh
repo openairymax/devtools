@@ -50,6 +50,13 @@ command -v python3 >/dev/null 2>&1 || {
     exit 1
 }
 
+# 全链预算取自契约常量 CANARY_RB_MAX_SECS（门禁侧从 canary.h 读取后经
+# G40_RB_SECS 传入，此处 300 仅作独立运行的兜底）。段内等待不得引入独立
+# 魔数：CI 慢机上曾因 60s 死线先于契约判据触发，把「链路比契约慢」误报
+# 成「四通道语义不成立」（run 40884260525 实证）。
+RB_SECS="${G40_RB_SECS:-300}"
+DEADLINE_MS=0
+
 TMP="$(mktemp -d)"
 PIDS=()
 cleanup() {
@@ -108,13 +115,12 @@ expect_err() { # $1=name $2=resp-file
         exit 1
     fi
 }
-wait_log() { # $1=pattern $2=timeout-sec $3=logfile
-    local deadline=$(( $(date +%s) + $2 ))
-    while [ "$(date +%s)" -lt "$deadline" ]; do
-        if grep -q "$1" "$3" 2>/dev/null; then return 0; fi
+wait_log() { # $1=pattern $2=logfile；截止 = 全链预算（见 DEADLINE_MS）
+    while [ "$(date +%s%3N)" -lt "$DEADLINE_MS" ]; do
+        if grep -q "$1" "$2" 2>/dev/null; then return 0; fi
         sleep 0.2
     done
-    log_err "timeout waiting for log: $1"
+    log_err "timeout waiting for log: $1 (budget ${RB_SECS}s)"
     return 1
 }
 start_daemon() { # $1=sandbox $2=logfile  (+env: KILL_ENV="VAR=val" 经 env 命令注入)
@@ -148,34 +154,46 @@ load_params() {
     python3 -c 'import json,sys; print(json.dumps({"json": sys.argv[1]}))' "$MIN_POLICY"
 }
 
+# RPC 失败必须自解释：rpc.py 在收不到完整帧时 exit 2，若直接裸调用，
+# set -e 会静默以 2 终止，CI 只能看到「语义不成立」（run 40884260525 /
+# 本机 run4 各中一次）。此处统一回显响应原文与宿主日志尾部。
+rpc_call() { # $1=resp-file $2=sock $3=method $4=params $5=daemon-log
+    if ! python3 "$TMP/rpc.py" "$2" "$3" "$4" >"$1"; then
+        log_err "rpc ${3} 无完整响应帧: $(cat "$1")"
+        tail -20 "$5" || true
+        return 1
+    fi
+}
+
 # ── T1: V8 全链 + Gate 40 跨进程哨兵 ────────────────────────
 section "T1: adopt -> shadow -> cross-process kill sentinel -> rollback"
 SB1="$TMP/t1"; LOG1="$SB1-daemon.log"
 start_daemon "$SB1" "$LOG1"
 SOCK1="$SB1/run/cupolas.sock"
 
-python3 "$TMP/rpc.py" "$SOCK1" policy_load "$(load_params)" >"$TMP/r1.json"
+rpc_call "$TMP/r1.json" "$SOCK1" policy_load "$(load_params)" "$LOG1" || exit 1
 expect_ok "T1 policy_load staged" "$TMP/r1.json"
 
 T0=$(date +%s%3N)
-python3 "$TMP/rpc.py" "$SOCK1" policy_activate '{"description": "gate-40 v8 lab"}' >"$TMP/r2.json"
+DEADLINE_MS=$(( T0 + RB_SECS * 1000 ))
+rpc_call "$TMP/r2.json" "$SOCK1" policy_activate '{"description": "gate-40 v8 lab"}' "$LOG1" || exit 1
 expect_ok "T1 policy_activate (canary gate divert)" "$TMP/r2.json"
 
-wait_log "canary session entered shadow" 60 "$LOG1" || exit 1
+wait_log "canary session entered shadow" "$LOG1" || exit 1
 log_ok "T1 shadow session established"
 
 mkdir -p "$SB1/run/local/evolve/policy"
 : > "$SB1/run/local/evolve/policy/kill"
 
-wait_log "canary kill switch hit, rolling back" 15 "$LOG1" || exit 1
+wait_log "canary kill switch hit, rolling back" "$LOG1" || exit 1
 log_ok "T1 kill sentinel observed cross-process"
 
 T1=$(date +%s%3N)
 ELAPSED=$((T1 - T0))
-if [ "$ELAPSED" -le 300000 ]; then
-    log_ok "T1 V8 full chain: ${ELAPSED}ms <= 300000ms (CANARY_RB_MAX_SECS)"
+if [ "$ELAPSED" -le $(( RB_SECS * 1000 )) ]; then
+    log_ok "T1 V8 full chain: ${ELAPSED}ms <= $(( RB_SECS * 1000 ))ms (CANARY_RB_MAX_SECS=${RB_SECS}s)"
 else
-    log_err "T1 V8 full chain: ${ELAPSED}ms > 300000ms"
+    log_err "T1 V8 full chain: ${ELAPSED}ms > $(( RB_SECS * 1000 ))ms (CANARY_RB_MAX_SECS=${RB_SECS}s)"
     exit 1
 fi
 stop_daemons
@@ -186,13 +204,13 @@ SB2="$TMP/t2"; LOG2="$SB2-daemon.log"
 KILL_ENV="AIRY_CUPOLAS_CANARY_KILL=1" start_daemon "$SB2" "$LOG2"
 SOCK2="$SB2/run/cupolas.sock"
 
-python3 "$TMP/rpc.py" "$SOCK2" policy_load "$(load_params)" >"$TMP/r3.json"
+rpc_call "$TMP/r3.json" "$SOCK2" policy_load "$(load_params)" "$LOG2" || exit 1
 expect_ok "T2 policy_load unaffected (two-phase staging)" "$TMP/r3.json"
 
-python3 "$TMP/rpc.py" "$SOCK2" policy_activate '{"description": "gate-40 t2"}' >"$TMP/r4.json"
+rpc_call "$TMP/r4.json" "$SOCK2" policy_activate '{"description": "gate-40 t2"}' "$LOG2" || exit 1
 expect_err "T2 activate rejected under kill switch" "$TMP/r4.json"
 
-python3 "$TMP/rpc.py" "$SOCK2" policy_status '{}' >"$TMP/r5.json"
+rpc_call "$TMP/r5.json" "$SOCK2" policy_status '{}' "$LOG2" || exit 1
 if has_field "$TMP/r5.json" result && \
    python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["result"]["staged"] else 1)' "$TMP/r5.json"; then
     log_ok "T2 staged preserved after rejection (retryable, no partial effect)"
