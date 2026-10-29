@@ -8,10 +8,15 @@
 #
 # T1（V8 全链 + Gate 40 跨进程哨兵）：
 #   load → activate（can_gate 分流建灰度会话）→ 日志确认 entered shadow →
+#   RPC 确认分流不固化（epoch/version_count 均为入会话前基线）→
 #   本脚本进程直接落盘 <AIRY_HOME>/run/local/evolve/policy/kill（不经
 #   CLI、不共进程——验证通道三语义中的跨进程可见性）→ 日志确认 kill
-#   switch hit → 全链耗时 ≤ CANARY_RB_MAX_SECS(300s)，即 V8 判据
+#   switch hit → RPC 确认回滚终态（epoch=基线+1、运行集换回基线、零版本
+#   快照）→ 全链耗时 ≤ CANARY_RB_MAX_SECS(300s)，即 V8 判据
 #   rb_secs>300 → -5 拒绝的反面实证：真实链路必须能在窗口内完成。
+#   终态断言不可省：日志行只证「哨兵被看见」，can_roll() 内
+#   dpolicy_canary_revert() 失败仅告警「engine session kept」，无终态断言
+#   时半回滚同样全绿（V8「采纳→回滚全链」的发行口径此前即缺此锚点）。
 #
 # T2（env 通道 fail-closed）：
 #   AIRY_CUPOLAS_CANARY_KILL=1 起服务 → load 照常入暂存（两段式不受
@@ -123,6 +128,24 @@ wait_log() { # $1=pattern $2=logfile；截止 = 全链预算（见 DEADLINE_MS�
     log_err "timeout waiting for log: $1 (budget ${RB_SECS}s)"
     return 1
 }
+# policy_status 的数值字段是回滚终态的唯一 RPC 可见锚点：canary 五态机
+# 的 CANARY_ST_ROLLED 不经 RPC/磁盘暴露，而 dpolicy_canary_revert() 会把
+# 旧集换回运行集并令 epoch 单调 +1，且不产生版本快照（version_count 不动）。
+st_num() { # $1=resp-file $2=field
+    python3 -c 'import json,sys
+print(json.load(open(sys.argv[1]))["result"][sys.argv[2]])' "$1" "$2"
+}
+# 日志行在 can_roll() 之前打出，回滚又由治理线程执行（500ms 分片轮询），
+# 故 RPC 侧可能先读到旧 epoch；固化判据 = epoch 达到期望值。
+wait_epoch() { # $1=sock $2=logfile $3=期望 epoch
+    while [ "$(date +%s%3N)" -lt "$DEADLINE_MS" ]; do
+        rpc_call "$TMP/es.json" "$1" policy_status '{}' "$2" || return 1
+        [ "$(st_num "$TMP/es.json" epoch)" -ge "$3" ] && return 0
+        sleep 0.2
+    done
+    log_err "timeout waiting epoch=${3}: stuck at $(st_num "$TMP/es.json" epoch) (budget ${RB_SECS}s)"
+    return 1
+}
 start_daemon() { # $1=sandbox $2=logfile  (+env: KILL_ENV="VAR=val" 经 env 命令注入)
     mkdir -p "$1/run"
     # 展开产生的 VAR=val 单词不会被 shell 识别为赋值前缀（POSIX 语义，
@@ -171,6 +194,14 @@ SB1="$TMP/t1"; LOG1="$SB1-daemon.log"
 start_daemon "$SB1" "$LOG1"
 SOCK1="$SB1/run/cupolas.sock"
 
+# 回滚终态基线：shadow 分流不固化运行集，故「回滚后」应与「入会话前」逐字段
+# 相等。基线显式取自 RPC，不硬编码 0——引擎启动内置规则数属实现细节。
+rpc_call "$TMP/r0.json" "$SOCK1" policy_status '{}' "$LOG1" || exit 1
+BASE_EPOCH="$(st_num "$TMP/r0.json" epoch)"
+BASE_RULE="$(st_num "$TMP/r0.json" rule_count)"
+BASE_VER="$(st_num "$TMP/r0.json" version_count)"
+log_ok "T1 pre-session baseline: epoch=${BASE_EPOCH} rule_count=${BASE_RULE} version_count=${BASE_VER}"
+
 rpc_call "$TMP/r1.json" "$SOCK1" policy_load "$(load_params)" "$LOG1" || exit 1
 expect_ok "T1 policy_load staged" "$TMP/r1.json"
 
@@ -182,11 +213,34 @@ expect_ok "T1 policy_activate (canary gate divert)" "$TMP/r2.json"
 wait_log "canary session entered shadow" "$LOG1" || exit 1
 log_ok "T1 shadow session established"
 
+# 分流不固化（灰度语义的反面实证）：会话期不得动 epoch、不得产版本快照
+rpc_call "$TMP/rw.json" "$SOCK1" policy_status '{}' "$LOG1" || exit 1
+if [ "$(st_num "$TMP/rw.json" epoch)" = "$BASE_EPOCH" ] &&
+   [ "$(st_num "$TMP/rw.json" version_count)" = "$BASE_VER" ]; then
+    log_ok "T1 divert not solidified: epoch stays ${BASE_EPOCH}, version_count stays ${BASE_VER}"
+else
+    log_err "T1 divert solidified the canary set: $(cat "$TMP/rw.json")"
+    exit 1
+fi
+
 mkdir -p "$SB1/run/local/evolve/policy"
 : > "$SB1/run/local/evolve/policy/kill"
 
 wait_log "canary kill switch hit, rolling back" "$LOG1" || exit 1
 log_ok "T1 kill sentinel observed cross-process"
+
+# 回滚终态断言：日志行只证明「哨兵被看见」，不证明引擎真的收敛。revert 的
+# 可见后果 = epoch 单调 +1 + 运行集换回基线 + 零版本快照。缺这条断言时，
+# 「canary revert failed, engine session kept」告警下的半回滚也能全绿。
+wait_epoch "$SOCK1" "$LOG1" "$(( BASE_EPOCH + 1 ))" || exit 1
+rpc_call "$TMP/r6.json" "$SOCK1" policy_status '{}' "$LOG1" || exit 1
+if [ "$(st_num "$TMP/r6.json" rule_count)" = "$BASE_RULE" ] &&
+   [ "$(st_num "$TMP/r6.json" version_count)" = "$BASE_VER" ]; then
+    log_ok "T1 rollback terminal state: epoch=$(( BASE_EPOCH + 1 )) rule_count=${BASE_RULE} version_count=${BASE_VER} (旧集换回)"
+else
+    log_err "T1 rollback did not restore pre-session set: $(cat "$TMP/r6.json")"
+    exit 1
+fi
 
 T1=$(date +%s%3N)
 ELAPSED=$((T1 - T0))
@@ -221,5 +275,5 @@ fi
 stop_daemons
 
 section "Gate 40 lab verdict"
-log_ok "V8 full chain within 300s window + kill switch fail-closed"
+log_ok "V8 full chain within ${RB_SECS}s window, rollback terminal state verified, env channel fail-closed"
 exit 0
