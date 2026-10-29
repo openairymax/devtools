@@ -917,7 +917,6 @@ http2_event_loop_accept
 http2_event_loop_cleanup
 http2_free_response_headers
 http2_gateway_add_session
-http2_gateway_destroy_impl
 http2_gateway_remove_session
 http2_gateway_start_impl
 http2_gateway_stop_impl
@@ -933,8 +932,6 @@ http2_set_nonblocking
 http2_stream_append_body
 http2_stream_set_header_str
 http2_submit_response_impl
-http_gateway_probe_listen
-http_gateway_queue_unauthorized
 http_gateway_route_auth_required
 initialize_atomic_vars
 initialize_loop_resources
@@ -1272,7 +1269,6 @@ platform_resolve_path
 plugin_discovery_destroy
 plugin_discovery_free_results
 plugin_discovery_init
-plugin_discovery_parse_manifest
 plugin_discovery_scan
 plugin_permission_check
 plugin_permission_destroy
@@ -1409,17 +1405,13 @@ sched_dag_error_is_fatal
 sched_dag_error_is_transient
 sched_dag_finalize_terminal
 sched_dag_min_retry_at
-sched_dag_parse_node_deps
-sched_dag_parse_node_fields
 sched_dag_propagate_unreachable
 sched_dag_validate_and_build
 sched_dag_validate_deps
 sched_dag_worker_thread
 sched_dag_write_back_node
-sched_dispatch_agent_socket
 sched_dispatch_enabled
 sched_dispatch_executor
-sched_dispatch_timeout_ms
 sched_d_register_spawned_agent
 sched_queue_take_highest
 sched_service_cancel_dag
@@ -1598,10 +1590,7 @@ think_gccp_free_session
 think_gccp_get_or_create
 think_gccp_interact_cb
 think_orch_ops_cancel
-think_orch_ops_free_list
-think_orch_ops_get_status
 think_orch_ops_inject
-think_orch_ops_list_pending
 think_orch_ops_schedule
 think_orch_phase_name
 think_orch_run_thread
