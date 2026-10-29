@@ -19,8 +19,10 @@
 #   - ep_health deep 探针轮转：round0 即 deep，此后每 5 轮（150s）一次 deep；
 #     粘滞判定 reachable=(ok && deep!=0)，故存活/自愈的 status=ok 断言窗口取
 #     240s（覆盖最坏一轮完整轮转 + 容差）。
-#   - complete 失败路径：连接拒绝快失败 × 4 次尝试（LLM_MAX_RETRIES=3），
-#     失联断言窗口 60s。
+#   - complete 失败路径：llm_d 的本地重连预算（固定短退避）与路由策略阶梯会
+#     把秒级瞬时抖动吃掉，这是设计意图而非缺陷。故「上游不可用必须失败」只在
+#     持续失联下断言：后台每 200ms 摘除新生 llama-server，请求返回即撤除注入，
+#     窗口 60s。
 #
 # 用法：
 #   agentrt-llm-e2e.sh [--bindir <dir>] [--keep] [--skip-install]
@@ -212,16 +214,25 @@ log "== 装配：bin 链接 + model.yaml + profile.env =="
 ln -sfn "$BINDIR/llm_d" "$AIRY_HOME/bin/llm_d"
 ln -sfn "$BINDIR/supervisor_d" "$AIRY_HOME/bin/supervisor_d"
 
+# capabilities 是上游能力的显式声明（唯一来源，不派生）：llama-server 的
+# OpenAI 兼容口真实消费 seed/grammar/response_format/cache_prompt 与
+# chat_template_kwargs；num_ctx 无 per-request 语义（上下文由 -c 定死），
+# slot_id 的线格式键名与 llama.cpp 的 id_slot 不同，声明二者即为虚假能力。
 cat > "$MODEL_YAML" <<YEOF
 models:
   - name: $MODEL_ID
     model_id: $MODEL_ID
     provider: local-llamacpp
     base_url: http://127.0.0.1:$LLM_PORT/v1
-    endpoint_kind: llamacpp
     api_format: chat
     provision: managed
     artifact: $LOCAL_MODEL
+    capabilities:
+      seed: true
+      grammar: true
+      response_format: true
+      cache_prompt: true
+      enable_thinking: true
 YEOF
 
 cat > "$PROFILE_ENV" <<PEOF
@@ -255,6 +266,17 @@ cold=$(health_field "$H1" cold)
 log "== 幕二：存活断言（complete 200 + health status=ok，窗口 240s）=="
 wait_complete 240 || fail "幕二 complete 未恢复（模型加载或路由故障）"
 log "complete OK content=\"$COMPLETE_LAST\""
+# 链条非降级取证：同参重发，llama.cpp timings.cache_n 由 llm_d 回显为
+# kv_cache_tokens。cache_prompt 能力位为真后 envelope 恒发 cache_prompt=1；
+# 上游默认同为 true，故此断言证明「KV 复用链路可观测且生效」，不单独证明
+# 声明是唯一原因（诚实边界见 r42）。
+WARM=$(rpc_call "$LLM_SOCK" complete "$COMPLETE_PARAMS" 190)
+KV=$(printf '%s' "$WARM" | python3 -c '
+import json, sys
+r = json.loads(sys.stdin.read()).get("result") or {}
+print(int(((r.get("timings") or {}).get("kv_cache_tokens")) or 0))' 2>/dev/null || echo 0)
+(( KV > 0 )) || fail "幕二 热请求未复用 KV（kv_cache_tokens=$KV）"
+log "KV 复用确认：kv_cache_tokens=$KV"
 wait_health ok 240 || { log "末次 health: $HEALTH_LAST"; fail "幕二 health 未达 ok"; }
 log "health OK: status=ok deep=$(health_field "$HEALTH_LAST" deep) cold=$(health_field "$HEALTH_LAST" cold)"
 
@@ -272,15 +294,31 @@ for (( i=0; i<30; i++ )); do
 done
 [[ "$DEAD_SEEN" == 1 ]] || fail "kill 后 3s 内 11435 始终可连接（kill 未生效）"
 log "11435 已拒连（旧 pid=$OLD_PID）"
-# 失联窗 complete 紧贴拒连窗发出：respawn 需 tick + 启动监听（>1s），
-# llm_d 连接拒绝快失败毫秒级返回，窗口稳定；断言失败路径而非挂死。
+# 持续失联注入：单次 kill 造成的缺口会被「本地重连 + 路由阶梯」在秒级内
+# 吃掉（机制正确行为），不能作为失败断言窗口。此处把上游维持在不可用直到
+# 请求返回，断言的是真实不变量——上游持续不可用时 complete 必须失败，且
+# 在墙钟预算内返回而非挂死。
+STOPF=$(mktemp)
+(
+    while [[ ! -f "$STOPF" ]]; do
+        pkill -9 -f "llama-server.*$LLM_PORT" 2>/dev/null || true
+        sleep 0.2
+    done
+) &
+KILLER=$!
 if rpc_call "$LLM_SOCK" complete "$COMPLETE_PARAMS" 60 | python3 -c '
 import json, sys
 resp = json.loads(sys.stdin.read())
 sys.exit(0 if resp.get("result") and resp["result"].get("choices") else 1)'; then
-    fail "失联窗口内 complete 竟然成功（重试/路由面与预期不符）"
+    : > "$STOPF"
+    wait "$KILLER" 2>/dev/null || true
+    rm -f "$STOPF"
+    fail "持续失联窗口内 complete 竟然成功（上游不可用时出现假成功）"
 fi
-log "失联态 complete 按预期失败（快失败×4 次尝试）"
+: > "$STOPF"
+wait "$KILLER" 2>/dev/null || true
+rm -f "$STOPF"
+log "持续失联态 complete 按预期失败（注入已撤除）"
 
 # ---------- 幕四：自愈硬断言 ----------
 log "== 幕四：自愈断言（新 pid + 11435 复活 + complete/health 恢复）=="
