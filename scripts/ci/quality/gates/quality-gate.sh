@@ -52,6 +52,13 @@ check_gate() {
     esac
 }
 
+# 宿主动态链接器告警（libselinux.so.1 无版本信息）会随子进程调用次数混入
+# 各门禁的 2>&1 捕获流，条数取决于调度时机。0.1.20 B8 DoD② 要求全量门禁
+# 三次输出逐行一致，故回显子门禁输出前统一剔除该类环境噪声——只影响回显
+# 视图，不参与判据、不改退出码。
+HOST_NOISE_RE='libselinux\.so\.1: no version information'
+gate_view() { grep -vE "$HOST_NOISE_RE" || true; }
+
 print_header() {
     echo "╔══════════════════════════════════════════════════╗"
     echo "║   AgentRT Quality Gate                           ║"
@@ -383,11 +390,11 @@ gate_corekern_runtime() {
         log_info "Probing production processes for runtime evidence (build: ${ckrt_build_dir})..."
         local ckrt_out
         if ckrt_out=$(bash "$ckrt_script" --build-dir "$ckrt_build_dir" 2>&1); then
-            echo "$ckrt_out" | tail -8
+            printf '%s\n' "$ckrt_out" | gate_view | tail -8
             check_gate "CorekernRuntime" 0
         else
             local ckrt_exit=$?
-            echo "$ckrt_out" | tail -15
+            printf '%s\n' "$ckrt_out" | gate_view | tail -15
             if [ $ckrt_exit -eq 2 ]; then
                 log_warn "corekern runtime check: build artifacts missing, manual review required"
                 check_gate "CorekernRuntime" 2
