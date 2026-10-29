@@ -56,6 +56,10 @@ check_gate() {
 # 各门禁的 2>&1 捕获流，条数取决于调度时机。0.1.20 B8 DoD② 要求全量门禁
 # 三次输出逐行一致，故回显子门禁输出前统一剔除该类环境噪声——只影响回显
 # 视图，不参与判据、不改退出码。
+#
+# 必须与截尾同用（r45）：噪声先占满 tail 窗口时，失败原因行会被挤出视图，
+# 红门禁只剩"某门 FAILED"而无判据——Gate 12 的 llm_d 超限行就这样消失过
+# 一次。故所有子门禁回显点一律经 gate_view 再截尾，不逐处置信。
 HOST_NOISE_RE='libselinux\.so\.1: no version information'
 gate_view() { grep -vE "$HOST_NOISE_RE" || true; }
 
@@ -155,7 +159,7 @@ gate_ban() {
     local ban_script="${SCRIPT_DIR}/../../verify/security/forbidden_functions.sh"
     if [ -x "$ban_script" ]; then
         log_info "Running BAN rule scan..."
-        if bash "$ban_script" 2>&1 | tail -10; then
+        if bash "$ban_script" 2>&1 | gate_view | tail -10; then
             check_gate "BAN-Rules" 0
         else
             check_gate "BAN-Rules" 1
@@ -210,7 +214,7 @@ gate_security() {
     local sec_script="${SCRIPT_DIR}/../../verify/security/security-scan.sh"
     if [ -x "$sec_script" ]; then
         log_info "Running security scan..."
-        if bash "$sec_script" "$@" 2>&1 | tail -20; then
+        if bash "$sec_script" "$@" 2>&1 | gate_view | tail -20; then
             check_gate "Security" 0
         else
             local sec_exit=$?
@@ -237,7 +241,7 @@ gate_contract() {
     local contract_script="${SCRIPT_DIR}/contract-version-check.sh"
     if [ -x "$contract_script" ]; then
         log_info "Checking contract versions..."
-        if bash "$contract_script" 2>&1 | tail -5; then
+        if bash "$contract_script" 2>&1 | gate_view | tail -5; then
             check_gate "Contract" 0
         else
             check_gate "Contract" 1
@@ -258,7 +262,7 @@ gate_cross_repo() {
     local cross_repo_script="${SCRIPT_DIR}/cross-repo-verify.sh"
     if [ -x "$cross_repo_script" ]; then
         log_info "Running cross-repo verification..."
-        if bash "$cross_repo_script" 2>&1 | tail -10; then
+        if bash "$cross_repo_script" 2>&1 | gate_view | tail -10; then
             check_gate "CrossRepo" 0
         else
             check_gate "CrossRepo" 1
@@ -282,7 +286,7 @@ gate_complexity() {
         # 已有 FAIL 函数在 CCN_LONG_TAIL_REMEDIATION.md 长尾治理计划中跟踪，不阻塞
         # 全量扫描由开发者手动运行: ./complexity-check.sh
         log_info "Running incremental complexity check (CCN_BASE_REF=${CCN_BASE_REF:-HEAD})..."
-        if bash "$complexity_script" --incremental 2>&1 | tail -50; then
+        if bash "$complexity_script" --incremental 2>&1 | gate_view | tail -50; then
             check_gate "Complexity" 0
         else
             local cx_exit=$?
@@ -334,7 +338,7 @@ gate_header_duplication() {
     local hdr_script="${SCRIPT_DIR}/header-duplication-check.sh"
     if [ -x "$hdr_script" ] || [ -f "$hdr_script" ]; then
         log_info "Running header duplication check..."
-        if bash "$hdr_script" 2>&1 | tail -20; then
+        if bash "$hdr_script" 2>&1 | gate_view | tail -20; then
             check_gate "HeaderDup" 0
         else
             check_gate "HeaderDup" 1
@@ -356,7 +360,7 @@ gate_abi_frozen() {
     local abi_script="${SCRIPT_DIR}/abi-frozen-check.sh"
     if [ -x "$abi_script" ] || [ -f "$abi_script" ]; then
         log_info "Running ABI frozen check..."
-        if bash "$abi_script" 2>&1 | tail -20; then
+        if bash "$abi_script" 2>&1 | gate_view | tail -20; then
             check_gate "ABI-Frozen" 0
         else
             local abi_exit=$?
@@ -422,7 +426,7 @@ gate_name_length() {
         log_info "Running function-name length check..."
         local fn_out fn_rc=0
         fn_out=$(bash "$fn_script" 2>&1) || fn_rc=$?
-        echo "$fn_out" | tail -12
+        echo "$fn_out" | gate_view | tail -12
         if [ "$fn_rc" -eq 0 ]; then
             check_gate "NameLength" 0
         elif [ "$fn_rc" -eq 2 ]; then
@@ -451,7 +455,7 @@ gate_loc_ceiling() {
         log_info "Running V16.1 LOC ceiling check..."
         local loc_out loc_rc=0
         loc_out=$(bash "$loc_script" 2>&1) || loc_rc=$?
-        echo "$loc_out" | tail -20
+        echo "$loc_out" | gate_view | tail -20
         if [ "$loc_rc" -eq 0 ]; then
             check_gate "LocCeiling" 0
         elif [ "$loc_rc" -eq 2 ]; then
@@ -481,7 +485,7 @@ gate_propagation() {
         log_info "Running V16.13 propagation & dead-signal check..."
         local prop_out prop_rc=0
         prop_out=$(bash "$prop_script" 2>&1) || prop_rc=$?
-        echo "$prop_out" | tail -20
+        echo "$prop_out" | gate_view | tail -20
         if [ "$prop_rc" -eq 0 ]; then
             check_gate "Propagation" 0
         elif [ "$prop_rc" -eq 2 ]; then
@@ -510,7 +514,7 @@ gate_header_shadow() {
         log_info "Running V16.12 header-shadow check..."
         local shadow_out shadow_rc=0
         shadow_out=$(bash "$shadow_script" 2>&1) || shadow_rc=$?
-        echo "$shadow_out" | tail -20
+        echo "$shadow_out" | gate_view | tail -20
         if [ "$shadow_rc" -eq 0 ]; then
             check_gate "HeaderShadow" 0
         elif [ "$shadow_rc" -eq 2 ]; then
@@ -539,7 +543,7 @@ gate_adapter_registry() {
         log_info "Running V16.11 adapter-registry check..."
         local ad_out ad_rc=0
         ad_out=$(bash "$ad_script" 2>&1) || ad_rc=$?
-        echo "$ad_out" | tail -20
+        echo "$ad_out" | gate_view | tail -20
         if [ "$ad_rc" -eq 0 ]; then
             check_gate "AdapterRegistry" 0
         elif [ "$ad_rc" -eq 2 ]; then
@@ -569,7 +573,7 @@ gate_sample_form() {
         log_info "Running V16.10 sample-form check..."
         local sf_out sf_rc=0
         sf_out=$(bash "$sf_script" 2>&1) || sf_rc=$?
-        echo "$sf_out" | tail -20
+        echo "$sf_out" | gate_view | tail -20
         if [ "$sf_rc" -eq 0 ]; then
             check_gate "SampleForm" 0
         elif [ "$sf_rc" -eq 2 ]; then
@@ -599,7 +603,7 @@ gate_version_consistency() {
         log_info "Running version-consistency check..."
         local vc_out vc_rc=0
         vc_out=$(bash "$vc_script" 2>&1) || vc_rc=$?
-        echo "$vc_out" | tail -20
+        echo "$vc_out" | gate_view | tail -20
         if [ "$vc_rc" -eq 0 ]; then
             check_gate "VersionConsistency" 0
         elif [ "$vc_rc" -eq 2 ]; then
@@ -633,7 +637,7 @@ gate_loc_budget() {
         log_info "Running G2 LOC budget check..."
         local lb_out lb_rc=0
         lb_out=$(bash "$lb_script" 2>&1) || lb_rc=$?
-        echo "$lb_out" | tail -20
+        echo "$lb_out" | gate_view | tail -20
         if [ "$lb_rc" -eq 0 ]; then
             check_gate "LocBudget" 0
         elif [ "$lb_rc" -eq 2 ]; then
@@ -662,7 +666,7 @@ gate_stub_scan() {
         log_info "Running G6 stub scan check..."
         local sb_out sb_rc=0
         sb_out=$(bash "$sb_script" 2>&1) || sb_rc=$?
-        echo "$sb_out" | tail -20
+        echo "$sb_out" | gate_view | tail -20
         if [ "$sb_rc" -eq 0 ]; then
             check_gate "StubScan" 0
         elif [ "$sb_rc" -eq 2 ]; then
@@ -691,7 +695,7 @@ gate_file_length() {
         log_info "Running G24 file-length check..."
         local fl_out fl_rc=0
         fl_out=$(bash "$fl_script" 2>&1) || fl_rc=$?
-        echo "$fl_out" | tail -20
+        echo "$fl_out" | gate_view | tail -20
         if [ "$fl_rc" -eq 0 ]; then
             check_gate "FileLength" 0
         elif [ "$fl_rc" -eq 2 ]; then
@@ -720,7 +724,7 @@ gate_clone() {
         log_info "Running G26 clone/duplication check..."
         local cl_out cl_rc=0
         cl_out=$(bash "$cl_script" 2>&1) || cl_rc=$?
-        echo "$cl_out" | tail -20
+        echo "$cl_out" | gate_view | tail -20
         if [ "$cl_rc" -eq 0 ]; then
             check_gate "Clone" 0
         elif [ "$cl_rc" -eq 2 ]; then
@@ -754,7 +758,7 @@ gate_port_coord() {
         log_info "Running G5 port coordinate check..."
         local pc_out pc_rc=0
         pc_out=$(bash "$pc_script" 2>&1) || pc_rc=$?
-        echo "$pc_out" | tail -20
+        echo "$pc_out" | gate_view | tail -20
         if [ "$pc_rc" -eq 0 ]; then
             check_gate "PortCoord" 0
         elif [ "$pc_rc" -eq 2 ]; then
@@ -788,7 +792,7 @@ gate_policy_payload() {
         log_info "Running G18/G19 policy payload check..."
         local pp_out pp_rc=0
         pp_out=$(bash "$pp_script" 2>&1) || pp_rc=$?
-        echo "$pp_out" | tail -25
+        echo "$pp_out" | gate_view | tail -25
         if [ "$pp_rc" -eq 0 ]; then
             check_gate "PolicyPayload" 0
         elif [ "$pp_rc" -eq 2 ]; then
@@ -825,7 +829,7 @@ gate_layer() {
         log_info "Running G21/G23 layer boundary check..."
         local lb_out lb_rc=0
         lb_out=$(bash "$lb_script" 2>&1) || lb_rc=$?
-        echo "$lb_out" | tail -25
+        echo "$lb_out" | gate_view | tail -25
         if [ "$lb_rc" -eq 0 ]; then
             check_gate "LayerBoundary" 0
         elif [ "$lb_rc" -eq 2 ]; then
@@ -860,7 +864,7 @@ gate_fanout() {
         log_info "Running G13 load/fan-out check..."
         local fo_out fo_rc=0
         fo_out=$(bash "$fo_script" 2>&1) || fo_rc=$?
-        echo "$fo_out" | tail -25
+        echo "$fo_out" | gate_view | tail -25
         if [ "$fo_rc" -eq 0 ]; then
             check_gate "FanOut" 0
         elif [ "$fo_rc" -eq 2 ]; then
@@ -893,7 +897,7 @@ gate_symbol_conservation() {
         log_info "Running G1 public-surface symbol conservation check..."
         local sc_out sc_rc=0
         sc_out=$(bash "$sc_script" 2>&1) || sc_rc=$?
-        echo "$sc_out" | tail -40
+        echo "$sc_out" | gate_view | tail -40
         if [ "$sc_rc" -eq 0 ]; then
             check_gate "SymbolConservation" 0
         elif [ "$sc_rc" -eq 2 ]; then
@@ -1024,7 +1028,7 @@ gate_form_count() {
     log_info "Running fleet form-count gate..."
     local fc_out fc_rc=0
     fc_out=$(bash "$fc_script" 2>&1) || fc_rc=$?
-    echo "$fc_out" | tail -25
+    echo "$fc_out" | gate_view | tail -25
     if [ "$fc_rc" -eq 0 ]; then
         check_gate "FleetFormCount" 0
     elif [ "$fc_rc" -eq 2 ]; then
@@ -1055,7 +1059,7 @@ gate_facade_attribution() {
     log_info "Running facade-attribution gate..."
     local fa_out fa_rc=0
     fa_out=$(bash "$fa_script" 2>&1) || fa_rc=$?
-    echo "$fa_out" | tail -20
+    echo "$fa_out" | gate_view | tail -20
     if [ "$fa_rc" -eq 0 ]; then
         check_gate "FacadeAttribution" 0
     else
@@ -1086,7 +1090,7 @@ gate_ratchet() {
     log_info "Running ratchet drift audit..."
     local ra_out ra_rc=0
     ra_out=$(bash "$ra_script" 2>&1) || ra_rc=$?
-    echo "$ra_out" | tail -20
+    echo "$ra_out" | gate_view | tail -20
     if [ "$ra_rc" -eq 0 ]; then
         check_gate "RatchetDrift" 0
     else
@@ -1118,7 +1122,7 @@ gate_ledger() {
     log_info "Running ledger consistency audit..."
     local lg_out lg_rc=0
     lg_out=$(bash "$lg_script" 2>&1) || lg_rc=$?
-    echo "$lg_out" | tail -20
+    echo "$lg_out" | gate_view | tail -20
     if [ "$lg_rc" -eq 0 ]; then
         check_gate "LedgerConsistency" 0
     else
@@ -1149,7 +1153,7 @@ gate_meta_failclosed() {
     log_info "Running meta fail-closed audit..."
     local mf_out mf_rc=0
     mf_out=$(bash "$mf_script" 2>&1) || mf_rc=$?
-    echo "$mf_out" | tail -20
+    echo "$mf_out" | gate_view | tail -20
     if [ "$mf_rc" -eq 0 ]; then
         check_gate "MetaFailClosed" 0
     else
@@ -1180,7 +1184,7 @@ gate_doc_consistency() {
     log_info "Running doc-code consistency audit..."
     local dc_out dc_rc=0
     dc_out=$(bash "$dc_script" 2>&1) || dc_rc=$?
-    echo "$dc_out" | tail -20
+    echo "$dc_out" | gate_view | tail -20
     if [ "$dc_rc" -eq 0 ]; then
         check_gate "DocConsistency" 0
     else
