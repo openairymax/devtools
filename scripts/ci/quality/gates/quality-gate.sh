@@ -1407,6 +1407,91 @@ gate_partial35() {
 }
 
 # ============================================================================
+# Gate 38: 金丝雀六门禁可触发（0.1.20 §9.1 Gate 38 / §9.1.2）
+# 六门禁 K1-K6 各自可触发（-2..-7 互异）；无观测样本为 -8 而非放行；
+# 反向用例（七红一绿）证明判别力。fail-closed：跳过不是判定。
+# ============================================================================
+gate_canary38() {
+    section "Gate 38: Canary Six-Gate Triggerability (0.1.20)"
+
+    local g38_script="${SCRIPT_DIR}/g38-canary-gate.sh"
+    if [ ! -f "$g38_script" ]; then
+        log_err "canary six-gate script not found: ${g38_script}"
+        check_gate "Canary38" 1
+        return 1
+    fi
+
+    log_info "Running canary six-gate triggerability audit..."
+    local g38_out g38_rc=0
+    g38_out=$(bash "$g38_script" 2>&1) || g38_rc=$?
+    echo "$g38_out" | tail -12
+    if [ "$g38_rc" -eq 0 ]; then
+        check_gate "Canary38" 0
+    else
+        log_err "canary six-gate audit failed (rc=${g38_rc})"
+        check_gate "Canary38" 1
+        return 1
+    fi
+}
+
+# ============================================================================
+# Gate 39: 金丝雀爆炸半径（0.1.20 §9.1 Gate 39 / §7.0.2.2）
+# ≤3 文件 / ≤200 行 / 新增 150 / 修改 200 四常量实例值；比较方向为超限才拒；
+# 恰好等于上限须接受；两红一绿反向用例守上限不被悄悄拆除。
+# ============================================================================
+gate_blast39() {
+    section "Gate 39: Canary Blast Radius (0.1.20)"
+
+    local g39_script="${SCRIPT_DIR}/g39-blast-gate.sh"
+    if [ ! -f "$g39_script" ]; then
+        log_err "blast-radius script not found: ${g39_script}"
+        check_gate "Blast39" 1
+        return 1
+    fi
+
+    log_info "Running blast-radius hard-ceiling audit..."
+    local g39_out g39_rc=0
+    g39_out=$(bash "$g39_script" 2>&1) || g39_rc=$?
+    echo "$g39_out" | tail -12
+    if [ "$g39_rc" -eq 0 ]; then
+        check_gate "Blast39" 0
+    else
+        log_err "blast-radius audit failed (rc=${g39_rc})"
+        check_gate "Blast39" 1
+        return 1
+    fi
+}
+
+# ============================================================================
+# Gate 40: kill switch 四通道（0.1.20 §5.7 V8 / §9.1 Gate 40，gate:lab）
+# 四通道独立实现 + 跨实例可见用例 + TTL/回滚预算契约。lab 臂需真实
+# cupolas_d：环境缺失按 exit 2 上报 WARNING（不静默绿），正式发布前
+# 须补一次人工跑通记录。
+# ============================================================================
+gate_kill40() {
+    section "Gate 40: Kill Switch Four Channels (0.1.20, gate:lab)"
+
+    local g40_script="${SCRIPT_DIR}/g40-killswitch-gate.sh"
+    if [ ! -f "$g40_script" ]; then
+        log_err "kill-switch script not found: ${g40_script}"
+        check_gate "Kill40" 1
+        return 1
+    fi
+
+    log_info "Running kill-switch four-channel audit..."
+    local g40_out g40_rc=0
+    g40_out=$(bash "$g40_script" "${QUALITY_GATE_BUILD_DIR}" 2>&1) || g40_rc=$?
+    echo "$g40_out" | tail -12
+    case "$g40_rc" in
+        0) check_gate "Kill40" 0 ;;
+        2) log_warn "kill-switch lab precondition unmet (build tree absent); static arms judged"
+           check_gate "Kill40" 2 ;;
+        *) log_err "kill-switch audit failed (rc=${g40_rc})"
+           check_gate "Kill40" 1 ;;
+    esac
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1447,6 +1532,9 @@ main() {
     local skip_g34=false
     local skip_g35=false
     local skip_g31=false
+    local skip_canary=false
+    local skip_blast=false
+    local skip_kill=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1598,12 +1686,24 @@ main() {
                 skip_g31=true
                 shift
                 ;;
+            --skip-canary)
+                skip_canary=true
+                shift
+                ;;
+            --skip-blast)
+                skip_blast=true
+                shift
+                ;;
+            --skip-kill)
+                skip_kill=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--skip-canary] [--skip-blast] [--skip-kill] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1646,6 +1746,9 @@ main() {
                 echo "  38. Plan Schema Rejection (0.1.20, Gate 34 12 reason classes)"
                 echo "  39. Partial-Failure Semantics (0.1.20, Gate 35 five combos + stage)"
                 echo "  40. Verifier Isolation (0.1.20, Gate 31 deterministic chain zero LLM symbols)"
+                echo "  41. Canary Six-Gate Triggerability (0.1.20, Gate 38 K1-K6 + unknown -8)"
+                echo "  42. Canary Blast Radius (0.1.20, Gate 39 3 files / 200 lines / 150+200)"
+                echo "  43. Kill Switch Four Channels (0.1.20, Gate 40 gate:lab env/file/sentry/CLI)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1685,6 +1788,9 @@ main() {
                 echo "  --skip-g34            Skip Gate 34 plan schema rejection (0.1.20, 12 reason classes) check"
                 echo "  --skip-g35            Skip Gate 35 partial-failure semantics (0.1.20, five combos + stage) check"
                 echo "  --skip-g31            Skip Gate 31 verifier isolation (0.1.20, deterministic chain zero LLM symbols) check"
+                echo "  --skip-canary         Skip Gate 38 canary six-gate triggerability (0.1.20, K1-K6 + unknown -8) check"
+                echo "  --skip-blast          Skip Gate 39 canary blast radius (0.1.20, 3 files / 200 lines) check"
+                echo "  --skip-kill           Skip Gate 40 kill switch four channels (0.1.20, gate:lab) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1748,6 +1854,9 @@ main() {
         $skip_g34 || gate_plan34
         $skip_g35 || gate_partial35
         $skip_g31 || gate_verifier31
+        $skip_canary || gate_canary38
+        $skip_blast || gate_blast39
+        $skip_kill || gate_kill40
     fi
 
     set -e
