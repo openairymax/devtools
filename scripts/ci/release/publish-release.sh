@@ -363,7 +363,11 @@ PYEOF
     # `agentrt-<ver>/VERSION`（Windows 腿）或 `VERSION`（pkg 内容直打）。
     # 首版断言漏了 tar 的 `./<dir>/VERSION`，把完整包判成缺件（v0.1.19
     # 重发实证），故前缀 `./` 与单层包目录都必须可选。
-    if ! printf '%s\n' "$listing" | tr '\\' '/' | grep -Eq '^(\./)?([^/]+/)?VERSION$'; then
+    # grep -q 命中即早退，上游 tr 在超缓冲清单（>64KB，v0.1.20
+    # linux-x86-64 实证）上收 SIGPIPE 退出 141，与 set -o pipefail
+    # 复合后"匹配成功"被误判失败（时序竞态，仅大包偶发）。改用
+    # grep -E >/dev/null 全量消费流，语义不变且无早退。
+    if ! printf '%s\n' "$listing" | tr '\\' '/' | grep -E '^(\./)?([^/]+/)?VERSION$' > /dev/null; then
         log_fail "包根缺少版本 SSoT（VERSION）: $(basename "$f")"; PREFAIL=1
     fi
     tmpext="$(mktemp -d)"
