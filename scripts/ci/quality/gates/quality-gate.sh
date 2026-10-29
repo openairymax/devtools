@@ -96,6 +96,9 @@ gate_compile() {
     # 布局下 ".." 按物理目标解析，三个候选全部落空（cupolas 静默不装配，
     # 进而 safety_guard.h 不可解析）。此处一次性把布局事实解析成显式 -D
     # 锚点，不在 workflow 内复制环境变量形成双副本。
+    # 锚点集合＝产品件全集（cupolas/lang_gateway/cognition/gateway_biz/canary）；
+    # 漏挂即产品件在该门禁中零编译（canary 曾因缺席而在 CI 全程未编译，
+    # configure 仅留 WARN，违背「边开发边测试」），故此处按清单全量锚定。
     local _prod_root=""
     if [ -d "${PROJECT_ROOT}/agent-workload/products" ]; then
         _prod_root="${PROJECT_ROOT}/agent-workload/products"
@@ -110,7 +113,8 @@ gate_compile() {
             "CUPOLAS_SRC_DIR:cupolas" \
             "LANG_GW_SRC_DIR:lang_gateway" \
             "COG_SRC_DIR:cognition" \
-            "GATEWAY_BIZ_SRC_DIR:gateway_biz"; do
+            "GATEWAY_BIZ_SRC_DIR:gateway_biz" \
+            "CANARY_SRC_DIR:canary"; do
             local _var="${_anchor%%:*}"
             local _dir="${_anchor#*:}"
             if [ -f "${_prod_root}/${_dir}/CMakeLists.txt" ]; then
