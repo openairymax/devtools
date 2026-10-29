@@ -349,6 +349,78 @@ check_tool_schema_consistency() {
 }
 
 ###############################################################################
+# Check 8: 产品件结构契约（products 形态面统一骨架）
+###############################################################################
+# 产品件是策略面载荷。骨架统一的收益是判断成本：任取一件都按同一路径回答
+# "能否构建 / 有无测试 / 是否已被污染"，而不必逐个 ls 重新推断。骨架之外的
+# 目录（docs/ scripts/ tools/ daemon/）只在产品独立发行时成立，所对应的测试
+# 归属必须在下方表中显式登记——未登记的缺 tests/ 即红，避免"测试在别处"成为
+# 默认说辞。
+check_product_layout() {
+    log_header "Check 8: Products Skeleton Contract"
+
+    local products_dir="${PROJECT_ROOT}/agent-workload/products"
+    if [[ ! -d "$products_dir" ]]; then
+        add_issue "products dir not found: ${products_dir}"
+        log_warn "products dir NOT FOUND"
+        return
+    fi
+
+    # 键=产品名，值=相对 agentrt 的宿主测试目录（测试不在产品树内的显式归属）
+    declare -A HOST_TEST_HOME=(
+        ["gateway_biz"]="daemons/gateway_d/tests"
+    )
+
+    local -a required_files=(CMakeLists.txt LICENSE README.md README_zh.md)
+    local -a required_dirs=(include src)
+
+    local dir name f missing test_home host_home artifact bad=0
+    for dir in "$products_dir"/*/; do
+        [[ -d "$dir" ]] || continue
+        name="$(basename "$dir")"
+        missing=""
+        for f in "${required_files[@]}"; do
+            [[ -f "${dir}${f}" ]] || missing+=" ${f}"
+        done
+        for f in "${required_dirs[@]}"; do
+            [[ -d "${dir}${f}" ]] || missing+=" ${f}/"
+        done
+        if [[ -n "$missing" ]]; then
+            add_issue "products/${name}: missing${missing}"
+            log_warn "products/${name}: missing${missing}"
+            bad=1
+        fi
+
+        test_home=""
+        if [[ -d "${dir}tests" ]] && [[ -n "$(ls -A "${dir}tests" 2>/dev/null)" ]]; then
+            test_home="${dir}tests"
+        elif [[ -n "${HOST_TEST_HOME[$name]:-}" ]]; then
+            host_home="${PROJECT_ROOT}/agent-workload/agentrt/${HOST_TEST_HOME[$name]}"
+            if [[ -d "$host_home" ]] && [[ -n "$(ls -A "$host_home" 2>/dev/null)" ]]; then
+                test_home="$host_home"
+            fi
+        fi
+        if [[ -z "$test_home" ]]; then
+            add_issue "products/${name}: no test attribution (tests/ or HOST_TEST_HOME)"
+            log_warn "products/${name}: no test attribution"
+            bad=1
+        fi
+
+        artifact="$(find "$dir" -maxdepth 2 \( -name 'CMakeCache.txt' -o -name '*.o' \) -print -quit 2>/dev/null || true)"
+        if [[ -n "$artifact" ]]; then
+            add_issue "products/${name}: build artifact in source tree: ${artifact#${PROJECT_ROOT}/}"
+            log_warn "products/${name}: build artifact ${artifact#${PROJECT_ROOT}/}"
+            bad=1
+        fi
+    done
+
+    if [[ $bad -eq 0 ]]; then
+        log_ok "all products satisfy the skeleton contract"
+        check_pass
+    fi
+}
+
+###############################################################################
 # 报告生成
 ###############################################################################
 generate_report() {
@@ -413,6 +485,7 @@ main() {
     check_git_submodules
     check_ci_consistency
     check_tool_schema_consistency
+    check_product_layout
 
     generate_report
 
