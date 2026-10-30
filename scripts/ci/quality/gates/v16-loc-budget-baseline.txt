@@ -43,7 +43,16 @@
 # 直连 monit.sock 会破坏「客户端只经 gateway」的 SSoT 纪律，故增行换合规。
 # 增长即增长，不称"减重"；欠账登记：core 收敛欠账由 1192 增至 1253 行，
 # 随 §7.5 收敛表在 D 面配减中回收。
-core=81251
-facade=64509
+# 2026-10-30 r75：core 81251 → 81221（-30），facade 64509 → 64554（+45）。
+#   ① core 侧为 D4 死件清扫：删 airy_log_write_va 与
+#      airy_token_std_count_batch 两个无头文件声明、全树零扇入的导出
+#      （-30 有效行）；其余 1,222 行差额经全树扇入扫描确认不属于死码，
+#      如实登记 D 面台账 §4，随 §7.5 收敛表在 0.1.21 配减。
+#   ② facade 侧为 D5 受管进程环境隔离的真功能（9fa1cb5 生产 55 物理行 /
+#      45 有效行：sup_proc_t.keepenv + sup_env_scrub + KEEPENV 声明解析）。
+#      该增量换掉的是受管 llama-server 被宿主 LD_LIBRARY_PATH 污染的实证
+#      故障，属缺陷修复而非结构开销；此前未随 r73 落账，本次一并 converged。
+core=81221
+facade=64554
 cupolas=17464
 target=79999
