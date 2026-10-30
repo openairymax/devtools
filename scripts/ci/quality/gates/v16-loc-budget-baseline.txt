@@ -16,7 +16,12 @@
 # 增长即增长，不称"减重"；收敛欠账由 1063 行增至 1098 行，随 §3.7l 四顺延 0.1.21。
 # 2026-10-29 r45：facade 64226 → 64240（+14），与上方 llm_d +16 同源（模型行
 # 未命中键的诊断日志），core 侧同批变化已含在其中，无独立增长。
-core=81097
-facade=64240
+# 2026-10-30 r46：core 81097 → 81096（-1），facade 64240 → 64232（-8）。
+# core 侧：W4 加固把 airy_file_rename/airy_file_remove 塞进已近 G24 上限的
+# platform.c（820 行超限），按能力域拆出 platform_file.c 单独成件，Windows
+# errno 映射由 13 行 switch 压为 6 行 if/else-if，拆分净减 1 行。facade 侧
+# 8 行为既有滞后，随本次 --converge 一并落账，非本批新增。
+core=81096
+facade=64232
 cupolas=17342
 target=79999
