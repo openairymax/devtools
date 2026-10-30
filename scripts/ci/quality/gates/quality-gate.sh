@@ -1500,6 +1500,35 @@ gate_kill40() {
 }
 
 # ============================================================================
+# Gate 46: 生态四模块契约（0.1.20 §12.4 #9 收口）
+# agents/markets/prompts/skills 四守卫此前只在模块内独立可跑、门禁零引用
+# （「有测试」≠「测试在跑」）。本门禁使其常驻生效：任一守卫判红即红，
+# 依赖或守卫文件缺席按 fail-closed 判红（不提供 skip 分支）。
+# ============================================================================
+gate_eco46() {
+    section "Gate 46: Ecosystem Four-Module Contract (0.1.20)"
+
+    local g46_script="${SCRIPT_DIR}/g46-ecosystem-contract.sh"
+    if [ ! -f "$g46_script" ]; then
+        log_err "ecosystem contract script not found: ${g46_script}"
+        check_gate "Ecosystem46" 1
+        return 1
+    fi
+
+    log_info "Running ecosystem four-module guards..."
+    local g46_out g46_rc=0
+    g46_out=$(bash "$g46_script" 2>&1) || g46_rc=$?
+    echo "$g46_out" | gate_view | tail -12
+    if [ "$g46_rc" -eq 0 ]; then
+        check_gate "Ecosystem46" 0
+    else
+        log_err "ecosystem contract gate failed (rc=${g46_rc})"
+        check_gate "Ecosystem46" 1
+        return 1
+    fi
+}
+
+# ============================================================================
 # 主函数
 # ============================================================================
 main() {
@@ -1543,6 +1572,7 @@ main() {
     local skip_canary=false
     local skip_blast=false
     local skip_kill=false
+    local skip_g46=false
     local strict_mode=false
 
     while [[ $# -gt 0 ]]; do
@@ -1706,12 +1736,16 @@ main() {
                 skip_kill=true
                 shift
                 ;;
+            --skip-g46)
+                skip_g46=true
+                shift
+                ;;
             --strict)
                 strict_mode=true
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--skip-canary] [--skip-blast] [--skip-kill] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--skip-canary] [--skip-blast] [--skip-kill] [--skip-g46] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1757,6 +1791,7 @@ main() {
                 echo "  41. Canary Six-Gate Triggerability (0.1.20, Gate 38 K1-K6 + unknown -8)"
                 echo "  42. Canary Blast Radius (0.1.20, Gate 39 3 files / 200 lines / 150+200)"
                 echo "  43. Kill Switch Four Channels (0.1.20, Gate 40 gate:lab env/file/sentry/CLI)"
+                echo "  44. Ecosystem Four-Module Contract (0.1.20, Gate 46 vocab/contract/registry/skill)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -1799,6 +1834,7 @@ main() {
                 echo "  --skip-canary         Skip Gate 38 canary six-gate triggerability (0.1.20, K1-K6 + unknown -8) check"
                 echo "  --skip-blast          Skip Gate 39 canary blast radius (0.1.20, 3 files / 200 lines) check"
                 echo "  --skip-kill           Skip Gate 40 kill switch four channels (0.1.20, gate:lab) check"
+                echo "  --skip-g46            Skip Gate 46 ecosystem four-module contract (0.1.20) check"
                 echo "  --strict              Treat warnings as failures"
                 exit 0
                 ;;
@@ -1865,6 +1901,7 @@ main() {
         $skip_canary || gate_canary38
         $skip_blast || gate_blast39
         $skip_kill || gate_kill40
+        $skip_g46 || gate_eco46
     fi
 
     set -e
