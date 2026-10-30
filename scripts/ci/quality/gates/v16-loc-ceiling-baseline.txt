@@ -8,5 +8,10 @@
 # 2026-10-30 r73 再登记 +503：E-2 收口把 llm_d config 层四个 FAIL 函数
 # （service_config_json / yaml_pricing / yaml_providers×2）按职责拆小，
 # 以行数换圈复杂度（FAIL 档 6→0）。拆分义务与上文合并，0.1.21 一并落地。
-llm_d|13934|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;0.1.21-split-obligation)
+# 2026-10-31 r82 再登记 +73：P-A fail-closed 收口（e43bfbd）的净增——三态
+# 加载的返回值判定、注册表空判 API（provider_reg_count）、请求层两个错误码
+# 的归因分支、启动期根因证据，以及配套两条单测之外的源码行。同批已把重复
+# 的 REGISTRY-EMPTY 留证与超长命名收敛（-21 行），剩余为功能真增长；
+# 拆载义务不变，0.1.21 首行执行。
+llm_d|14007|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;0.1.21-split-obligation)
 tool_d|11541|table1-tool_d(0.1.20,ledger-356)

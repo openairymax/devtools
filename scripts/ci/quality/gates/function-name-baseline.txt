@@ -437,7 +437,6 @@ airy_token_counter_truncate
 airy_token_get_algorithm_info
 airy_token_set_precision
 airy_token_standard_count
-airy_token_std_count_batch
 airy_token_validate_config
 airy_tool_provider_register
 airy_tool_provider_unregister
