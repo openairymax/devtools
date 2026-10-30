@@ -21,7 +21,13 @@
 # platform.c（820 行超限），按能力域拆出 platform_file.c 单独成件，Windows
 # errno 映射由 13 行 switch 压为 6 行 if/else-if，拆分净减 1 行。facade 侧
 # 8 行为既有滞后，随本次 --converge 一并落账，非本批新增。
+# 2026-10-30 r67：cupolas 17342 → 17460（+118），构成是 0.1.20 W6 金丝雀
+# K1/K2 的真实度量源（products/cupolas dcb5bfa）：引擎在灰度会话期对同一
+# 请求在新旧两集各裁一次并上报观测（eval 拆为 eval_rules/eval_obs/eval_locked
+# + obs_seq 奇偶交替抵消缓存预热），宿主侧 svc_canary.c 增观测累计与门禁取值。
+# 该增量换掉的是此前 K1/K2 无度量源、只能申报 CANARY_K_UNKNOWN 的空缺，
+# 属能力补实而非结构开销；账三欠账随之 +118，随 §7.5 收敛表在 0.1.21 配减。
 core=81096
 facade=64232
-cupolas=17342
+cupolas=17460
 target=79999
