@@ -178,7 +178,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ---------- 前置 ----------
-command -v airy-local >/dev/null 2>&1 || fail "airy-local 不在 PATH"
+# airy-local 只在真正要安装时才是前置：--skip-install 的语义就是
+# "工件已就位、不触安装器"，此时在 PATH 里断言它会与参数语义自相矛盾，
+# 使已安装机器无法复跑验收（会把"缺安装器"误报成"链不可用"）。
 if [[ -z "$BINDIR" ]]; then
     for cand in "$HOME/airy-build-e2e/bin" "$PWD/build/bin"; do
         [[ -x "$cand/llm_d" && -x "$cand/supervisor_d" ]] && { BINDIR="$cand"; break; }
@@ -202,6 +204,7 @@ log "== 准备：配置备份 =="
 
 # ---------- 安装（幂等） ----------
 if (( ! OPT_SKIP_INSTALL )); then
+    command -v airy-local >/dev/null 2>&1 || fail "airy-local 不在 PATH（安装所需）"
     log "== 安装：llama.cpp(cpu) + 模型 $MODEL_ID（registry 幂等，首跑含真实下载）=="
     airy-local --variant cpu install
     airy-local model install "$MODEL_ID"
