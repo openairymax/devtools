@@ -52,7 +52,14 @@
 #      45 有效行：sup_proc_t.keepenv + sup_env_scrub + KEEPENV 声明解析）。
 #      该增量换掉的是受管 llama-server 被宿主 LD_LIBRARY_PATH 污染的实证
 #      故障，属缺陷修复而非结构开销；此前未随 r73 落账，本次一并 converged。
+# 2026-10-31 r82：facade 64554 → 64609（+55），core 与 cupolas 不动。构成是
+# 0.1.20 P-A 的 fail-closed 收口（e43bfbd）：model 配置加载由二态改三态
+# （读失败 / 可读但零模型 / 真成功），注册表为空与查找未命中拆成两个错误码，
+# 请求层与启动期各留一条根因证据。此前三种失败都以 INVALID_MODEL 流出，
+# 排障只能看到「模型未配置」这一句假象。同批把 svc_reg_empty 的重复留证、
+# provider_registry_count 的超长名与冗余注释一并收敛（-21 行），净增 55 行
+# 属缺陷归因的真功能，收敛欠账并入 §7.5 表随 0.1.21 llm_d 拆载配减。
 core=81221
-facade=64554
+facade=64609
 cupolas=17464
 target=79999
