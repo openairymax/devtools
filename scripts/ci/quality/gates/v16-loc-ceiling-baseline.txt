@@ -5,5 +5,8 @@
 # 2026-10-29 r45 再登记 +16：models[] 行拒载改为打印越界键名（3026b03a8df4），
 # 把 A7-5 五幕 e2e 上一轮"配置契约错拼被误判为模型加载故障"的排查成本消掉。
 # 诊断可定位性属生产必需，不为凑 LOC 计数回退；差额并入同一拆载义务。
-llm_d|13431|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;0.1.21-split-obligation)
+# 2026-10-30 r73 再登记 +503：E-2 收口把 llm_d config 层四个 FAIL 函数
+# （service_config_json / yaml_pricing / yaml_providers×2）按职责拆小，
+# 以行数换圈复杂度（FAIL 档 6→0）。拆分义务与上文合并，0.1.21 一并落地。
+llm_d|13934|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;0.1.21-split-obligation)
 tool_d|11541|table1-tool_d(0.1.20,ledger-356)
