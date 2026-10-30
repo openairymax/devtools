@@ -52,6 +52,20 @@ precheck() {
         echo "g46: 缺依赖即判红（fail-closed，不 skip；§12.4 #9）" >&2
         return 1
     fi
+    # skills 守卫在插件模块内 `from agentrt.plugin_types import ...`，依赖
+    # agentrt Python SDK：要么已安装该包，要么伞仓布局下的源码树
+    # agent-workload/sdk/sdk-python（插件自带该兜底路径）。两者皆不可达时
+    # 报错是导入失败、指针落在插件源码行上，会把「SDK 子模块未 init」读成
+    # 代码缺陷——CI run 41122590599 就是这样红的。故在此显式前置判定，
+    # 让红因指向装配缺口。
+    local sdk="${ROOT}/agent-workload/sdk/sdk-python"
+    if ! python3 -c 'import agentrt' 2>/dev/null && \
+       [ ! -f "${sdk}/agentrt/__init__.py" ]; then
+        echo "g46: FAIL agentrt Python SDK 不可达（skills 守卫依赖）" >&2
+        echo "g46: 期望已安装 agentrt 包，或 ${sdk}/agentrt 存在" >&2
+        echo "g46: CI 侧须 init sdk 仓的 sdk-python 子模块" >&2
+        return 1
+    fi
     if [ ! -d "$ECO" ]; then
         echo "g46: FAIL 生态根不存在: ${ECO}" >&2
         echo "g46: 期望 agent-workload/ecosystem（CI 需递归 init 其子模块）" >&2
