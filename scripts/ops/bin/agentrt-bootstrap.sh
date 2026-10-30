@@ -46,6 +46,9 @@ NC='\033[0m'
 
 SILENT=0
 DRY_RUN=0
+# 库模式（AIRY_BOOTSTRAP_LIB=1）：仅暴露函数面供测试源入，跳过主流程与
+# 依赖探测副作用。生产调用方永不置位。
+AIRY_BOOTSTRAP_LIB="${AIRY_BOOTSTRAP_LIB:-0}"
 
 log_info()  { ((SILENT)) || echo -e "${GREEN}[INFO]${NC} $*"; }
 log_warn()  { ((SILENT)) || echo -e "${YELLOW}[WARN]${NC} $*"; }
@@ -138,7 +141,9 @@ fi
 # 的 SDK（由发行包安装器负责，检查时注入 PYTHONPATH），检查失败仅告警不阻断。
 AGENT_SDK_OK=1
 AIRY_SDK_CHECK="import airymax_agents, orchestration, agentrt"
-if [ -d "${AIRY_HOME}/lib" ]; then
+if (( AIRY_BOOTSTRAP_LIB )); then
+    :   # 库模式：依赖面由调用方负责，此处不探测亦不安装
+elif [ -d "${AIRY_HOME}/lib" ]; then
     if ! PYTHONPATH="${AIRY_HOME}/lib" python3 -c "${AIRY_SDK_CHECK}" >/dev/null 2>&1; then
         AGENT_SDK_OK=0
         if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
@@ -722,10 +727,114 @@ upsert_profile_var() {
     fi
 }
 
+# profile.env 键读取（key="val" 形态，去包围引号；键缺失输出空）
+decl_get() {
+    local file="$1" key="$2" line
+    [[ -f "$file" ]] || return 0
+    line="$(grep -m1 "^${key}=" "$file" 2>/dev/null || true)"
+    [[ -z "$line" ]] && return 0
+    line="${line#*=}"
+    line="${line#\"}"
+    printf '%s' "${line%\"}"
+}
+
+# profile.env 键删除（幂等：键不存在静默成功）
+decl_del() {
+    local file="$1" key="$2" tmp
+    [[ -f "$file" ]] || return 0
+    tmp="${file}.tmp.$$"
+    awk -v k="$key" 'index($0, k "=") != 1 { print }' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+# 探活通道形态校验：tcp:<1..65535> 或绝对 UDS 路径（与 decl.c 收口一致）
+sup_ep_valid() {
+    local ep="$1" port
+    case "$ep" in
+        tcp:*)
+            port="${ep#tcp:}"
+            [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 ))
+            ;;
+        /*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# 从 CORE 名单剔除一个名称（托管声明撤销后的清退路径）
+sup_core_drop() {
+    local decl_file="$1" name="$2" core tok out=""
+    core="$(decl_get "$decl_file" AIRYRT_LAUNCH_CORE)"
+    for tok in $core; do
+        [[ "$tok" == "$name" ]] && continue
+        out="${out:+$out }$tok"
+    done
+    upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_CORE" "$out"
+}
+
+# 外部托管进程声明摄取（0.1.20 A7-3）：策略载体（airy-local 等）在
+# $AIRY_HOME/config/managed.d/*.env 落四键片段（AIRYRT_MANAGED_NAME/_BIN/
+# _EP/_ARGS），本函数把名称并入 CORE 名单、BIN/EP/ARGS 逐键 upsert。
+# 机制面对具体组件零知识：片段语义即全部契约，不内嵌任何产品特判。
+# 片段非法（缺名、路径不可执行、EP 形态非法）跳过并告警——与 decl.c 的
+# fail-closed 同源，配置面错误不得放大为整群启动失败。
+# 收敛：profile.env 记 AIRYRT_LAUNCH_MANAGED 名单，片段撤销后对应 BIN/EP/
+# ARGS 键与 CORE 名单同步出清，不留悬挂声明。
+sup_ingest_managed() {
+    local decl_file="$1"
+    local frag_dir="${AIRY_HOME}/config/managed.d"
+    local old_names new_names="" frag name bin ep args core
+    old_names="$(decl_get "$decl_file" AIRYRT_LAUNCH_MANAGED)"
+
+    if [[ -d "$frag_dir" ]]; then
+        for frag in "$frag_dir"/*.env; do
+            [[ -f "$frag" ]] || continue
+            name="$(decl_get "$frag" AIRYRT_MANAGED_NAME)"
+            bin="$(decl_get "$frag" AIRYRT_MANAGED_BIN)"
+            ep="$(decl_get "$frag" AIRYRT_MANAGED_EP)"
+            args="$(decl_get "$frag" AIRYRT_MANAGED_ARGS)"
+            if [[ -z "$name" || -z "$bin" || ! -x "$bin" ]]; then
+                log_warn "managed.d: skip $(basename "$frag") (name/bin absent or not executable)"
+                continue
+            fi
+            if ! sup_ep_valid "$ep"; then
+                log_warn "managed.d: skip ${name} (endpoint invalid: '${ep}')"
+                continue
+            fi
+            core="$(decl_get "$decl_file" AIRYRT_LAUNCH_CORE)"
+            case " ${core} " in
+                *" ${name} "*) ;;
+                *) upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_CORE" "${core:+$core }${name}" ;;
+            esac
+            upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_BIN_${name}" "$bin"
+            upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_EP_${name}" "$ep"
+            [[ -n "$args" ]] && upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_ARGS_${name}" "$args"
+            new_names="${new_names:+$new_names }${name}"
+            log_info "managed.d: ${name} <- $(basename "$frag")"
+        done
+    fi
+
+    local stale
+    for stale in $old_names; do
+        case " ${new_names} " in
+            *" ${stale} "*) continue ;;
+        esac
+        decl_del "$decl_file" "AIRYRT_LAUNCH_BIN_${stale}"
+        decl_del "$decl_file" "AIRYRT_LAUNCH_EP_${stale}"
+        decl_del "$decl_file" "AIRYRT_LAUNCH_ARGS_${stale}"
+        sup_core_drop "$decl_file" "$stale"
+        log_info "managed.d: retired ${stale}"
+    done
+
+    if [[ -n "$new_names" ]]; then
+        upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_MANAGED" "$new_names"
+    else
+        decl_del "$decl_file" "AIRYRT_LAUNCH_MANAGED"
+    fi
+}
+
 # supervisor 声明调谐：写 $AIRY_HOME/config/profile.env（sup_decl_load 声明
 # 源）。CORE/AUX 名单两行 + 各 daemon ARGS 声明（未登记的声明被 decl.c
 # fail-closed 拒绝，故只写有值的键）。llm_d 用 model.yaml 路径，其余用
-# AGENTRT_CONFIG。
+# AGENTRT_CONFIG。名单落定后再摄取 managed.d 托管片段。
 sup_write_decl() {
     local decl_dir="${AIRY_HOME}/config"
     local decl_file="${decl_dir}/profile.env"
@@ -743,6 +852,7 @@ sup_write_decl() {
         fi
         [[ -n "$args_val" ]] && upsert_profile_var "$decl_file" "$args_key" "$args_val"
     done
+    sup_ingest_managed "$decl_file"
     log_info "Launch declaration: ${decl_file}"
 }
 
@@ -1447,4 +1557,7 @@ main() {
     return 0
 }
 
-main "$@"
+# 直接执行才进主流程：源入（测试函数面）不得拉起 daemon 群
+if (( ! AIRY_BOOTSTRAP_LIB )) && [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
