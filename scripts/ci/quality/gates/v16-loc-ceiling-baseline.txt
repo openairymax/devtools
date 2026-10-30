@@ -13,5 +13,11 @@
 # 的归因分支、启动期根因证据，以及配套两条单测之外的源码行。同批已把重复
 # 的 REGISTRY-EMPTY 留证与超长命名收敛（-21 行），剩余为功能真增长；
 # 拆载义务不变，0.1.21 首行执行。
-llm_d|14007|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;0.1.21-split-obligation)
-tool_d|11541|table1-tool_d(0.1.20,ledger-356)
+# 2026-10-31 r84 再登记 +29 / +2：运行态缺陷 P-B（冷启动 503 被计为端点故障）
+# 与 P-C（熔断恢复零日志）的收口（5e9b05d / a2eaa81）：HTTP 503 → 不可就绪错误码
+# 的映射与诊断串、LLM_FO_NOT_READY 归因档、健康面记账分流、恢复期单条 INFO；
+# tool_d +2 为 P-D（权限规则路径三方不一致）补 cupolas/ 一级与加载正向见证
+# （795191b）。三处都是缺陷归因的真功能，不是结构开销；拆载义务不变，
+# 0.1.21 首行与 P-A 一并执行。
+llm_d|14036|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;0.1.21-split-obligation)
+tool_d|11543|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b)
