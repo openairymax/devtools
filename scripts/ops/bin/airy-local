@@ -59,6 +59,55 @@ airy_local_model_pin_file() {
     fi
 }
 
+airy_local_managed_file() {
+    echo "$(airy_local_home)/config/managed.d/llamacpp.env"
+}
+
+###############################################################################
+# 托管声明片段（supervisor 侧由 agentrt-bootstrap.sh 通用摄取四键契约）
+###############################################################################
+
+# 取一件在位模型的 asset 名（注册表声明顺序首个在位者），无则空
+airy_local_model_pick() {
+    local registry="$1"
+    [[ -f "$registry" ]] || return 0
+    local key asset
+    while IFS= read -r key; do
+        asset="$(airy_config_get "$registry" "$key")"
+        if [[ -n "$asset" && -f "$(airy_local_models_dir)/${asset}" ]]; then
+            printf '%s\n' "$asset"
+            return 0
+        fi
+    done < <(grep '^model\..*\.asset=' "$registry" 2>/dev/null | cut -d'=' -f1)
+    return 0
+}
+
+# 声明片段按当前安装态收敛：组件可执行且有在位模型才落片，否则清退。
+# 片段是机制面唯一契约（NAME/BIN/EP/ARGS），不含任何 supervisor 私有知识。
+airy_local_decl_sync() {
+    local frag registry server asset model port
+    frag="$(airy_local_managed_file)"
+    registry="$(airy_local_registry_file)"
+    server="$(airy_config_get "$registry" server)"
+    if [[ -z "$server" || ! -x "$server" ]]; then
+        rm -f "$frag"
+        return 0
+    fi
+    asset="$(airy_local_model_pick "$(airy_local_model_registry)")"
+    if [[ -z "$asset" ]]; then
+        rm -f "$frag"
+        return 0
+    fi
+    model="$(airy_local_models_dir)/${asset}"
+    port="${AIRY_LOCAL_LLM_PORT:-11435}"
+    airy_mkdir "$(dirname "$frag")"
+    airy_config_set "$frag" "AIRYRT_MANAGED_NAME" "llama_server"
+    airy_config_set "$frag" "AIRYRT_MANAGED_BIN" "$server"
+    airy_config_set "$frag" "AIRYRT_MANAGED_EP" "tcp:${port}"
+    airy_config_set "$frag" "AIRYRT_MANAGED_ARGS" "-m ${model} --host 127.0.0.1 --port ${port}"
+    airy_log_info "Managed declaration: ${frag} (tcp:${port}, model=${asset})"
+}
+
 ###############################################################################
 # pin 清单解析
 ###############################################################################
@@ -295,6 +344,7 @@ airy_local_cmd_install() {
 
     rm -f "$dest"
     airy_log_info "Installed: ${AIRY_LOCAL_COMPONENT} ${version} (${key}) -> ${comp_dir}"
+    airy_local_decl_sync
 }
 
 ###############################################################################
@@ -362,6 +412,7 @@ airy_local_cmd_remove() {
     fi
 
     rm -rf "$comp_dir" "$tmp_dir"
+    airy_local_decl_sync
     airy_log_info "Removed: ${AIRY_LOCAL_COMPONENT} (models kept: $(airy_local_home)/local/models)"
 }
 
@@ -441,6 +492,7 @@ airy_local_cmd_model_install() {
     airy_config_set "$registry" "model.${name}.sha256" "$sha"
     airy_config_set "$registry" "model.${name}.installed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     airy_log_info "Installed model: ${name} (${asset}) -> ${models_dir}"
+    airy_local_decl_sync
 }
 
 airy_local_cmd_model_list() {
@@ -480,6 +532,7 @@ airy_local_cmd_model_remove() {
     airy_config_del "$registry" "model.${name}.size"
     airy_config_del "$registry" "model.${name}.sha256"
     airy_config_del "$registry" "model.${name}.installed_at"
+    airy_local_decl_sync
     airy_log_info "Removed model: ${name} (${asset})"
 }
 
