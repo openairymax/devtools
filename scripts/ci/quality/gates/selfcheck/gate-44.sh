@@ -15,6 +15,9 @@
 #      断言 T1 审计器必须检出——审计器失明等于元门禁失效
 #   T5 selfcheck 清单完整性：gate-31/32/33/34/35/36/37/38/39/40/41/42/
 #      43/44/45 与 layer-check（Gate 24 E 段）必须在册
+#   T6 裁决降级反证：WARN/SKIP 必须触发降级横幅而非 ALL PASSED，
+#      strict 下必须阻断；--skip-* 必须计入 GATE_SKIP（假绿面收口）
+#   T7 合约数据集语义反证：候选全缺席=未判定(rc=2)，目录在但零合约头=红(rc=1)
 #
 # 用法: selfcheck/gate-44.sh
 # 退出码: 0 = 全部断言符合预期；1 = 元审计失败
@@ -114,6 +117,45 @@ gate_file_length >/dev/null 2>&1 || rc=$?
 expect_rc "T2c file-length missing red" 1 "$rc"
 expect_rc "T2d FileLength verdict counted" 2 "$GATE_FAIL"
 
+# ── T6: 裁决降级反证（WARN/SKIP 不得伪装全绿）──────────────
+section "T6: verdict must degrade on WARN/SKIP, never fake green"
+GATE_PASS=10; GATE_FAIL=0; GATE_WARN=1; GATE_SKIP=0; SKIPPED_NAMES=""
+rc=0
+t6_out=$(gate_verdict false) || rc=$?
+expect_rc "T6a WARN non-strict returns 0" 0 "$rc"
+if ! echo "$t6_out" | grep -q "PASSED WITH WARNINGS"; then
+    log_err "T6b: WARN did not degrade the banner"
+    exit 1
+fi
+if echo "$t6_out" | grep -q "ALL QUALITY GATES PASSED"; then
+    log_err "T6c: WARN still reported as ALL PASSED"
+    exit 1
+fi
+log_ok "T6b/T6c: WARN degraded, no fake green"
+rc=0
+gate_verdict true >/dev/null 2>&1 || rc=$?
+expect_rc "T6d WARN strict red" 1 "$rc"
+
+GATE_FAIL=1; GATE_WARN=0
+rc=0
+gate_verdict false >/dev/null 2>&1 || rc=$?
+expect_rc "T6e FAIL red" 1 "$rc"
+GATE_FAIL=0
+
+skip_fake=true
+count_skips
+expect_rc "T6f skip counted" 1 "$GATE_SKIP"
+rc=0
+t6_out=$(gate_verdict false) || rc=$?
+expect_rc "T6g skip non-strict returns 0" 0 "$rc"
+if ! echo "$t6_out" | grep -q "PASSED WITH WARNINGS"; then
+    log_err "T6h: skip did not degrade the banner"
+    exit 1
+fi
+log_ok "T6h: skip degraded, not fake green"
+unset skip_fake
+count_skips
+
 # ── T3: 缺基线不静默反证（隔离树）───────────────────────────
 section "T3: missing ratchet baseline must be red, never recreated"
 T3="$TMP/t3"
@@ -193,6 +235,31 @@ for s in gate-31.sh gate-32.sh gate-33.sh gate-34.sh gate-35.sh gate-36.sh gate-
     fi
 done
 
+# ── T7: 合约数据集语义反证（未判定 ≠ 通过）─────────────────
+section "T7: contract dataset semantics (absent=NOT JUDGED, empty=red)"
+T7="$TMP/t7"
+T7_GATES="$T7/a/b/c/d/e/gates"
+mkdir -p "$T7_GATES/lib"
+cp "${GATES_DIR}/contract-version-check.sh" "$T7_GATES/"
+cp "${GATES_DIR}/lib/contract-sso.sh" "$T7_GATES/lib/"
+rc=0
+bash "$T7_GATES/contract-version-check.sh" --ci >/dev/null 2>&1 || rc=$?
+expect_rc "T7a absent SSoT dataset -> NOT JUDGED(2)" 2 "$rc"
+mkdir -p "$T7/a/contracts"
+rc=0
+bash "$T7_GATES/contract-version-check.sh" --ci >/dev/null 2>&1 || rc=$?
+expect_rc "T7b empty contract dir -> red(1)" 1 "$rc"
+# T7c 正例：现行语义串版本声明必须被解析（不得误报缺少版本/未 bump）
+for f in contract_A_B contract_A_C contract_B_C; do
+    printf '#ifndef %s_H\n#define %s_H\n#define %s_VERSION "1.0.0"\n#endif\n' \
+        "$f" "$f" "$f" > "$T7/a/contracts/$f.h"
+done
+find "$T7/a/contracts" -name 'contract_*.h' | sort > "$T7/snap.txt"
+rc=0
+bash "$T7_GATES/contract-version-check.sh" --ci \
+    --baseline-snapshot "$T7/snap.txt" >/dev/null 2>&1 || rc=$?
+expect_rc "T7c canonical semver parsed (no false red)" 0 "$rc"
+
 section "Gate 44 selfcheck verdict"
-log_ok "16 项断言全部符合预期（A 类假绿面全数可检出，审计器自证可红）"
+log_ok "全部断言符合预期（A 类假绿面全数可检出，审计器自证可红）"
 exit 0

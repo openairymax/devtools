@@ -18,7 +18,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
-CONTRACTS_DIR="${PROJECT_ROOT}/contracts"
+CONTRACTS_DIR=""
+GIT_ROOT=""
+CONTRACTS_REL=""
 BASELINE_BRANCH="main"
 BASELINE_SNAPSHOT=""
 CI_MODE=false
@@ -71,6 +73,35 @@ while [[ $# -gt 0 ]]; do
 done
 
 ###############################################################################
+# 合约 SSoT 宿主解析与版本声明解析（0.1.20 Q3）
+#
+# 历史实现把宿主硬编码为 <root>/contracts；该目录已不存在，实际合约头
+# 随文档仓迁至 docs-closed/agent-workload-dev/06-contracts/。硬编码单路径
+# 的直接后果是「目录不存在 → 无变更 → 通过」的空判据，门禁形同虚设。
+# 解析器与版本声明解析统一放 lib/contract-sso.sh，与 Gate 5 共用同一份
+# 事实源，避免两处判据各自漂移。
+###############################################################################
+# shellcheck source=lib/contract-sso.sh
+source "${SCRIPT_DIR}/lib/contract-sso.sh"
+
+resolve_rc=0
+CONTRACTS_DIR=$(csso_root "$PROJECT_ROOT") || resolve_rc=$?
+if [[ "$resolve_rc" -eq 1 ]]; then
+    log_error "contract directories exist but hold no contract_*.h: empty judgement"
+    exit 1
+elif [[ "$resolve_rc" -eq 2 ]]; then
+    log_info "contract SSoT dataset absent in this tree (NOT JUDGED)"
+    exit 2
+fi
+
+if GIT_ROOT=$(git -C "$CONTRACTS_DIR" rev-parse --show-toplevel 2>/dev/null); then
+    CONTRACTS_REL="${CONTRACTS_DIR#"$GIT_ROOT"}"
+    CONTRACTS_REL="${CONTRACTS_REL#/}"
+else
+    GIT_ROOT=""
+fi
+
+###############################################################################
 # 合约文件定义
 ###############################################################################
 declare -A CONTRACT_TEAMS=(
@@ -86,25 +117,14 @@ declare -A CONTRACT_VERSION_MACRO=(
 )
 
 ###############################################################################
-# 版本号提取函数
+# 版本号提取
+#
+# 合约头的权威声明形式是语义串（#define CONTRACT_A_B_VERSION "1.0.0"），
+# 历史实现只认十六进制 0x00MMmmpp，对本仓现行合约全部取空值，一旦合约
+# 真的变更就会拿 0x00000000 与 0x00000000 比对而误报「版本未 bump」。
+# 解析统一由 lib/contract-sso.sh 的 csso_ver 完成（语义串/十六进制/数值
+# 三元组三形式等价），本脚本不再自带第二份正则。
 ###############################################################################
-extract_version_hex() {
-    local file="$1"
-    local macro="$2"
-    grep -oP "#define\s+${macro}\s+0x[0-9a-fA-F]+" "$file" 2>/dev/null | \
-        grep -oP "0x[0-9a-fA-F]+" || echo "0x00000000"
-}
-
-hex_to_semver() {
-    local hex="$1"
-    hex="${hex#0x}"
-    hex="${hex#0X}"
-    # 格式: 0x00MAJORMINORPATCH
-    local major=$(( (0x${hex} >> 24) & 0xFF ))
-    local minor=$(( (0x${hex} >> 16) & 0xFF ))
-    local patch=$(( (0x${hex}) & 0xFFFF ))
-    echo "${major}.${minor}.${patch}"
-}
 
 ###############################################################################
 # 主检测逻辑
@@ -128,21 +148,27 @@ if [[ -n "${BASELINE_SNAPSHOT}" ]]; then
     CHANGED_FILES=$(diff <(sort "${BASELINE_SNAPSHOT}") \
         <(find "${CONTRACTS_DIR}" -name "contract_*.h" -type f | sort) 2>/dev/null || true)
 else
-    # 使用 git diff 比对
-    if git rev-parse --verify "${BASELINE_BRANCH}" >/dev/null 2>&1; then
-        CHANGED_FILES=$(git diff --name-only "${BASELINE_BRANCH}" HEAD -- \
-            "contracts/contract_*.h" 2>/dev/null || true)
-    elif git rev-parse --verify "origin/${BASELINE_BRANCH}" >/dev/null 2>&1; then
-        CHANGED_FILES=$(git diff --name-only "origin/${BASELINE_BRANCH}" HEAD -- \
-            "contracts/contract_*.h" 2>/dev/null || true)
-    else
-        log_warn "Cannot find baseline branch '${BASELINE_BRANCH}', checking all contracts"
-        CHANGED_FILES=$(find "${CONTRACTS_DIR}" -name "contract_*.h" -type f 2>/dev/null || true)
+    # 使用 git diff 比对（仓库根与相对路径均取自合约宿主，禁止假设 cwd）
+    if [[ -z "$GIT_ROOT" ]]; then
+        log_error "contracts host is not inside a git work tree: cannot judge drift (NOT JUDGED)"
+        exit 2
     fi
+    # 基线 ref 只解析一次：后续 diff 与基线内容读取共用，避免两处判定
+    # 落在不同 ref 上（分支本地/远端并存时曾是隐患）。
+    if git -C "$GIT_ROOT" rev-parse --verify "${BASELINE_BRANCH}" >/dev/null 2>&1; then
+        BASE_REF="${BASELINE_BRANCH}"
+    elif git -C "$GIT_ROOT" rev-parse --verify "origin/${BASELINE_BRANCH}" >/dev/null 2>&1; then
+        BASE_REF="origin/${BASELINE_BRANCH}"
+    else
+        log_error "baseline ref '${BASELINE_BRANCH}' absent in ${GIT_ROOT}: cannot judge drift (NOT JUDGED)"
+        exit 2
+    fi
+    CHANGED_FILES=$(git -C "$GIT_ROOT" diff --name-only "${BASE_REF}" HEAD -- \
+        "${CONTRACTS_REL}" 2>/dev/null | grep -E 'contract_[A-Z]_[A-Z]\.h$' || true)
 fi
 
 if [[ -z "${CHANGED_FILES}" ]]; then
-    log_ok "No contract files changed. Skipping version check."
+    log_ok "No contract files changed against baseline (judged: ${CONTRACTS_DIR})"
     exit 0
 fi
 
@@ -158,8 +184,8 @@ for contract_file in contract_A_B.h contract_A_C.h contract_B_C.h; do
     filepath="${CONTRACTS_DIR}/${contract_file}"
 
     if [[ ! -f "$filepath" ]]; then
-        log_warn "Contract file not found: ${contract_file} (skipped)"
-        continue
+        log_error "Contract file missing from resolved SSoT: ${contract_file} (fail-closed)"
+        exit 1
     fi
 
     # 检查此文件是否在变更列表中
@@ -171,41 +197,34 @@ for contract_file in contract_A_B.h contract_A_C.h contract_B_C.h; do
     CHANGED_CONTRACTS+=("${contract_file}")
 
     macro="${CONTRACT_VERSION_MACRO[${contract_file}]}"
-    current_hex=$(extract_version_hex "${filepath}" "${macro}")
-    current_ver=$(hex_to_semver "${current_hex}")
+    current_ver=$(csso_ver "${macro}" < "$filepath") || {
+        log_error "${contract_file}: no canonical version declaration for ${macro} (fail-closed)"
+        exit 1
+    }
 
-    # 获取基线版本
-    baseline_hex="0x00000000"
+    # 获取基线版本（与变更检测共用 BASE_REF）
+    baseline_ver=""
     if [[ -n "${BASELINE_SNAPSHOT}" ]]; then
-        baseline_hex=$(grep "^${contract_file}:" "${BASELINE_SNAPSHOT}" 2>/dev/null | \
-            cut -d: -f2 || echo "0x00000000")
-    elif git rev-parse --verify "${BASELINE_BRANCH}" >/dev/null 2>&1; then
-        baseline_content=$(git show "${BASELINE_BRANCH}:${filepath}" 2>/dev/null || true)
+        baseline_ver=$(grep "^${contract_file}:" "${BASELINE_SNAPSHOT}" 2>/dev/null | \
+            head -1 | cut -d: -f2 || true)
+    else
+        baseline_content=$(git -C "$GIT_ROOT" show \
+            "${BASE_REF}:${CONTRACTS_REL}/${contract_file}" 2>/dev/null || true)
         if [[ -n "${baseline_content}" ]]; then
-            baseline_hex=$(echo "${baseline_content}" | \
-                grep -oP "#define\s+${macro}\s+0x[0-9a-fA-F]+" | \
-                grep -oP "0x[0-9a-fA-F]+" || echo "0x00000000")
-        fi
-    elif git rev-parse --verify "origin/${BASELINE_BRANCH}" >/dev/null 2>&1; then
-        baseline_content=$(git show "origin/${BASELINE_BRANCH}:${filepath}" 2>/dev/null || true)
-        if [[ -n "${baseline_content}" ]]; then
-            baseline_hex=$(echo "${baseline_content}" | \
-                grep -oP "#define\s+${macro}\s+0x[0-9a-fA-F]+" | \
-                grep -oP "0x[0-9a-fA-F]+" || echo "0x00000000")
+            baseline_ver=$(printf '%s\n' "${baseline_content}" | csso_ver "${macro}" || true)
         fi
     fi
-
-    baseline_ver=$(hex_to_semver "${baseline_hex}")
+    [[ -n "${baseline_ver}" ]] || baseline_ver="unknown"
 
     # 检查版本是否被 bump
-    if [[ "${current_hex}" == "${baseline_hex}" ]]; then
+    if [[ "${current_ver}" == "${baseline_ver}" ]]; then
         # 版本未变更 —— 如果文件内容确实变了（不只是版本号），则报错
         log_error "${contract_file}: VERSION NOT BUMPED!"
-        log_error "  Current:  ${current_ver} (0x${current_hex})"
-        log_error "  Baseline: ${baseline_ver} (0x${baseline_hex})"
+        log_error "  Current:  ${current_ver}"
+        log_error "  Baseline: ${baseline_ver}"
         log_error "  Teams affected: ${CONTRACT_TEAMS[${contract_file}]}"
         log_error "  ACTION: Bump ${macro} before modifying this contract."
-        log_error "  Example: #define ${macro} 0x00010001  /* v1.0.1 */"
+        log_error "  Example: #define ${macro} \"1.0.1\"  /* or _MAJOR/_MINOR/_PATCH */"
         echo ""
         ((VERSION_MISMATCH++)) || true
     else
@@ -225,8 +244,8 @@ done
 ###############################################################################
 # 生成合约版本快照（供后续 CI 使用）
 ###############################################################################
-# 铁律 4.7：快照落源码区外（对齐 release.sh 先例），CI_ARTIFACT_DIR 可覆盖
-SNAPSHOT_FILE="${CI_ARTIFACT_DIR:-$(dirname "$PROJECT_ROOT")/works-engineering/airymaxrt-build/ci-artifacts}/contract-versions.txt"
+# 快照默认落系统临时目录：不得在源码区或工作区落生成物（铁律 4.7）
+SNAPSHOT_FILE="${CI_ARTIFACT_DIR:-${TMPDIR:-/tmp}/agentrt-ci-artifacts}/contract-versions.txt"
 mkdir -p "$(dirname "${SNAPSHOT_FILE}")"
 
 echo "# AgentRT Contract Versions Snapshot" > "${SNAPSHOT_FILE}"
@@ -236,9 +255,11 @@ for contract_file in contract_A_B.h contract_A_C.h contract_B_C.h; do
     filepath="${CONTRACTS_DIR}/${contract_file}"
     if [[ -f "$filepath" ]]; then
         macro="${CONTRACT_VERSION_MACRO[${contract_file}]}"
-        hex=$(extract_version_hex "${filepath}" "${macro}")
-        ver=$(hex_to_semver "${hex}")
-        echo "${contract_file}:${hex}:${ver}" >> "${SNAPSHOT_FILE}"
+        ver=$(csso_ver "${macro}" < "$filepath") || {
+            log_error "${contract_file}: cannot snapshot version (no ${macro} declaration)"
+            exit 1
+        }
+        echo "${contract_file}:${ver}" >> "${SNAPSHOT_FILE}"
     fi
 done
 

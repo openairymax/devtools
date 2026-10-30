@@ -63,6 +63,59 @@ check_gate() {
 HOST_NOISE_RE='libselinux\.so\.1: no version information'
 gate_view() { grep -vE "$HOST_NOISE_RE" || true; }
 
+# --skip-* 必须入账：GATE_SKIP 此前恒为 0，skip 只让覆盖率静默下降，
+# 汇总仍打印全绿（假绿）。此处按实际置位的 skip_* 变量计数并具名。
+SKIPPED_NAMES=""
+count_skips() {
+    local var
+    GATE_SKIP=0
+    SKIPPED_NAMES=""
+    for var in $(compgen -v skip_ 2>/dev/null || true); do
+        [ "$var" = "skip_" ] && continue
+        eval "[ \"\${$var}\" = true ]" || continue
+        GATE_SKIP=$((GATE_SKIP+1))
+        SKIPPED_NAMES="${SKIPPED_NAMES} ${var#skip_}"
+    done
+}
+
+# 末段裁决（可单测）：FAIL 阻断；strict 下 WARN/SKIP 亦阻断；
+# 非 strict 下 WARN>0 或 SKIP>0 输出降级横幅，明示未充分判定，
+# 不得把「没判」表述为「全部通过」（0.1.20 §9 fail-open 收口）。
+gate_verdict() {
+    local strict_mode="$1"
+    echo -e "  ${COLOR_GREEN}Passed:${COLOR_RESET}   $GATE_PASS"
+    echo -e "  ${COLOR_RED}Failed:${COLOR_RESET}   $GATE_FAIL"
+    echo -e "  ${COLOR_YELLOW}Warnings:${COLOR_RESET} $GATE_WARN"
+    echo -e "  ${COLOR_YELLOW}Skipped:${COLOR_RESET}  $GATE_SKIP${SKIPPED_NAMES:+(not judged:${SKIPPED_NAMES})}"
+    echo ""
+    local unjudged=$((GATE_WARN + GATE_SKIP))
+    if [ "$GATE_FAIL" -gt 0 ]; then
+        echo -e "${COLOR_RED}╔══════════════════════════════════════╗${COLOR_RESET}"
+        echo -e "${COLOR_RED}║     QUALITY GATE FAILED              ║${COLOR_RESET}"
+        echo -e "${COLOR_RED}║     ${GATE_FAIL} GATE(S) FAILED                   ║${COLOR_RESET}"
+        echo -e "${COLOR_RED}╚══════════════════════════════════════╝${COLOR_RESET}"
+        return 1
+    fi
+    if $strict_mode && [ "$unjudged" -gt 0 ]; then
+        echo -e "${COLOR_RED}╔══════════════════════════════════════╗${COLOR_RESET}"
+        echo -e "${COLOR_RED}║     QUALITY GATE FAILED (STRICT)     ║${COLOR_RESET}"
+        echo -e "${COLOR_RED}║     ${unjudged} WARN/SKIP TREATED AS FAILURE  ║${COLOR_RESET}"
+        echo -e "${COLOR_RED}╚══════════════════════════════════════╝${COLOR_RESET}"
+        return 1
+    fi
+    if [ "$unjudged" -gt 0 ]; then
+        echo -e "${COLOR_YELLOW}╔══════════════════════════════════════╗${COLOR_RESET}"
+        echo -e "${COLOR_YELLOW}║  PASSED WITH WARNINGS (NOT FULLY     ║${COLOR_RESET}"
+        echo -e "${COLOR_YELLOW}║  JUDGED: ${unjudged} gate(s) degraded)   ║${COLOR_RESET}"
+        echo -e "${COLOR_YELLOW}╚══════════════════════════════════════╝${COLOR_RESET}"
+        return 0
+    fi
+    echo -e "${COLOR_GREEN}╔══════════════════════════════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}║     ALL QUALITY GATES PASSED         ║${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}╚══════════════════════════════════════╝${COLOR_RESET}"
+    return 0
+}
+
 print_header() {
     echo "╔══════════════════════════════════════════════════╗"
     echo "║   AgentRT Quality Gate                           ║"
@@ -134,14 +187,15 @@ gate_compile() {
 
     log_info "Out-of-source build dir: ${build_dir}"
     mkdir -p "$build_dir"
-    cd "$build_dir"
 
+    # 禁止 cd 进构建树：编排器 cwd 一旦被改写，其后门禁（如 Gate 4/26）的
+    # git 相对路径判定全部错位。cmake 显式 -B/-S 与 --build 已足够定位。
     local _cfg_log="${build_dir}/configure.log"
     local _bld_log="${build_dir}/build.log"
-    if cmake -B . -S "${AGENTRT_SRC}" -DCMAKE_BUILD_TYPE=Debug \
+    if cmake -B "$build_dir" -S "${AGENTRT_SRC}" -DCMAKE_BUILD_TYPE=Debug \
         ${_prod_args[@]+"${_prod_args[@]}"} >"${_cfg_log}" 2>&1; then
         tail -5 "${_cfg_log}"
-        if cmake --build . >"${_bld_log}" 2>&1; then
+        if cmake --build "$build_dir" >"${_bld_log}" 2>&1; then
             tail -5 "${_bld_log}"
             check_gate "Compile" 0
         else
@@ -245,8 +299,16 @@ gate_contract() {
     local contract_script="${SCRIPT_DIR}/contract-version-check.sh"
     if [ -x "$contract_script" ]; then
         log_info "Checking contract versions..."
-        if bash "$contract_script" 2>&1 | gate_view | tail -5; then
+        # --ci 使违规在本地同样阻断；rc=2 表示本树不含合约 SSoT 数据集，
+        # 属「未判定」而非通过——按 WARN 显式降级，不得计 PASS。
+        local c_out c_rc=0
+        c_out=$(bash "$contract_script" --ci 2>&1) || c_rc=$?
+        echo "$c_out" | gate_view | tail -8
+        if [ "$c_rc" -eq 0 ]; then
             check_gate "Contract" 0
+        elif [ "$c_rc" -eq 2 ]; then
+            log_warn "contract check: contract SSoT dataset absent (NOT JUDGED)"
+            check_gate "Contract" 2
         else
             check_gate "Contract" 1
         fi
@@ -266,8 +328,16 @@ gate_cross_repo() {
     local cross_repo_script="${SCRIPT_DIR}/cross-repo-verify.sh"
     if [ -x "$cross_repo_script" ]; then
         log_info "Running cross-repo verification..."
-        if bash "$cross_repo_script" 2>&1 | gate_view | tail -10; then
+        # 管道会吞掉子进程 rc（原实现只能区分 0/非 0）。显式捕获后按
+        # 0=判定通过 2=数据集不含被测物（NOT JUDGED，降级 WARN）区分。
+        local xr_out xr_rc=0
+        xr_out=$(bash "$cross_repo_script" 2>&1) || xr_rc=$?
+        echo "$xr_out" | gate_view | tail -14
+        if [ "$xr_rc" -eq 0 ]; then
             check_gate "CrossRepo" 0
+        elif [ "$xr_rc" -eq 2 ]; then
+            log_warn "cross-repo verify: dataset incomplete, some checks NOT JUDGED"
+            check_gate "CrossRepo" 2
         else
             check_gate "CrossRepo" 1
         fi
@@ -735,8 +805,8 @@ gate_clone() {
             log_warn "clone check: rate above target but within baseline"
             check_gate "Clone" 2
         elif [ "$cl_rc" -eq 3 ]; then
-            log_warn "clone check: environment error, manual review required"
-            check_gate "Clone" 2
+            log_err "clone check: judgement input missing/empty (fail-closed)"
+            check_gate "Clone" 1
         else
             check_gate "Clone" 1
         fi
@@ -769,8 +839,8 @@ gate_port_coord() {
             log_warn "port coord check: violations within baseline (ratchet held)"
             check_gate "PortCoord" 2
         elif [ "$pc_rc" -eq 3 ]; then
-            log_warn "port coord check: environment error, manual review required"
-            check_gate "PortCoord" 2
+            log_err "port coord check: judgement input missing/empty (fail-closed)"
+            check_gate "PortCoord" 1
         else
             check_gate "PortCoord" 1
         fi
@@ -803,8 +873,8 @@ gate_policy_payload() {
             log_warn "policy payload check: violations within baseline (ratchet held)"
             check_gate "PolicyPayload" 2
         elif [ "$pp_rc" -eq 3 ]; then
-            log_warn "policy payload check: environment error, manual review required"
-            check_gate "PolicyPayload" 2
+            log_err "policy payload check: judgement input missing/empty (fail-closed)"
+            check_gate "PolicyPayload" 1
         else
             check_gate "PolicyPayload" 1
         fi
@@ -840,8 +910,8 @@ gate_layer() {
             log_warn "layer boundary check: violations within baseline (ratchet held)"
             check_gate "LayerBoundary" 2
         elif [ "$lb_rc" -eq 3 ]; then
-            log_warn "layer boundary check: environment error, manual review required"
-            check_gate "LayerBoundary" 2
+            log_err "layer boundary check: judgement input missing/empty (fail-closed)"
+            check_gate "LayerBoundary" 1
         else
             check_gate "LayerBoundary" 1
         fi
@@ -875,8 +945,8 @@ gate_fanout() {
             log_warn "fan-out check: violations within baseline (ratchet held)"
             check_gate "FanOut" 2
         elif [ "$fo_rc" -eq 3 ]; then
-            log_warn "fan-out check: environment error, manual review required"
-            check_gate "FanOut" 2
+            log_err "fan-out check: judgement input missing/empty (fail-closed)"
+            check_gate "FanOut" 1
         else
             check_gate "FanOut" 1
         fi
@@ -1906,34 +1976,14 @@ main() {
 
     set -e
 
-    # 输出结果
+    # 输出结果（skip 先入账，再统一裁决）
+    count_skips
     section "Quality Gate Results"
     echo ""
-    echo -e "  ${COLOR_GREEN}Passed:${COLOR_RESET}   $GATE_PASS"
-    echo -e "  ${COLOR_RED}Failed:${COLOR_RESET}   $GATE_FAIL"
-    echo -e "  ${COLOR_YELLOW}Warnings:${COLOR_RESET} $GATE_WARN"
-    echo -e "  ${COLOR_YELLOW}Skipped:${COLOR_RESET}  $GATE_SKIP"
-    echo ""
-
-    if [ "$GATE_FAIL" -eq 0 ]; then
-        if $strict_mode && [ "$GATE_WARN" -gt 0 ]; then
-            echo -e "${COLOR_RED}╔══════════════════════════════════════╗${COLOR_RESET}"
-            echo -e "${COLOR_RED}║     QUALITY GATE FAILED (STRICT)     ║${COLOR_RESET}"
-            echo -e "${COLOR_RED}║     ${GATE_WARN} WARNING(S) TREATED AS FAILURE  ║${COLOR_RESET}"
-            echo -e "${COLOR_RED}╚══════════════════════════════════════╝${COLOR_RESET}"
-            exit 1
-        fi
-        echo -e "${COLOR_GREEN}╔══════════════════════════════════════╗${COLOR_RESET}"
-        echo -e "${COLOR_GREEN}║     ALL QUALITY GATES PASSED         ║${COLOR_RESET}"
-        echo -e "${COLOR_GREEN}╚══════════════════════════════════════╝${COLOR_RESET}"
+    if gate_verdict "$strict_mode"; then
         exit 0
-    else
-        echo -e "${COLOR_RED}╔══════════════════════════════════════╗${COLOR_RESET}"
-        echo -e "${COLOR_RED}║     QUALITY GATE FAILED              ║${COLOR_RESET}"
-        echo -e "${COLOR_RED}║     ${GATE_FAIL} GATE(S) FAILED                   ║${COLOR_RESET}"
-        echo -e "${COLOR_RED}╚══════════════════════════════════════╝${COLOR_RESET}"
-        exit 1
     fi
+    exit 1
 }
 
 main "$@"

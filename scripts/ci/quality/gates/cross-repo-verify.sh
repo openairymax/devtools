@@ -19,8 +19,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
-# 铁律 4.7：核验制品落源码区外（对齐 release.sh 先例），CI_ARTIFACT_DIR 可覆盖
-ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${WORKSPACE_ROOT}/works-engineering/airymaxrt-build/ci-artifacts}/cross-repo"
+# 合约 SSoT 共享解析（Gate 4/5 同源，0.1.20 Q3）
+# shellcheck source=lib/contract-sso.sh
+source "${SCRIPT_DIR}/lib/contract-sso.sh"
+# 铁律 4.7：核验制品落系统临时目录（CI_ARTIFACT_DIR 可覆盖），不落源码区/工作区
+ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${TMPDIR:-/tmp}/agentrt-ci-artifacts}/cross-repo"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; MAGENTA='\033[0;35m'; NC='\033[0m'
@@ -37,11 +40,20 @@ JSON_OUTPUT=false
 
 ISSUES=0
 PASSED=0
+NOT_JUDGED=0
 declare -a ISSUE_LIST=()
+declare -a UNJUDGED_LIST=()
 
 add_issue() {
     ((ISSUES++)) || true
     ISSUE_LIST+=("$1")
+}
+
+# 未判定（数据集不含被测物）不得计为通过：单列计数并作为 rc=2 上报，
+# 由编排器降级为 WARN（0.1.20 §9 fail-closed 收口）。
+add_unjudged() {
+    ((NOT_JUDGED++)) || true
+    UNJUDGED_LIST+=("$1")
 }
 
 check_pass() {
@@ -156,15 +168,24 @@ check_version_consistency() {
 check_contract_compatibility() {
     log_header "Check 3: API Contract Compatibility"
 
-    local contracts_dir="${PROJECT_ROOT}/contracts"
-    if [[ ! -d "$contracts_dir" ]]; then
-        # 0.1.6 修正：共享契约层物理宿主已移至 commons/include/airymax/
-        # （[SC] 头，见 docs 09-ssot-registry TP-001~011），根级 contracts/
-        # 目录不再是 SSoT 物理位置，缺失不构成问题。
-        log_info "contracts/ directory not present (SC headers live in commons/include/airymax, skipped)"
-        check_pass
+    # 合约 SSoT 宿主解析（0.1.20 Q3）：与 contract-version-check.sh 共用
+    # lib/contract-sso.sh 同一份候选集与版本解析，禁止各自硬编码路径形成
+    # 双副本。命中且含合约头才判定；目录在但零合约头 = 判据为空（红）；
+    # 候选全缺席 = 本树不含合约数据集（未判定，rc=2）。
+    local contracts_dir="" rc=0
+    contracts_dir=$(csso_root "$PROJECT_ROOT") || rc=$?
+
+    if [[ "$rc" -ne 0 ]]; then
+        if [[ "$rc" -eq 1 ]]; then
+            add_issue "contract SSoT dirs exist but hold no contract_*.h (empty judgement)"
+            log_warn "contract SSoT empty: fail-closed"
+        else
+            add_unjudged "API contract compatibility"
+            log_warn "contract SSoT dataset absent in this tree (NOT JUDGED)"
+        fi
         return
     fi
+    log_info "Contract SSoT: ${contracts_dir}"
 
     # Check each contract header
     for contract in contract_A_B.h contract_A_C.h contract_B_C.h; do
@@ -181,13 +202,18 @@ check_contract_compatibility() {
                 log_warn "  $contract: MISSING INCLUDE GUARD"
             fi
 
-            # Verify contract has version marker
-            if grep -q "CONTRACT_VERSION\|VERSION.*0\.1" "$contracts_dir/$contract" 2>/dev/null; then
-                log_ok "  $contract: version marker OK"
+            # Verify contract declares a canonical version. 历史判据是
+            # grep "CONTRACT_VERSION|VERSION.*0.1"，与现行 SSoT（语义串
+            # CONTRACT_A_B_VERSION "1.0.0"）不匹配，导致真实合约恒判缺
+            # 版本标记；改由共享解析器判定，三形式等价。
+            local cmacro cver
+            cmacro=$(echo "$contract" | sed -E 's/^contract_(.*)\.h$/CONTRACT_\1_VERSION/')
+            if cver=$(csso_ver "$cmacro" < "$contracts_dir/$contract"); then
+                log_ok "  $contract: version marker OK ($cver)"
                 check_pass
             else
-                add_issue "$contract: missing version marker"
-                log_warn "  $contract: NO VERSION MARKER"
+                add_issue "$contract: no canonical version declaration ($cmacro)"
+                log_warn "  $contract: NO CANONICAL VERSION"
             fi
         else
             add_issue "$contract: not found"
@@ -453,9 +479,10 @@ generate_report() {
         cat > "${ARTIFACT_DIR}/cross-repo-report.json" << EOF
 {
     "timestamp": "$(date -Iseconds)",
-    "total_checks": $((PASSED + ISSUES)),
+    "total_checks": $((PASSED + ISSUES + NOT_JUDGED)),
     "passed": $PASSED,
     "issues": $ISSUES,
+    "not_judged": $NOT_JUDGED,
     "issue_list": [
         $(for i in "${!ISSUE_LIST[@]}"; do
             echo "        \"${ISSUE_LIST[$i]}\""
@@ -471,9 +498,10 @@ EOF
     echo "============================================================"
     echo "  Cross-Repo Verification Summary"
     echo "============================================================"
-    echo "  Total checks: $((PASSED + ISSUES))"
+    echo "  Total checks: $((PASSED + ISSUES + NOT_JUDGED))"
     echo "  Passed:       $PASSED"
     echo "  Issues:       $ISSUES"
+    echo "  Not judged:   $NOT_JUDGED"
     echo ""
 
     if [[ ${#ISSUE_LIST[@]} -gt 0 ]]; then
@@ -484,10 +512,12 @@ EOF
     fi
 
     echo ""
-    if [[ $ISSUES -eq 0 ]]; then
-        echo "  Status: ALL CHECKS PASSED"
-    else
+    if [[ $ISSUES -gt 0 ]]; then
         echo "  Status: $ISSUES ISSUE(S) FOUND"
+    elif [[ $NOT_JUDGED -gt 0 ]]; then
+        echo "  Status: $NOT_JUDGED CHECK(S) NOT JUDGED (dataset incomplete)"
+    else
+        echo "  Status: ALL CHECKS PASSED"
     fi
     echo "============================================================"
 }
@@ -514,6 +544,9 @@ main() {
 
     if [[ $ISSUES -gt 0 ]]; then
         return 1
+    fi
+    if [[ $NOT_JUDGED -gt 0 ]]; then
+        return 2
     fi
     return 0
 }
