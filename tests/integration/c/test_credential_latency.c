@@ -20,6 +20,7 @@
 #include "cupolas.h"
 #include "cupolas_signature.h"
 #include "cupolas_vault.h"
+#include "airy_it_home.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1017,6 +1018,12 @@ int main(int argc, char *argv[])
     printf("  Target: P99 < 1 ms per acquisition\n");
     printf("=========================================\n\n");
 
+    /* 审计事件只落临时安装根，须先于任何 airy_* 调用完成路径解析。 */
+    if (it_home_init("cred_lat") != 0) {
+        fprintf(stderr, "cannot create isolated AIRY_HOME\n");
+        return 1;
+    }
+
     /* INT-19.1: 单凭证获取 */
     printf("--- INT-19.1: Single Credential Acquisition ---\n");
     RUN_TEST(int19_1_single_credential_acquisition);
@@ -1045,5 +1052,6 @@ int main(int argc, char *argv[])
     }
     printf("=========================================\n");
 
+    it_home_clean();
     return g_tests_failed > 0 ? 1 : 0;
 }
