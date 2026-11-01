@@ -19,7 +19,9 @@
 #
 # 选项:
 #   -c <config>    指定 agentrt.yaml 配置文件
-#   -b <bindir>    指定 daemon 二进制目录 (默认: /usr/local/bin)
+#   -b <bindir>    指定 daemon 二进制目录 (默认: $AIRY_HOME/bin)；目录不在
+#                  安装根内时二进制以实体复制归位到 $AIRY_HOME/bin（不建
+#                  外部软链，构建树易失会让安装产物静默换字节）
 #   -r <runtimedir> 指定运行时目录 (默认: /tmp/agentrt)
 #   -t <timeout>   全局健康检查超时秒数 (默认: 120)
 #   -w / --watchdog  全部拉起后进入 watchdog 自愈巡检循环（默认每 10s，
@@ -857,15 +859,30 @@ sup_write_decl() {
 }
 
 # supervisor 以 $AIRY_HOME/bin/<name> 固定解析子进程（decl.c add_proc），
-# -b 自定义二进制目录时用符号链接归位，保证监管域可达。
+# -b 指定外部二进制目录时把实体复制归位（含 supervisor_d 自身），保证
+# 监管域可达且安装根自持。
 sup_bin_link() {
     local home_bin="${AIRY_HOME}/bin"
     [[ "${AGENTRT_BINDIR}" == "${home_bin}" ]] && return 0
     mkdir -p "$home_bin"
     local d
-    for d in "${SUP_CORE_DAEMONS[@]}" "${SUP_AUX_DAEMONS[@]}"; do
-        [[ -x "${AGENTRT_BINDIR}/${d}" ]] && ln -sfn "${AGENTRT_BINDIR}/${d}" "${home_bin}/${d}"
+    for d in "${SUP_BIN_NAME}" "${SUP_CORE_DAEMONS[@]}" "${SUP_AUX_DAEMONS[@]}"; do
+        [[ -x "${AGENTRT_BINDIR}/${d}" ]] || continue
+        sup_bin_put "${AGENTRT_BINDIR}/${d}" "${home_bin}/${d}"
     done
+}
+
+# 二进制归位：一律复制实体，安装根绝不链外部构建树（构建树重建或重启
+# 换盘会让"已安装"二进制静默换字节）。源与目标同目录即同一文件，跳过；
+# 陈旧链接先摘除；任一步失败即返回非零并留明确错误，由 set -e 中止。
+sup_bin_put() {
+    local src="$1" dst="$2"
+    if [[ "$(readlink -f "$(dirname "$src")")" == "$(readlink -f "$(dirname "$dst")")" ]]; then
+        return 0
+    fi
+    if [[ -L "$dst" ]]; then rm -f "$dst"; fi
+    cp -f "$src" "$dst" && chmod +x "$dst" \
+        || { log_error "Failed to place ${dst} (source: ${src})"; return 1; }
 }
 
 # 启动失败诊断：daemon 日志尾部经 stderr 输出（log_error 同通道，-s
