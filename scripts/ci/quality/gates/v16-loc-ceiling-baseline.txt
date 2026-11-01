@@ -19,5 +19,5 @@
 # tool_d +2 为 P-D（权限规则路径三方不一致）补 cupolas/ 一级与加载正向见证
 # （795191b）。三处都是缺陷归因的真功能，不是结构开销；拆载义务不变，
 # 0.1.21 首行与 P-A 一并执行。
-llm_d|14036|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;0.1.21-split-obligation)
-tool_d|11543|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b)
+llm_d|14101|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;0.1.21-split-obligation)
+tool_d|11548|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec)
