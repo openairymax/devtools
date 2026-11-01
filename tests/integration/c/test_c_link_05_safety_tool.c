@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "memory_compat.h"
+#include "airy_it_home.h"
 #include "approval/safety_guard_bridge.h"
 #include "daemon_security.h"
 #include "airy_types.h"
@@ -341,6 +342,12 @@ static void test_concurrent_safety_checks(void) {
 int main(void) {
     printf("=== C-L05 Integration Tests: Cupolas SafetyGuard → tool_d ===\n\n");
 
+    /* 审计事件只落临时安装根，须先于任何 airy_* 调用完成路径解析。 */
+    if (it_home_init("c_link_05") != 0) {
+        fprintf(stderr, "cannot create isolated AIRY_HOME\n");
+        return 1;
+    }
+
     /* v0.1.1 BEHAVIOR_DIFF 修正：真实 daemon_security 采用 fail-closed 策略，
      * daemon_check_tool_permission() 在 ACL 表为空时默认拒绝所有请求。
      * 桩函数则默认全部通过。迁移到真实库需预注册 ACL 条目，为测试中
@@ -361,5 +368,6 @@ int main(void) {
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            g_tests_passed, g_tests_total, g_tests_failed);
+    it_home_clean();
     return g_tests_failed > 0 ? 1 : 0;
 }
