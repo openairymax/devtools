@@ -57,6 +57,11 @@ set(INTEGRATION_INCLUDE_DIRS
     ${AIRY_INTEG_RT_ROOT}/commons/include
     ${CUPOLAS_SRC_DIR}/include
     ${CUPOLAS_SRC_DIR}/src
+    # 安全域头内聚 src/security/（cupolas_signature.h / cupolas_vault.h /
+    # cupolas_network_security.h），Cupolas 集成测试按短名直连
+    ${CUPOLAS_SRC_DIR}/src/security
+    # 上述头以 <> 形式取 cupolas_signer_info.h / cupolas_vault_cred_type.h
+    ${AIRY_INTEG_RT_ROOT}/commons/utils/types
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -325,3 +330,34 @@ if(TARGET airy_llm_service)
 else()
     airy_print_warn("  [integration] Skipping test_llm_d_routing: airy_llm_service not available (BUILD_DAEMON=OFF)")
 endif()
+
+# ============================================================================
+# Cupolas 安全穹顶集成测试（INT-11 / INT-13 / INT-14 / INT-19）
+# ============================================================================
+# 这四支用例与此前 INT-12（test_cupolas_latency）同批落盘，但从未登记进
+# 任何 add_executable：编译面从未被触碰，故长期以"源码存在、CI 无覆盖"
+# 的悬空状态存续。实测四支均以真实 cupolas 库编过并全绿，故登记启用；
+# INT-12 因被测 API 已退役另行删除（见提交说明）。
+#
+# 断言均针对真实实现，不使用桩；事件落 it_home_init() 建立的临时安装根。
+
+# INT-11: 四层防护链（D1 沙箱 / D2 权限 / D3 净化 / D4 审计+SHA-256）
+# 沙箱执行经 workbench 默认 30s 超时，单支约 90s。
+configure_real_lib_test(test_cupolas_chain
+    LIBS cupolas
+)
+
+# INT-13: SHA-256 审计链完整性（篡改检测 / genesis 校验）
+configure_real_lib_test(test_cupolas_audit_chain
+    LIBS cupolas
+)
+
+# INT-14: 凭证轮换策略（vault 存储/轮换/ACL/元数据）
+configure_real_lib_test(test_cupolas_credentials
+    LIBS cupolas
+)
+
+# INT-19: 凭证池获取延迟基准（单取/轮换/耗尽恢复/并发/校验）
+configure_real_lib_test(test_credential_latency
+    LIBS cupolas
+)
