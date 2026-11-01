@@ -26,7 +26,8 @@
 #
 # 用法：
 #   agentrt-llm-e2e.sh [--bindir <dir>] [--keep] [--skip-install]
-#     --bindir       supervisor_d/llm_d 所在目录（缺省自动探测）
+#     --bindir       supervisor_d/llm_d 所在目录（缺省自动探测）；两个二进制
+#                    以实体复制进 $AIRY_HOME/bin，安装根不链外部构建树
 #     --keep         保留现场（不清理进程与配置，用于失败诊断）
 #     --skip-install 跳过 airy-local 安装（工件已就位时加速重跑）
 # =============================================================================
@@ -50,6 +51,18 @@ OPT_SKIP_INSTALL=0
 
 log()  { printf '[e2e] %s\n' "$*"; }
 fail() { printf '[e2e][FAIL] %s\n' "$*" >&2; exit 1; }
+
+# 二进制归位：安装根必须自持，构建树里的二进制一律复制实体（软链到临时
+# 构建树会随重建或重启静默换字节，缺陷 P-G）。陈旧链接先摘除，复制失败
+# 立即中止，不留半成品。
+put_bin() { # $1=src $2=dst
+    if [[ "$(readlink -f "$(dirname "$1")")" == "$(readlink -f "$(dirname "$2")")" ]]; then
+        return 0
+    fi
+    if [[ -L "$2" ]]; then rm -f "$2"; fi
+    cp -f "$1" "$2" && chmod +x "$2" \
+        || fail "二进制归位失败：$1 -> $2（检查磁盘/权限）"
+}
 
 # ---------- 参数 ----------
 while [[ ${#} -gt 0 ]]; do
@@ -213,9 +226,9 @@ fi
 [[ -f "$LOCAL_MODEL" ]] || fail "模型未就位：$LOCAL_MODEL"
 
 # ---------- 装配（声明面：supervisor 以 $AIRY_HOME/bin/<name> 固定解析） ----------
-log "== 装配：bin 链接 + model.yaml + profile.env =="
-ln -sfn "$BINDIR/llm_d" "$AIRY_HOME/bin/llm_d"
-ln -sfn "$BINDIR/supervisor_d" "$AIRY_HOME/bin/supervisor_d"
+log "== 装配：bin 复制 + model.yaml + profile.env =="
+put_bin "$BINDIR/llm_d" "$AIRY_HOME/bin/llm_d"
+put_bin "$BINDIR/supervisor_d" "$AIRY_HOME/bin/supervisor_d"
 
 # capabilities 是上游能力的显式声明（唯一来源，不派生）：llama-server 的
 # OpenAI 兼容口真实消费 seed/grammar/response_format/cache_prompt 与
