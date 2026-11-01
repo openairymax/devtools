@@ -17,7 +17,7 @@ csso_root() {
     for cand in \
         "${root}/contracts" \
         "${root}/agent-workload/agentrt/contracts" \
-        "${root}/docs/docs-closed/agent-workload-dev/06-contracts"; do
+        "${root}/docs/docs-closed/agent-workload-dev/10-designs-and-contracts/contracts"; do
         [ -d "$cand" ] || continue
         seen=1
         if compgen -G "${cand}/contract_*.h" >/dev/null 2>&1; then
