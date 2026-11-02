@@ -28,6 +28,10 @@
 # AIRY_CROSS_TC 三者同时给出即启用。四依赖编进目标 sysroot
 # （<sysroot>/usr，libdir=lib/<triple>），由 bootstrap-cross-toolchain.sh
 # 生成的 toolchain-<arch>.cmake 消费；非交叉路径行为完全不变。
+# libwebsockets 4.3.3 不认 CMAKE_INSTALL_LIBDIR（其 lib/CMakeLists.txt 走
+# 自有 LWS_INSTALL_LIB_DIR + LIB_SUFFIX），交叉时必须经 LIB_SUFFIX 才能
+# 落进 multiarch libdir，否则库与 .pc 落在 usr/lib 而下游收集器只扫
+# usr/lib/<triple>（riscv 腿 finalize 缺依赖的根因）。
 # ============================================================================
 set -euo pipefail
 
@@ -50,6 +54,7 @@ export JOBS
 CROSS_TRIPLE="${AIRY_CROSS_TRIPLE:-}"
 CROSS_CMAKE=()
 CROSS_OSSL=()
+CROSS_LWS=()
 if [ -n "$CROSS_TRIPLE" ]; then
     SYSROOT="${AIRY_CROSS_SYSROOT:?交叉模式须设 AIRY_CROSS_SYSROOT}"
     CROSS_TC="${AIRY_CROSS_TC:?交叉模式须设 AIRY_CROSS_TC}"
@@ -72,6 +77,9 @@ if [ -n "$CROSS_TRIPLE" ]; then
         -DOPENSSL_CRYPTO_LIBRARY="$DEPS_LIBDIR/libcrypto.so"
         -DOPENSSL_INCLUDE_DIR="$PREFIX/include"
     )
+    # lws 自有落盘旋钮：库、.pc 与 .pc 内的 libdir 均由 lib${LIB_SUFFIX}
+    # 推导，一次传值即三者同时对齐 multiarch 布局。
+    CROSS_LWS=(-DLIB_SUFFIX="/$CROSS_TRIPLE")
     # 交叉 CC 内联 sysroot：OpenSSL Configure / curl autoconf 不走 cmake
     # 工具链文件，必须由命令串自带根路径，否则找不到目标 libc 头文件。
     export CC="$CROSS_TC/root/usr/bin/$CROSS_TRIPLE-gcc --sysroot=$CROSS_TC/root -I$SYSROOT/usr/include"
@@ -333,7 +341,8 @@ if [ ! -f "$DEPS_LIBDIR/libwebsockets.so" ]; then
         -DLWS_WITH_SSL=ON -DLWS_WITH_SHARED=ON -DLWS_WITH_STATIC=OFF \
         -DLWS_WITHOUT_TESTAPPS=ON -DLWS_WITHOUT_TEST_SERVER=ON \
         -DLWS_WITHOUT_TEST_SERVER_EXTPOLL=ON -DLWS_WITHOUT_TEST_CLIENT=ON \
-        -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF "${CROSS_CMAKE[@]}"
+        -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF \
+        "${CROSS_CMAKE[@]}" "${CROSS_LWS[@]}"
     cmake --build /tmp/lws-build --parallel "$JOBS"
     cmake --install /tmp/lws-build
     [ -z "$CROSS_TRIPLE" ] && ldconfig 2>/dev/null || true
