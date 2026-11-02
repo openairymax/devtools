@@ -19,5 +19,9 @@
 # tool_d +2 为 P-D（权限规则路径三方不一致）补 cupolas/ 一级与加载正向见证
 # （795191b）。三处都是缺陷归因的真功能，不是结构开销；拆载义务不变，
 # 0.1.21 首行与 P-A 一并执行。
-llm_d|14101|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;0.1.21-split-obligation)
+# 2026-11-02 r86 再登记 +14：P-L 前置缺陷收口（daemons 010af23fc406）——传输层
+# 读空闲判据由「全形态」收窄为「仅流式」，非流式以 read_idle_sec <= 0 声明
+# 本形态无产出节律，避免健康长生成被 LOW_SPEED 判死。新增分支与判据注释
+# 共 14 物理行，测试补测在 tests/ 不计入本口径；拆载义务不变，0.1.21 首行执行。
+llm_d|14115|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;0.1.21-split-obligation)
 tool_d|11548|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec)
