@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================================
-# bootstrap-cross-toolchain.sh <i686|armv7l> —— 免 root 交叉工具链引导
+# bootstrap-cross-toolchain.sh <i686|armv7l|riscv64> —— 免 root 交叉工具链引导
 #
 # 六架构兼容决策（2026-08-30）：x86（x86_64/i686）、ARM（aarch64/armv7l）、
-# RISC-V（riscv64/riscv32）32/64 位全兼容。本脚本为 i686 / armv7l（armhf）
-# 从 Ubuntu noble 仓下载交叉工具链与目标依赖库并解压到构建台（源码区外），
+# RISC-V（riscv64/riscv32）32/64 位全兼容。本脚本为 i686 / armv7l（armhf）/
+# riscv64 从 Ubuntu 仓下载交叉工具链与目标依赖库并解压到构建台（源码区外），
 # 布局与 riscv64-toolchain 完全一致：
 #
 #   <TC>/
@@ -14,11 +14,22 @@
 #     sysroot/            第三方依赖库（multiarch 布局 usr/lib/<multiarch>）
 #     toolchain-<arch>.cmake
 #
+# 套件自适应（0.1.20）：SUITE 取构建容器的 VERSION_CODENAME（focal/noble…），
+# 可用 AIRY_SUITE 覆盖。交叉腿必须在与出包运行基线一致的发行版内 bootstrap
+# ——20.04（glibc 2.31）容器里若取 noble sysroot（2.39），产物在 20.04/22.04
+# 上直接 "GLIBC_2.34 not found"。依赖清单按套件分支（t64 改名仅 noble 起）。
+#
+# riscv64 的 cJSON/OpenSSL/libcurl/libwebsockets 不取 apt 预编译包：focal 的
+# cJSON 1.7.10 缺 cJSON_GetNumberValue，且 apt libcurl 链 libssl1.1 会与
+# agentrt 直链的 libssl.so.3 形成双 OpenSSL ABI（0.1.6e 根因）。四者由
+# lib-builddeps.sh 交叉模式编进 sysroot，与此处 libc 同源。
+#
 # 用法:
 #   bash bootstrap-cross-toolchain.sh i686
 #   bash bootstrap-cross-toolchain.sh armv7l
+#   bash bootstrap-cross-toolchain.sh riscv64
 #
-# 产物消费方：tools/scripts/ci/release/build.sh build_cross i686|armv7l
+# 产物消费方：tools/scripts/ci/release/build.sh build_cross i686|armv7l|riscv64
 #   （CMakeLists: airy_depgraph 门禁无关；此处指 agentrt 顶层 CMake 交叉配置）
 # ============================================================================
 set -euo pipefail
@@ -38,8 +49,14 @@ case "$ARCH" in
         TOOL_PKGS="gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf"
         ARCH_BASE="https://ports.ubuntu.com/ubuntu-ports"
         ;;
+    riscv64)
+        TC="riscv64-toolchain"; TRIPLE="riscv64-linux-gnu"; CMAKE_ARCH="riscv64"
+        MULTIARCH="riscv64-linux-gnu"; PORT_ARCH="riscv64"; TUI_TARGET="riscv64gc-unknown-linux-gnu"
+        TOOL_PKGS="gcc-riscv64-linux-gnu g++-riscv64-linux-gnu"
+        ARCH_BASE="https://ports.ubuntu.com/ubuntu-ports"
+        ;;
     *)
-        echo "用法: $0 <i686|armv7l>"; exit 1
+        echo "用法: $0 <i686|armv7l|riscv64>"; exit 1
         ;;
 esac
 
@@ -49,7 +66,14 @@ UMBRELLA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 BUILD_ROOT="${AIRY_WORKSPACE:-$(dirname "$UMBRELLA")/works-engineering}/airymaxrt-build"
 TC_DIR="$BUILD_ROOT/$TC"
 mkdir -p "$TC_DIR/dl" "$TC_DIR/dl-libs"
-SUITE="noble"
+# 套件随构建容器自适应（focal=20.04 基线 / noble=24.04），AIRY_SUITE 可覆盖
+if [ -n "${AIRY_SUITE:-}" ]; then
+    SUITE="$AIRY_SUITE"
+elif [ -r /etc/os-release ]; then
+    SUITE="$(. /etc/os-release && echo "${VERSION_CODENAME:-noble}")"
+else
+    SUITE="noble"
+fi
 
 log() { echo -e "\033[0;36m[INFO]\033[0m $*"; }
 ok()  { echo -e "\033[0;32m[ OK ]\033[0m $*"; }
@@ -64,12 +88,15 @@ while [ $i -lt ${#queue[@]} ]; do
     [ -n "${seen[$p]:-}" ] && continue
     seen["$p"]=1
     # 仅吸收与本架构相关的依赖（triple / *-cross / binutils / cpp / gcc-N）
+    # 宿主已装的同名包同样入队：root/ 必须自洽完整。crt1.o 与目标 libc
+    # 随 libc6-dev-<triple>-cross 落盘，若因宿主预装而跳过，root/ 就缺这些
+    # 文件，交叉配置阶段即失败（riscv64 腿 apt 预装 gcc-riscv64-linux-gnu
+    # 时曾因此只有编译器、无 crt/libc）。重复下载仅多几 MB，换确定性。
     while read -r d; do
         [ -z "$d" ] && continue
         case "$d" in
             *"$TRIPLE"*|*-cross*|binutils-*|cpp-*|gcc-*|g\+\+-*)
                 [ -n "${seen[$d]:-}" ] && continue
-                dpkg -s "$d" >/dev/null 2>&1 && continue  # 宿主已装无需重下
                 queue+=("$d")
                 ;;
         esac
@@ -87,7 +114,12 @@ done
 ok "工具链解压: $TC_DIR/root/usr/bin/$TRIPLE-gcc"
 
 # ─── 2) 目标依赖库 sysroot deb：ports.ubuntu.com ───
-# 依赖集与 riscv64-toolchain/dl-libs 同口径（agentrt 链接的第三方库）
+# 依赖集与 riscv64-toolchain/dl-libs 同口径（agentrt 链接的第三方库）。
+# 套件间差异只有 t64 改名（noble 起 libcurl4t64/libssl3t64/libffi8/libunistring5
+# 等）与 focal 的旧 soname（libssl1.1/libldap-2.4-2/libffi7）。四依赖
+# （cJSON/OpenSSL/libcurl/libwebsockets）一律不进清单：由 lib-builddeps.sh
+# 交叉自编译，避免 focal 旧符号缺失与双 OpenSSL ABI。
+if [ "$SUITE" = "noble" ]; then
 LIBS="libcjson-dev libcjson1 libcap-dev libcap2 libcurl4-openssl-dev libcurl4t64 \
 libevent-dev libevent-core-2.1-7t64 libevent-extra-2.1-7t64 libevent-openssl-2.1-7t64 libevent-pthreads-2.1-7t64 \
 libmicrohttpd-dev libmicrohttpd12t64 libnghttp2-dev libnghttp2-14 libsqlite3-dev libsqlite3-0 \
@@ -99,22 +131,40 @@ libgcrypt20-dev libgcrypt20 libgpg-error0 libkeyutils-dev libcom-err-dev \
 libsasl2-dev libsasl2-modules-db librtmp1 \
 libgmp10 libgnutls30t64 libhogweed6t64 libnettle8t64 libssh-4 libunistring5 libzstd1 \
 libp11-kit0 libtasn1-6 libffi8"
+else
+    # focal（20.04，riscv64 交叉腿基线）：pkg-config 型依赖 + 运行时 soname
+    LIBS="libcap-dev libcap2 \
+libevent-dev libevent-2.1-7 libevent-core-2.1-7 libevent-extra-2.1-7 \
+libevent-openssl-2.1-7 libevent-pthreads-2.1-7 \
+libmicrohttpd-dev libmicrohttpd12 libnghttp2-dev libnghttp2-14 \
+libsqlite3-dev libsqlite3-0 zlib1g-dev zlib1g \
+libkrb5-dev libkrb5-3 libgssapi-krb5-2 libk5crypto3 libkrb5support0 libcom-err2 libkeyutils1 \
+libssh2-1-dev libssh2-1 libldap2-dev libldap-2.4-2 libsasl2-2 \
+libpsl-dev libpsl5 libidn2-dev libidn2-0 libbrotli-dev libbrotli1 \
+libgcrypt20-dev libgcrypt20 libgpg-error0 libkeyutils-dev comerr-dev \
+libsasl2-dev libsasl2-modules-db librtmp1 \
+libgmp10 libgnutls30 libhogweed5 libnettle7 libssh-4 libunistring2 libzstd1 \
+libp11-kit0 libtasn1-6 libffi7 \
+libyaml-dev libyaml-0-2 libuv1-dev libuv1 libjansson-dev libjansson4 \
+libuuid1 libtirpc3 libbsd0 libmd4c0 libdouble-conversion3 libpcre2-8-0"
+fi
 
 cd "$TC_DIR/dl-libs"
-IDX="/tmp/pkgs-${ARCH}.txt"
+IDX="/tmp/pkgs-${ARCH}-${SUITE}.txt"
+: > "$IDX"
 # 拉取 main + universe 的 Package 索引（xz 解压；两次拼一个文件）
 for comp in main universe; do
     url="${ARCH_BASE}/dists/${SUITE}/${comp}/binary-${PORT_ARCH}/Packages.xz"
     curl -fsSL "$url" | xz -dc >> "$IDX" 2>/dev/null || echo "[WARN] $comp 索引拉取失败: $url"
 done
 awk '/^Package:/{p=$2} /^Filename:/{if (p != "") {f[p]=$2; p=""}} END{for (k in f) print k ":" f[k]}' \
-    "$IDX" > /tmp/pkgs-map-${ARCH}.txt
+    "$IDX" > "/tmp/pkgs-map-${ARCH}-${SUITE}.txt"
 declare -A FILENAME
 while read -r line; do
     [ -z "$line" ] && continue
     p="${line%%:*}"; f="${line#*:}"
     FILENAME["$p"]="$f"
-done < /tmp/pkgs-map-${ARCH}.txt
+done < "/tmp/pkgs-map-${ARCH}-${SUITE}.txt"
 
 # 并行下载（xargs -P 8）：先落清单再并发拉取，已存在文件跳过（幂等断点续跑）。
 # 顺序下载在慢网络下每包串行等待，61 包可能拖到小时级；并发显著提速。
