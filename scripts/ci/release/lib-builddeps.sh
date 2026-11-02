@@ -23,6 +23,11 @@
 # 环境：DEBIAN_FRONTEND 已设置；apt 基础依赖已装（build-essential、
 # libsqlite3-dev、zlib1g-dev、libzstd-dev、libevent-dev、
 # libnghttp2-dev、cmake（3.29.6 源码）、python3、rust 工具链）。
+#
+# 交叉模式（0.1.20 riscv64 腿）：AIRY_CROSS_TRIPLE / AIRY_CROSS_SYSROOT /
+# AIRY_CROSS_TC 三者同时给出即启用。四依赖编进目标 sysroot
+# （<sysroot>/usr，libdir=lib/<triple>），由 bootstrap-cross-toolchain.sh
+# 生成的 toolchain-<arch>.cmake 消费；非交叉路径行为完全不变。
 # ============================================================================
 set -euo pipefail
 
@@ -36,6 +41,62 @@ trap 'echo "::error::[builddeps] FAILED rc=$? cmd: ${BASH_COMMAND:-?}" >&2' ERR
 # 调用方经 AIRY_JOBS 传入（如 release.yml qemu 矩阵 -e AIRY_JOBS=2）。
 JOBS="${AIRY_JOBS:-$(nproc 2>/dev/null || echo 2)}"
 export JOBS
+
+# ── 交叉模式（AIRY_CROSS_TRIPLE 非空即启用）────────────────────────────
+# riscv64 交叉腿在 amd64 宿主上构建：四依赖一律装进目标 sysroot
+# （<sysroot>/usr，libdir=lib/<multiarch>），与 bootstrap-cross-toolchain.sh
+# 生成的 toolchain-<arch>.cmake 的 -I/-L 搜索路径同源。绝不写宿主
+# /usr/local：既污染宿主构建环境，也不会被 pkg_runtime_libs_cross 收进包。
+CROSS_TRIPLE="${AIRY_CROSS_TRIPLE:-}"
+CROSS_CMAKE=()
+CROSS_OSSL=()
+if [ -n "$CROSS_TRIPLE" ]; then
+    SYSROOT="${AIRY_CROSS_SYSROOT:?交叉模式须设 AIRY_CROSS_SYSROOT}"
+    CROSS_TC="${AIRY_CROSS_TC:?交叉模式须设 AIRY_CROSS_TC}"
+    CROSS_ARCH="${CROSS_TRIPLE%%-*}"
+    [ -f "$CROSS_TC/toolchain-${CROSS_ARCH}.cmake" ] || {
+        echo "::error::[builddeps] 缺 $CROSS_TC/toolchain-${CROSS_ARCH}.cmake" >&2
+        exit 1
+    }
+    PREFIX="$SYSROOT/usr"
+    DEPS_LIBDIR="$PREFIX/lib/$CROSS_TRIPLE"
+    OSSL_LIBDIR="lib/$CROSS_TRIPLE"
+    CROSS_CMAKE=(
+        -DCMAKE_TOOLCHAIN_FILE="$CROSS_TC/toolchain-${CROSS_ARCH}.cmake"
+        -DCMAKE_INSTALL_LIBDIR="lib/$CROSS_TRIPLE"
+    )
+    # OpenSSL 装在 lib/<multiarch>，FindOpenSSL 不以 sysroot 的 multiarch
+    # 子目录为默认搜索后缀，必须显式给出库/头路径（仅 lws 的 cmake 使用）。
+    CROSS_OSSL=(
+        -DOPENSSL_SSL_LIBRARY="$DEPS_LIBDIR/libssl.so"
+        -DOPENSSL_CRYPTO_LIBRARY="$DEPS_LIBDIR/libcrypto.so"
+        -DOPENSSL_INCLUDE_DIR="$PREFIX/include"
+    )
+    # 交叉 CC 内联 sysroot：OpenSSL Configure / curl autoconf 不走 cmake
+    # 工具链文件，必须由命令串自带根路径，否则找不到目标 libc 头文件。
+    export CC="$CROSS_TC/root/usr/bin/$CROSS_TRIPLE-gcc --sysroot=$CROSS_TC/root -I$SYSROOT/usr/include"
+    export CXX="$CROSS_TC/root/usr/bin/$CROSS_TRIPLE-g++ --sysroot=$CROSS_TC/root -I$SYSROOT/usr/include"
+    export LDFLAGS="-L$SYSROOT/usr/lib/$CROSS_TRIPLE -Wl,-rpath-link,$SYSROOT/usr/lib/$CROSS_TRIPLE"
+    # 交叉 binutils（ar/ranlib/nm/readelf）只在工具链 root 内，OpenSSL
+    # Configure 经 --cross-compile-prefix 按 PATH 查找；其运行库
+    # （libbfd/libopcodes）非标准 RUNPATH，须显式 LD_LIBRARY_PATH。
+    export PATH="$CROSS_TC/root/usr/bin:$PATH"
+    export LD_LIBRARY_PATH="$CROSS_TC/root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+    # 只认 sysroot 内 .pc：命中宿主 /usr/lib/pkgconfig 会把宿主库路径写进
+    # 目标二进制（交叉链接的经典污染面）。
+    export PKG_CONFIG_LIBDIR="$DEPS_LIBDIR/pkgconfig:$SYSROOT/usr/lib/$CROSS_TRIPLE/pkgconfig:$SYSROOT/usr/share/pkgconfig"
+    export PKG_CONFIG_PATH=
+    # curl 的 --with-openssl=DIR 只认 DIR/lib{,64}/pkgconfig；交叉安装把
+    # .pc 放在 lib/<triple>/pkgconfig，DIR 形态会退化为裸 -L 猜测。裸形态
+    # 走 pkg-config，由上面的 PKG_CONFIG_LIBDIR 精确指向 sysroot。
+    OSSL_CFG="--with-openssl"
+    echo "[builddeps] 交叉模式 $CROSS_TRIPLE：prefix=$PREFIX libdir=lib/$CROSS_TRIPLE"
+else
+    PREFIX="/usr/local"
+    DEPS_LIBDIR="$PREFIX/lib"
+    OSSL_LIBDIR="lib"
+    OSSL_CFG="--with-openssl=$PREFIX"
+fi
 
 # ── cmake ≥3.20（20.04 自带 3.16 不满足最低要求）────────────────────
 # 快路径优先级：
@@ -104,7 +165,7 @@ fi
 unset -f cmake_ge320 2>/dev/null || true
 
 # ── cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue）─────────────
-if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ]; then
+if [ ! -f "$DEPS_LIBDIR/libcjson.so" ] && [ ! -f "$PREFIX/lib64/libcjson.so" ]; then
     echo "[builddeps] 自编译 cJSON 1.7.18 …"
     if [ -f /deps/cJSON-1.7.18.tar.gz ]; then
         cp -f /deps/cJSON-1.7.18.tar.gz /tmp/cjson.tar.gz
@@ -115,8 +176,8 @@ if [ ! -f /usr/local/lib/libcjson.so ] && [ ! -f /usr/local/lib64/libcjson.so ];
     tar -xzf /tmp/cjson.tar.gz -C /tmp
     CJSON_DIR="$(ls -d /tmp/cJSON-* 2>/dev/null | head -1)"
     cmake -S "$CJSON_DIR" -B /tmp/cjson-build \
-        -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-        -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON "${CROSS_CMAKE[@]}"
     cmake --build /tmp/cjson-build --parallel "$JOBS"
     cmake --install /tmp/cjson-build
 fi
@@ -126,12 +187,12 @@ fi
 # FindOpenSSL/pkg-config 默认不搜 /usr/local/lib64 → 错解析到系统
 # 1.1.1f（不导出 EVP_DigestSignUpdate@@OPENSSL_3.0.0）→ license_sign
 # 链接失败。lib64 有残留即清理重装（幂等）。
-if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] || \
-   [ -f /usr/local/lib64/libssl.so ]; then
+if [ ! -f "$DEPS_LIBDIR/libcrypto.a" ] || [ -f "$PREFIX/lib64/libcrypto.a" ] || \
+   [ -f "$PREFIX/lib64/libssl.so" ]; then
     echo "[builddeps] 自编译 OpenSSL 3.0.17 …"
-    rm -rf /usr/local/lib64/libcrypto* /usr/local/lib64/libssl* \
-        /usr/local/lib64/pkgconfig/libcrypto.pc /usr/local/lib64/pkgconfig/libssl.pc \
-        /usr/local/include/openssl /usr/local/ssl
+    rm -rf "$PREFIX/lib64/libcrypto"* "$PREFIX/lib64/libssl"* \
+        "$PREFIX/lib64/pkgconfig/libcrypto.pc" "$PREFIX/lib64/pkgconfig/libssl.pc" \
+        "$PREFIX/include/openssl" "$PREFIX/ssl"
     if [ -f /deps/openssl-3.0.17.tar.gz ]; then
         cp -f /deps/openssl-3.0.17.tar.gz /tmp/openssl.tar.gz
     else
@@ -146,10 +207,36 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
     # 注意 uname -m 在 32 位容器里返回宿主内核架构（x86_64），必须用
     # gcc -dumpmachine 判定真实工具链；linux-generic32 走原生 32 位编译、
     # 不加 -m32。
+    if [ -n "$CROSS_TRIPLE" ]; then
+        # 交叉：目标名必须显式指定。宿主 gcc -dumpmachine 恒为 x86_64，
+        # ./config 会据此选 linux-x86_64 并编出错误指令集。
+        # Configure 恒把 --cross-compile-prefix 拼在 CC 之前
+        # （unix-Makefile.tmpl: CC=$(CROSS_COMPILE)$(CC)），而交叉模式已把
+        # CC 导出为「绝对路径 + --sysroot」命令串，二者相拼必得坏命令
+        # （riscv64-linux-gnu-/abs/...-gcc）。故子 shell 内先摘 CC/CXX，
+        # 让 Configure 落回目标默认 gcc/g++ 再拼交叉前缀；sysroot 与
+        # 第三方头/库路径改由 CFLAGS/LDFLAGS 承载（不参与前缀拼接）。
+        case "$CROSS_TRIPLE" in
+            riscv64-*) OSSL_TARGET=linux64-riscv64 ;;
+            *)
+                echo "::error::[builddeps] 未支持的交叉 OpenSSL 目标: $CROSS_TRIPLE" >&2
+                exit 1 ;;
+        esac
+        ( cd "$OPENSSL_DIR" \
+            && unset CC CXX \
+            && export PATH="$CROSS_TC/root/usr/bin:$PATH" \
+                CFLAGS="--sysroot=$CROSS_TC/root -I$SYSROOT/usr/include -O3" \
+                LDFLAGS="--sysroot=$CROSS_TC/root -L$SYSROOT/usr/lib/$CROSS_TRIPLE -Wl,-rpath-link,$SYSROOT/usr/lib/$CROSS_TRIPLE" \
+            && perl Configure "$OSSL_TARGET" no-tests \
+                --cross-compile-prefix="$CROSS_TRIPLE-" \
+                --prefix="$PREFIX" --openssldir="$PREFIX/ssl" \
+                shared --libdir="$OSSL_LIBDIR" \
+            && make -j"$JOBS" build_sw && make install_sw )
+    else
     case "$(gcc -dumpmachine 2>/dev/null)" in
         i[3-6]86-*)
             (cd "$OPENSSL_DIR" && perl Configure linux-generic32 \
-                --prefix=/usr/local --openssldir=/usr/local/ssl shared --libdir=lib \
+                --prefix="$PREFIX" --openssldir="$PREFIX/ssl" shared --libdir=lib \
                 && make -j"$JOBS" build_sw && make install_sw) ;;
         arm-*)
             # armhf 32 位（原生 AArch32 compat 或 qemu-armv7）：必须显式
@@ -161,20 +248,21 @@ if [ ! -f /usr/local/lib/libcrypto.a ] || [ -f /usr/local/lib64/libcrypto.a ] ||
             # bihf）才是事实标准。linux-armv4 与 qemu 路径下 ./config 所
             # 选目标一致，无行为漂移。
             (cd "$OPENSSL_DIR" && perl Configure linux-armv4 \
-                --prefix=/usr/local --openssldir=/usr/local/ssl shared --libdir=lib \
+                --prefix="$PREFIX" --openssldir="$PREFIX/ssl" shared --libdir=lib \
                 && make -j"$JOBS" build_sw && make install_sw) ;;
         *)
-            (cd "$OPENSSL_DIR" && ./config --prefix=/usr/local \
-                --openssldir=/usr/local/ssl shared --libdir=lib \
+            (cd "$OPENSSL_DIR" && ./config --prefix="$PREFIX" \
+                --openssldir="$PREFIX/ssl" shared --libdir=lib \
                 && make -j"$JOBS" build_sw && make install_sw) ;;
     esac
+    fi
     ldconfig 2>/dev/null || true
 else
     echo "[builddeps] OpenSSL 已就位（跳过）"
 fi
 
 # ── libcurl 8.5.0 自编译（裁剪非必需依赖）──────────────────────────────
-if [ ! -f /usr/local/lib/libcurl.so ]; then
+if [ ! -f "$DEPS_LIBDIR/libcurl.so" ]; then
     echo "[builddeps] 自编译 libcurl 8.5.0 …"
     if [ -f /deps/curl-8.5.0.tar.gz ]; then
         cp -f /deps/curl-8.5.0.tar.gz /tmp/curl.tar.gz
@@ -184,8 +272,9 @@ if [ ! -f /usr/local/lib/libcurl.so ]; then
     fi
     tar -xzf /tmp/curl.tar.gz -C /tmp
     CURL_DIR="$(ls -d /tmp/curl-* 2>/dev/null | head -1)"
-    (cd "$CURL_DIR" && ./configure --prefix=/usr/local \
-        --with-openssl=/usr/local \
+    (cd "$CURL_DIR" && ./configure --prefix="$PREFIX" --libdir="$DEPS_LIBDIR" \
+        ${CROSS_TRIPLE:+--host=$CROSS_TRIPLE} \
+        "$OSSL_CFG" \
         --without-nghttp2 --without-nghttp3 --without-libpsl --without-libidn2 \
         --without-brotli --without-zstd --without-librtmp --without-libssh2 \
         --disable-ldap --disable-ldaps --disable-rtsp --disable-dict \
@@ -193,7 +282,7 @@ if [ ! -f /usr/local/lib/libcurl.so ]; then
         --disable-smtp --disable-gopher --disable-manual --disable-debug \
         --enable-http --enable-https --enable-ftp --enable-file --with-zlib \
         && make -j"$JOBS" && make install)
-    ldconfig 2>/dev/null || true
+    [ -z "$CROSS_TRIPLE" ] && ldconfig 2>/dev/null || true
 else
     echo "[builddeps] libcurl 已就位（跳过）"
 fi
@@ -221,7 +310,7 @@ rm -f /usr/local/bin/curl /usr/local/bin/curl-config
 hash -r 2>/dev/null || true
 
 # ── libwebsockets 4.3.3 自编译（gateway_d websocket 组件，libssl.so.3）───
-if [ ! -f /usr/local/lib/libwebsockets.so ]; then
+if [ ! -f "$DEPS_LIBDIR/libwebsockets.so" ]; then
     echo "[builddeps] 自编译 libwebsockets 4.3.3 …"
     if [ -f /deps/lws-4.3.3.tar.gz ]; then
         cp -f /deps/lws-4.3.3.tar.gz /tmp/lws.tar.gz
@@ -237,23 +326,27 @@ if [ ! -f /usr/local/lib/libwebsockets.so ]; then
     # 到位到新版而失败（x86-64 回退 apt 3.16 未触发，2026-09-05 run 实证）。
     # cJSON 已同款处理，此处为 SSoT 补齐。
     cmake -S "$LWS_DIR" -B /tmp/lws-build \
-        -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DCMAKE_PREFIX_PATH=/usr/local \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+        -DCMAKE_PREFIX_PATH="$PREFIX" \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-        -DOPENSSL_ROOT_DIR=/usr/local \
+        -DOPENSSL_ROOT_DIR="$PREFIX" "${CROSS_OSSL[@]}" \
         -DLWS_WITH_SSL=ON -DLWS_WITH_SHARED=ON -DLWS_WITH_STATIC=OFF \
         -DLWS_WITHOUT_TESTAPPS=ON -DLWS_WITHOUT_TEST_SERVER=ON \
         -DLWS_WITHOUT_TEST_SERVER_EXTPOLL=ON -DLWS_WITHOUT_TEST_CLIENT=ON \
-        -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF
+        -DLWS_WITH_HTTP2=OFF -DLWS_WITH_MINIMAL_EXAMPLES=OFF "${CROSS_CMAKE[@]}"
     cmake --build /tmp/lws-build --parallel "$JOBS"
     cmake --install /tmp/lws-build
-    ldconfig 2>/dev/null || true
+    [ -z "$CROSS_TRIPLE" ] && ldconfig 2>/dev/null || true
 else
     echo "[builddeps] libwebsockets 已就位（跳过）"
 fi
 
 # 统一 pkg-config 解析到自编译库（后续 configure/cmake 依赖此环境）
-export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+if [ -n "$CROSS_TRIPLE" ]; then
+    export PKG_CONFIG_PATH="$DEPS_LIBDIR/pkgconfig"
+else
+    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+fi
 echo "[builddeps] 完成：OpenSSL 3.0.17 + libcurl 8.5.0 + libwebsockets 4.3.3"
 
 # ── 出口门：curl 命令行工具必须可用（fail-fast）───────────────────────
