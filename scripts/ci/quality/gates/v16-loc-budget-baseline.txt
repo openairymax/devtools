@@ -94,7 +94,19 @@
 # 拼接（cli_chat_memory.c seg_put）、渲染宽度（cli_render.c 删本地副本改委托）。
 # 该增量换掉的是三份各自为政的字节截断副本与由此产生的间歇 412，属缺陷
 # 归因真修复；余额随 §7.5 收敛表在 0.1.21 配减。
-core=81244
-facade=64678
+# 2026-11-02 r112：core 81244 → 81245（+1），facade 64678 → 64741（+63），
+# cupolas 不动。构成是 T-19/T-20 收口的超时预算同源化真功能，逐笔归因：
+#   ① core +1：commons ef420a5 新增 AIRY_THINK_TIMEOUT_DEFAULT_MS 宏
+#      （airy_defaults.h），三处 120000 字面量收敛至此单点；
+#   ② facade +63：T-19「预算量子 + 续期轮询」（agentrt 65d22bf68f04）——
+#      cli_think.c 量子取值链 +28、cli_gw.c 续期循环 +15、cli_gw_rpc.c
+#      call_q/json_q 变体 +13、头声明 +5、cli_orch.c 常量 +2；
+#   ③ daemons 4218964（T-20 装配期 fail fast）按同口径实测净 0
+#      （+1/-2/+1），不计增长。
+# r111 登记「三账不动」系漏账：commons 属 core、airy_cli 属 facade，均
+# 在账内，本轮以逐 commit 同口径归因纠正。属真实功能，增长即增长，不称
+# "减重"；余额随 §7.5 收敛表在 0.1.21 配减。
+core=81245
+facade=64741
 cupolas=17560
 target=79999
