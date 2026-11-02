@@ -215,7 +215,10 @@ set(CMAKE_C_COMPILER \${AIRY_TC_BIN}/${TRIPLE}-gcc)
 set(CMAKE_CXX_COMPILER \${AIRY_TC_BIN}/${TRIPLE}-g++)
 set(CMAKE_ASM_COMPILER \${AIRY_TC_BIN}/${TRIPLE}-gcc)
 
-set(CMAKE_FIND_ROOT_PATH \${AIRY_TC_ROOT};\${AIRY_SYSROOT})
+# 交叉包的 libc 开发文件（librt.so 等）落在 root/usr/<triple>/lib，不在
+# multiarch 目录下；FIND_ROOT_PATH_MODE_LIBRARY ONLY 会把它排除在
+# find_library 之外，导致 glibc<2.34 上的 shm_open/shm_unlink 链接失败。
+set(CMAKE_FIND_ROOT_PATH \${AIRY_TC_ROOT};\${AIRY_TC_ROOT}/usr/${TRIPLE};\${AIRY_SYSROOT})
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
