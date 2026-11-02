@@ -88,7 +88,7 @@ test_model_install_from_bundle() {
 
     local list_out
     list_out="$(run_airy_local "$home" model list)"
-    assert_contains "$list_out" "test-model [installed]" "list should show installed state"
+    assert_contains "$list_out" "test-model [user/installed]" "list should show installed state"
 }
 
 test_model_install_idempotent() {
@@ -160,7 +160,62 @@ test_model_remove_reverts() {
 
     local list_out
     list_out="$(run_airy_local "$home" model list)"
-    assert_contains "$list_out" "test-model [pinned]" "list should fall back to pinned after remove"
+    assert_contains "$list_out" "test-model [user/available]" "list should fall back to available after remove"
+}
+
+test_model_curated_catalog_visible() {
+    local home="${FIXTURE_ROOT}/home8"
+    local out
+    out="$(run_airy_local "$home" model list)"
+    assert_contains "$out" "qwen3.5-9b [curated/available]" "curated catalog should list shipped presets"
+    assert_contains "$out" "args: -t 12" "curated preset should expose optimized args"
+}
+
+test_model_user_layer_overrides_curated() {
+    local home="${FIXTURE_ROOT}/home9"
+    local override="${FIXTURE_ROOT}/override.list"
+    {
+        echo "version|1"
+        echo "model|qwen3.5-9b|Qwen3.5-9B-Q4_K_M.gguf|1|deadbeef"
+        echo "args|qwen3.5-9b|-t 4"
+    } > "$override"
+
+    local out
+    out="$(AIRY_LOCAL_MODEL_PIN="$override" AIRY_HOME="$home" "$AIRY_LOCAL_BIN" model list)"
+    assert_contains "$out" "args: -t 4" "user layer must override curated args"
+
+    local count
+    count="$(printf '%s\n' "$out" | grep -c '^qwen3.5-9b ' || true)"
+    assert_equal "1" "$count" "shadowed entry must be listed exactly once"
+}
+
+test_model_use_switches_active() {
+    local home="${FIXTURE_ROOT}/home10"
+    run_airy_local "$home" model install test-model
+    assert_equal "0" "$?" "install should succeed"
+
+    local registry="${home}/local/models/installed.env"
+    assert_equal "test-model" "$(airy_config_get "$registry" active_model)" "first installed model should become active"
+
+    # 伪组件 + 第二件已安装模型：验证 use 切换与声明片段 ARGS 收敛
+    local comp="${home}/local/llamacpp"
+    mkdir -p "${comp}/bin"
+    cp /bin/sh "${comp}/bin/llama-server"
+    airy_config_set "${comp}/installed.env" "server" "${comp}/bin/llama-server"
+    : > "${home}/local/models/alt.gguf"
+    airy_config_set "$registry" "model.alt-model.asset" "alt.gguf"
+    airy_config_set "$registry" "model.alt-model.args" "-t 3"
+
+    run_airy_local "$home" model use alt-model
+    assert_equal "0" "$?" "model use on installed model should succeed"
+    assert_equal "alt-model" "$(airy_config_get "$registry" active_model)" "active_model should switch"
+
+    local frag="${home}/config/managed.d/llamacpp.env"
+    assert_contains "$(airy_config_get "$frag" AIRYRT_MANAGED_ARGS)" "-t 3" "declaration should carry active model args"
+
+    local rc=0
+    run_airy_local "$home" model use no-such-model || rc=$?
+    assert_false "[[ ${rc} -eq 0 ]]" "model use on uninstalled model must fail closed"
 }
 
 test_model_unknown_fatal() {
@@ -189,6 +244,9 @@ run_all_tests() {
         "test_model_bad_sha_fail_closed"
         "test_model_size_drift_reconciles"
         "test_model_remove_reverts"
+        "test_model_curated_catalog_visible"
+        "test_model_user_layer_overrides_curated"
+        "test_model_use_switches_active"
         "test_model_unknown_fatal"
         "test_model_status_visible"
     )

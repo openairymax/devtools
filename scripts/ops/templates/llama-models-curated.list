@@ -1,0 +1,25 @@
+# AirymaxRT 自托管功能模型目录（curated，出厂自带优化配置）
+# 格式（与 llama-models.list 同源，向后兼容；新增字段均可选）：
+#   version|<目录版本>
+#   model|<name>|<asset>|<size>|<sha256>[|<repo>]
+#   args|<name>|<llama-server 参数>      运行时优化参数，由 managed 声明透传
+#   mirror|<alias>|<url-template>        template 可用 {asset} 与 {repo}
+# 分层：用户 pin 清单（AIRY_LOCAL_MODEL_PIN）优先，本目录兜底；
+# 用户在自有清单写同名 model/args 即覆盖出厂配置，写新条目即追加。
+# 参数依据：285H（Core Ultra 9 285H，16 核单 NUMA）实测 9B/Q4_K_M：
+#   -t 6/8/12/13/14/16 → 9.73/10.52/13.08/13.08/12.59/11.57 tok/s，12-13 线程为平台期
+#   单流 13.08 tok/s 已等于「有效带宽 75GB/s ÷ 权重 5.68GB」，纯 CPU 单流不可再破
+#   并发聚合（--cont-batching）：np2 18.3 / np3 22.8 / np4 29.2 tok/s，4 路后饱和
+#   故出厂取 12 线程 + 4 槽连续批处理：单流不降级（13 tok/s），多 Agent 并发可到 ~29 tok/s
+# 27B/UD-Q4_K_M（权重 16.46 GB）：
+#   -t 8/12/13/14/16 → 3.89/4.44/4.62/4.55/4.18 tok/s，13 线程为峰值
+#   -t 13 -c 8192 -fa on → 4.65 tok/s；再加 -ctk/-ctv q8_0 仍 4.65（KV 减半，速度无损）
+#   已越过「75GB/s ÷ 16.46GB = 4.56」的单流估算线 ⇒ 实测有效带宽约 76.5 GB/s
+#   并发聚合 np2/np3/np4 → 5.69/6.58/7.51 tok/s（4 路仅 1.63x），已转计算受限，
+#   故 27B 出厂取单流优先：不开 -np，保持每请求最低时延；并发场景请改用 9B 档
+version|1
+model|qwen3.5-9b|Qwen3.5-9B-Q4_K_M.gguf|5680522464|03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8|unsloth/Qwen3.5-9B-GGUF
+args|qwen3.5-9b|-t 12 -c 16384 -np 4 --cont-batching -fa on
+model|qwen3.8-27b-q4km|Qwen3.8-27B-UD-Q4_K_M.gguf|16464440224|322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482|unsloth/Qwen3.8-27B-GGUF
+args|qwen3.8-27b-q4km|-t 13 -c 8192 -fa on -ctk q8_0 -ctv q8_0
+mirror|hf-mirror|https://hf-mirror.com/{repo}/resolve/main/{asset}
