@@ -52,8 +52,9 @@ new_repo() {
 }
 
 run_gate() {
-    local repo="$1" anchor="$2"
+    local repo="$1" anchor="$2" waivers="${3:-}"
     local rc=0
+    RATCHET_WAIVERS="${waivers:-/dev/null}" \
     RATCHET_REPO="$repo" \
     RATCHET_BASELINE="$repo/v16-loc-budget-baseline.txt" \
     RATCHET_ANCHOR="$anchor" \
@@ -99,6 +100,31 @@ git -C "$TMP/c3" add -A && git -C "$TMP/c3" commit -qm "c3: post-anchor touch wi
 rc="$(run_gate "$TMP/c3" "$LEGACY")"
 expect_rc "C3 pre-anchor exemption" 0 "$rc"
 
+# ── C4: 已登记例外 + 豁免文件受背书 → 绿 ────────────────────
+section "C4: endorsed waiver for an unrewritable message must stay green"
+C4="$(new_repo "$TMP/c4")"
+printf 'core=200\nfacade=120\ncupolas=50\n' > "$TMP/c4/v16-loc-budget-baseline.txt"
+git -C "$TMP/c4" add -A && git -C "$TMP/c4" commit -qm "c2: raise facade, tag forgotten"
+SLIP="$(git -C "$TMP/c4" rev-parse HEAD)"
+printf '%s %s\n' "$SLIP" "pushed message slip, numbers re-measured" > "$TMP/c4/waivers.txt"
+git -C "$TMP/c4" add -A
+git -C "$TMP/c4" commit -qm "c3: register the waiver
+
+RATCHET-WAIVER-JUSTIFY: ${SLIP:0:12} the tag is missing in an already pushed commit"
+rc="$(run_gate "$TMP/c4" "$C4" "$TMP/c4/waivers.txt")"
+expect_rc "C4 endorsed waiver" 0 "$rc"
+
+# ── V2: 豁免文件无背书 commit → 不采信（fail-closed）→ 红 ────
+section "V2: waiver without an endorsing commit must be ignored"
+V2="$(new_repo "$TMP/v2")"
+printf 'core=200\nfacade=120\ncupolas=50\n' > "$TMP/v2/v16-loc-budget-baseline.txt"
+git -C "$TMP/v2" add -A && git -C "$TMP/v2" commit -qm "c2: raise facade, tag forgotten"
+SLIP2="$(git -C "$TMP/v2" rev-parse HEAD)"
+printf '%s %s\n' "$SLIP2" "self declared waiver" > "$TMP/v2/waivers.txt"
+git -C "$TMP/v2" add -A && git -C "$TMP/v2" commit -qm "c3: add waiver without endorsement"
+rc="$(run_gate "$TMP/v2" "$V2" "$TMP/v2/waivers.txt")"
+expect_rc "V2 unendorsed waiver" 1 "$rc"
+
 section "Gate 41 selfcheck verdict"
-log_ok "4/4 用例符合预期（一红三绿）"
+log_ok "6/6 用例符合预期（两红四绿）"
 exit 0

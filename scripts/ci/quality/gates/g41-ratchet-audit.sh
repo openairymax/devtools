@@ -10,6 +10,11 @@
 #
 # 用法: g41-ratchet-audit.sh
 # 退出码: 0=通过 1=棘轮漂移违例 2=环境错误
+#
+# 例外登记：同目录 g41-ratchet-waivers.txt，每行 "<sha(≥12)> <理由>"，用于
+# 已推送、无法改写的历史 commit 消息缺行事故（内容仍须经实测复核）。豁免
+# 文件本身受同等纪律约束：其最近一次改动 commit 必须带
+# "RATCHET-WAIVER-JUSTIFY:" 行，否则整个文件不被采信（fail-closed）。
 set -uo pipefail
 export LC_ALL=C
 
@@ -42,6 +47,33 @@ pin_at() {
 }
 
 violations=0
+WAIVERS="${RATCHET_WAIVERS:-${SCRIPT_DIR}/g41-ratchet-waivers.txt}"
+waiver_shas=()
+if [ -f "$WAIVERS" ]; then
+    waiver_rel="$(realpath --relative-to="$REPO_ROOT" "$WAIVERS" 2>/dev/null || echo "$WAIVERS")"
+    waiver_msg="$(git -C "$REPO_ROOT" log -1 --format=%B -- "$waiver_rel" 2>/dev/null || true)"
+    if printf '%s\n' "$waiver_msg" | grep -q '^RATCHET-WAIVER-JUSTIFY:'; then
+        while read -r w_sha w_rest; do
+            case "${w_sha:-}" in ''|'#'*) continue ;; esac
+            if [ -z "${w_rest:-}" ]; then
+                echo "g41: waiver without reason: ${w_sha}" >&2
+                exit 2
+            fi
+            waiver_shas+=("$w_sha")
+        done < "$WAIVERS"
+    else
+        echo "g41: waivers file lacks a RATCHET-WAIVER-JUSTIFY commit; ignored" >&2
+    fi
+fi
+
+waived() {
+    local c="$1" w
+    for w in ${waiver_shas[@]+"${waiver_shas[@]}"}; do
+        case "$c" in "$w"*) return 0 ;; esac
+    done
+    return 1
+}
+
 mapfile -t commits < <(git -C "$REPO_ROOT" log --format=%H -- "$BASELINE_REL")
 
 for ((i = 0; i < ${#commits[@]} - 1; i++)); do
@@ -64,6 +96,10 @@ for ((i = 0; i < ${#commits[@]} - 1; i++)); do
         fi
         if [ "$rose" -eq 1 ]; then
             if ! git -C "$REPO_ROOT" log -1 --format=%B "$newer" | grep -q '^RATCHET-JUSTIFY:'; then
+                if waived "$newer"; then
+                    echo "g41: WAIVED pin ${k} ${old_pins[$k]:-absent} -> ${v} in ${newer:0:12}"
+                    continue
+                fi
                 echo "g41: FAIL pin ${k} rose ${old_pins[$k]:-absent} -> ${v} in ${newer:0:12} without RATCHET-JUSTIFY"
                 violations=$((violations + 1))
             fi
