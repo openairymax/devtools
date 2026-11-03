@@ -191,7 +191,15 @@
 # 四个具名处理件（CCN 17 → 10，越过 WARN 阈值 15 的实例消失）。与 r73 同口径：
 # 拆解以行数换圈复杂度，净 +15 有效行；搬运本身净 0（5,702 行从 llm_d 迁入
 # new格 providers，两账同属 facade）。余额随 §7.5 收敛表在配减专项回收。
-core=81273
+# 2026-11-04 r126：core 81273 → 79147（-2126），facade 与 cupolas 不动。构成是
+# 批次八配减专项：旧 IPC 通道族整件退役（channel/server/client/shm/mq/rpc 六个
+# 实现件 + ipc_common 核心 + 十一个 API 头 = 2,126 有效行）。退役依据是零生产
+# 消费者——daemons / gateway / atoms / heapstore / products / sdk 全零扇入，
+# 仅自身单测自循环；且该族在 NOT WIN32 下条件编译，与三端等价可用目标背离。
+# 生产侧唯一通道为 daemon_rpc_client（socket + JSON-RPC 2.0），协议与可靠性
+# 组件（jsonrpc_helpers / method_dispatcher / param_validator / circuit_breaker /
+# ipc_backoff）全部保留。里程碑 target 79,999 达成，余量 852 行。
+core=79147
 facade=65800
 cupolas=17560
 target=79999
