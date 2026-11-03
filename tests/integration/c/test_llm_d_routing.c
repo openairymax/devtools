@@ -23,8 +23,8 @@
 #include "cache_common.h"
 #include "cost_tracker.h"
 #include "llm_service.h"
-#include "providers/core/adapter.h"
-#include "providers/core/registry.h"
+#include "airy_prov/adapter.h"
+#include "airy_prov/registry.h"
 #include "response.h"
 
 #include <assert.h>
