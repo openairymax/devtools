@@ -9,11 +9,13 @@
 #     均属五件套固定落点，先留 src/ 根、不 churn 生成器；7 领域源全部入子域。
 #
 # 断言：
-#   A1  6 域成形：src/{bootstrap,rpc,config,accounting,providers,router} 全为目录
+#   A1  5 域成形：src/{bootstrap,rpc,config,accounting,router} 全为目录
+#       （0.1.20 §13.17.45 批次七：provider 传输面迁出为独立能力格
+#        daemons/providers，llm_d 不再持有 src/providers/）
 #   A2  src/ 顶层裸文件 = 五件套固定落点 {main.c, svc.c} + 恰 1 个唯一私有头 *_internal.h
 #   A3  include/ 头集 = 2 发布头 + 1 生成头（白名单集合断言，防换名漂移）
 #   A4  唯一私有头及各域 internal.h 拆片后每片入度 ≤ 5
-#   A5  内层域（providers/router/accounting/config）对发布头 include 边 = 0（FATAL）
+#   A5  内层域（router/accounting/config）对发布头 include 边 = 0（FATAL）
 #   A6  装配域（bootstrap）对发布头残余边入基线只减不增（ops 装配现实，收敛驱动）
 #
 # 基线：v16-sample-baseline.txt（A6 台账）；--update-baseline 重建。
@@ -52,9 +54,9 @@ if [ ! -d "$LLM_D" ]; then
     exit 2
 fi
 
-# ── A1: 6 域成形 ──────────────────────────────────────────────
-section "A1: six-domain layout"
-for d in bootstrap rpc config accounting providers router; do
+# ── A1: 5 域成形 ──────────────────────────────────────────────
+section "A1: five-domain layout"
+for d in bootstrap rpc config accounting router; do
     if [ -d "${LLM_D}/src/${d}" ]; then
         log_ok "src/${d}/"
     else
@@ -62,6 +64,15 @@ for d in bootstrap rpc config accounting providers router; do
         VIOLATIONS=$((VIOLATIONS + 1))
     fi
 done
+
+# ── A1b: provider 传输面独立能力格在位（批次七迁出，勿回流 llm_d） ──
+PROVIDERS="${PROJECT_ROOT}/agent-workload/agentrt/daemons/providers"
+if [ -d "${PROVIDERS}/src/core" ] && [ -d "${PROVIDERS}/src/adapters" ]; then
+    log_ok "daemons/providers/{src/core,src/adapters} 独立能力格在位"
+else
+    log_err "missing provider capability cell: daemons/providers/src/{core,adapters}"
+    VIOLATIONS=$((VIOLATIONS + 1))
+fi
 
 # ── A2: src/ 顶层裸文件 = 五件套固定落点 ─────────────────────
 section "A2: src/ top-level bare files = five-piece landing points"
@@ -119,7 +130,7 @@ section "A5/A6: published-header reverse edges"
 declare -a A6_ENTRIES=()
 for hdr in $( ( cd "${LLM_D}/include" && ls *.h 2>/dev/null ) || true ); do
     # 内层域：硬断言零边（S2 判据）
-    for d in providers router accounting config; do
+    for d in router accounting config; do
         hits=$(grep -rl "include \"${hdr}\"\|include <${hdr}>" \
             "${LLM_D}/src/${d}" 2>/dev/null | wc -l || true)
         if [ "$hits" -gt 0 ]; then
