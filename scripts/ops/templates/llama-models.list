@@ -2,6 +2,8 @@
 # 格式：
 #   version|<清单版本>
 #   model|<name>|<asset>|<size>|<sha256>
+#   args|<name>|<llama-server 参数>      可选：运行时参数
+#   mem|<name>|<size>                   可选：稳态常驻量（派生准入门槛）
 #   mirror|<name>|<url-template>
 # sha256 实测来源：hf-mirror.com API lfs.oid（Git LFS oid 即内容 sha256，
 # 与 GitHub API digest 同法零下载核验）。

@@ -36,12 +36,13 @@ teardown_case() {
 }
 
 write_frag() {
-    local name="$1" bin="$2" ep="$3" args="$4"
+    local name="$1" bin="$2" ep="$3" args="$4" mem="${5:-}"
     {
         printf 'AIRYRT_MANAGED_NAME=%s\n' "$name"
         printf 'AIRYRT_MANAGED_BIN=%s\n' "$bin"
         printf 'AIRYRT_MANAGED_EP=%s\n' "$ep"
         [[ -n "$args" ]] && printf 'AIRYRT_MANAGED_ARGS=%s\n' "$args"
+        [[ -n "$mem" ]] && printf 'AIRYRT_MANAGED_MEM=%s\n' "$mem"
     } > "${AIRY_HOME}/config/managed.d/test.env"
 }
 
@@ -66,13 +67,26 @@ test_no_fragment_baseline() {
 
 test_fragment_ingested() {
     setup_case
-    write_frag "llama_server" "/bin/sh" "tcp:11435" "-m /models/qwen.gguf --port 11435"
+    write_frag "llama_server" "/bin/sh" "tcp:11435" "-m /models/qwen.gguf --port 11435" "9G"
     sup_write_decl
     assert_contains " $(decl AIRYRT_LAUNCH_CORE) " " llama_server " "托管名应并入 CORE"
     assert_equal "/bin/sh" "$(decl AIRYRT_LAUNCH_BIN_llama_server)" "BIN 声明应落位"
     assert_equal "tcp:11435" "$(decl AIRYRT_LAUNCH_EP_llama_server)" "EP 声明应落位"
     assert_contains "$(decl AIRYRT_LAUNCH_ARGS_llama_server)" "-m /models/qwen.gguf" "ARGS 声明应落位"
+    assert_equal "9G" "$(decl AIRYRT_LAUNCH_MEM_llama_server)" "MEM 声明应转写为准入键"
     assert_equal "llama_server" "$(decl AIRYRT_LAUNCH_MANAGED)" "托管名单应登记"
+    teardown_case
+}
+
+test_mem_withdrawn() {
+    setup_case
+    write_frag "llama_server" "/bin/sh" "tcp:11435" "" "9G"
+    sup_write_decl
+    assert_equal "9G" "$(decl AIRYRT_LAUNCH_MEM_llama_server)" "MEM 应先落位"
+    write_frag "llama_server" "/bin/sh" "tcp:11435" ""
+    sup_write_decl
+    assert_equal "" "$(decl AIRYRT_LAUNCH_MEM_llama_server)" "片段收回 MEM 后准入门槛应出清"
+    assert_contains " $(decl AIRYRT_LAUNCH_CORE) " " llama_server " "收回 MEM 不影响托管登记"
     teardown_case
 }
 
@@ -109,7 +123,7 @@ test_bad_ep_skipped() {
 
 test_fragment_retired() {
     setup_case
-    write_frag "llama_server" "/bin/sh" "tcp:11435" "-m /models/qwen.gguf"
+    write_frag "llama_server" "/bin/sh" "tcp:11435" "-m /models/qwen.gguf" "9G"
     sup_write_decl
     rm -f "${AIRY_HOME}/config/managed.d/test.env"
     sup_write_decl
@@ -117,6 +131,7 @@ test_fragment_retired() {
     assert_equal "" "$(decl AIRYRT_LAUNCH_BIN_llama_server)" "撤销后 BIN 键应出清"
     assert_equal "" "$(decl AIRYRT_LAUNCH_EP_llama_server)" "撤销后 EP 键应出清"
     assert_equal "" "$(decl AIRYRT_LAUNCH_ARGS_llama_server)" "撤销后 ARGS 键应出清"
+    assert_equal "" "$(decl AIRYRT_LAUNCH_MEM_llama_server)" "撤销后 MEM 键应出清"
     assert_equal "" "$(decl AIRYRT_LAUNCH_MANAGED)" "撤销后托管名单应为空"
     teardown_case
 }
@@ -130,12 +145,18 @@ test_airy_local_decl_sync() {
     airy_config_set "${comp}/installed.env" "server" "${comp}/bin/llama-server"
     airy_config_set "${models}/installed.env" "model.test-model.asset" "test-model-Q8_0.gguf"
     airy_config_set "${models}/installed.env" "model.test-model.sha256" "deadbeef"
+    airy_config_set "${models}/installed.env" "model.test-model.mem" "3G"
 
     airy_local_decl_sync
     local frag="${AIRY_HOME}/config/managed.d/llamacpp.env"
     assert_file_exists "$frag" "组件与模型到位应落声明片段"
     assert_equal "tcp:11435" "$(decl_get "$frag" AIRYRT_MANAGED_EP)" "EP 应取默认端口 11435"
     assert_contains "$(decl_get "$frag" AIRYRT_MANAGED_ARGS)" "test-model-Q8_0.gguf" "ARGS 应绑定在位模型"
+    assert_equal "3G" "$(decl_get "$frag" AIRYRT_MANAGED_MEM)" "MEM 应随模型体量落片"
+
+    airy_config_del "${models}/installed.env" "model.test-model.mem"
+    airy_local_decl_sync
+    assert_equal "" "$(decl_get "$frag" AIRYRT_MANAGED_MEM)" "注册表撤回体量后片段 MEM 应出清"
 
     rm -f "${models}/test-model-Q8_0.gguf"
     airy_local_decl_sync
@@ -148,6 +169,7 @@ run_all_tests() {
     local tests=(
         "test_no_fragment_baseline"
         "test_fragment_ingested"
+        "test_mem_withdrawn"
         "test_ingest_idempotent"
         "test_bad_bin_skipped"
         "test_bad_ep_skipped"

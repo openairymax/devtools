@@ -30,6 +30,7 @@ write_model_pin() {
     {
         echo "version|1"
         echo "model|test-model|${MODEL_ASSET}|${size}|${sha}"
+        echo "mem|test-model|3G"
         echo "mirror|broken|file:///nonexistent-airymax-model-test/{asset}"
     } > "$pin_file"
 }
@@ -85,6 +86,7 @@ test_model_install_from_bundle() {
     assert_equal "$MODEL_SHA" "$(airy_config_get "$registry" model.test-model.sha256)" "registry sha256 should match pin"
     assert_equal "$MODEL_SIZE" "$(airy_config_get "$registry" model.test-model.size)" "registry size should match pin"
     assert_equal "$MODEL_ASSET" "$(airy_config_get "$registry" model.test-model.asset)" "registry asset should match pin"
+    assert_equal "3G" "$(airy_config_get "$registry" model.test-model.mem)" "registry mem should carry the pin footprint"
 
     local list_out
     list_out="$(run_airy_local "$home" model list)"
@@ -157,6 +159,7 @@ test_model_remove_reverts() {
     assert_false "[[ -f ${home}/local/models/${MODEL_ASSET} ]]" "artifact must be deleted on remove"
     local registry="${home}/local/models/installed.env"
     assert_equal "" "$(airy_config_get "$registry" model.test-model.sha256)" "registry entry must be deleted on remove"
+    assert_equal "" "$(airy_config_get "$registry" model.test-model.mem)" "registry footprint must be deleted on remove"
 
     local list_out
     list_out="$(run_airy_local "$home" model list)"
