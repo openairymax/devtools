@@ -32,5 +32,10 @@
 # 退避常量、等座循环与超时告警共 22 物理行（测试在 tests/ 不计入本口径）；
 # 换掉的是「多槽端点被压成单流 → 吞吐天花板」，属缺陷真修复。拆载义务不变，
 # 0.1.21 首行执行。
-llm_d|14143|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;+6-unknown-key@09f860b;+22-gate-queue@fa0fbfd;0.1.21-split-obligation)
+# 2026-11-03 r116 再登记 +99：r113 P-T（T-23）根因修复（daemons c7eef1d）——
+# 流式回调契约改为返回取消意图后，取消需沿 sse 三段发射、toolstream 累积、
+# adapter 收尾、service_request 守卫、service_chain 端点记账、RPC 出口逐层
+# 传播，物理行 +99（测试在 tests/ 不计入本口径）。换掉的是客户端断开后上游
+# 仍继续生成、槽位与 token 持续消耗的缺陷；拆载义务不变，0.1.21 首行执行。
+llm_d|14242|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;+6-unknown-key@09f860b;+22-gate-queue@fa0fbfd;+99-cancel-prop@c7eef1d;0.1.21-split-obligation)
 tool_d|11548|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec)
