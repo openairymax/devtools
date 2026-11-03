@@ -148,7 +148,20 @@
 #      + 公共前缀/子串评分 top3），校验失败给参数契约文本。模型由此
 #      可自我纠错，属反馈归因真功能。
 # 增长即增长，不称"减重"；余额随 §7.5 收敛表在配减专项批次回收。
+# 2026-11-03 r121：facade 65152 → 65219（+67），core 与 cupolas 不动。构成是
+# 0.1.20 社区反馈②（CLI 指令不清晰）批次三的两笔（agentrt 58cd74066 /
+# e47d36f9d，tools 模块），逐笔归因：
+#   ① facade +38：分发误匹配修复——cli_dispatch_command 前缀回退判定
+#      写反（单字符输入误触首条命令、短一字符直触 /tui、尾部多字符
+#      误触 /status），收敛为精确 → 唯一前缀 → 歧义列候选三步；新增
+#      cli_cmd_exact/cli_cmd_prefix/cli_cmd_token 助手（airy_cli_cmdline.c
+#      +34、cli_internal.h +4），配分发行为测试（tests 不入账）。
+#   ② facade +29：usage 体系——cli_command_t 增 usage 字段，33 条命令
+#      表全填实；needs_args 缺参提示带用法行；/help <cmd> 单命令查询
+#      （cli_cmds.c +26、表与头 +3）。
+# 两笔换掉的是「输入被静默改道」与「参数形态靠猜」，属反馈归因真
+# 功能；余额随 §7.5 收敛表在配减专项批次回收。
 core=81256
-facade=65152
+facade=65219
 cupolas=17560
 target=79999
