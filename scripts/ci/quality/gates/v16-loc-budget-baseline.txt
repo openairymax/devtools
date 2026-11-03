@@ -133,7 +133,22 @@
 # 三笔换掉的是「客户端断开后上游仍在跑」的槽位与 token 浪费，以及双思考
 # 静默降级的 fail-open；属缺陷归因真功能，增长即增长，不称"减重"；
 # 余额随 §7.5 收敛表在 0.1.21 llm_d 拆载配减。
+# 2026-11-03 r120：facade 64846 → 65152（+306），core 与 cupolas 不动。
+# 两笔构成不同，分开登记：
+#   ① facade +192：daemons 1fceda5（supervisor_d 驻留闸）——受管进程可
+#      声明 AIRYRT_LAUNCH_MEM_<NAME>，fork 前经 airy-rt-cap admit --need
+#      判定；拒绝是结论不是故障，进程进新 wait 态按
+#      AIRYRT_SUP_ADMIT_RETRY_MS（30s）重问，不计失败不退避。属 r116
+#      之后落库未落账的一笔（本轮归因补记），换掉的是长压测引擎把
+#      机器挤挂的实机故障（登录会话进程不过 systemd 准入）。
+#   ② facade +114：daemons b84605c（0.1.20 社区反馈④批次二）——tool_d
+#      两类请求级拒绝（未知工具 / 参数校验失败）改经 result 信封回传
+#      面向模型诊断（failure_class=RESPOND_TO_MODEL 沿透传链回模型）：
+#      未知工具给 "did you mean" 近似建议（registry each_name 受控遍历
+#      + 公共前缀/子串评分 top3），校验失败给参数契约文本。模型由此
+#      可自我纠错，属反馈归因真功能。
+# 增长即增长，不称"减重"；余额随 §7.5 收敛表在配减专项批次回收。
 core=81256
-facade=64846
+facade=65152
 cupolas=17560
 target=79999
