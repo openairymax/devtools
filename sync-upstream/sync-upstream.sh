@@ -28,7 +28,8 @@ set -euo pipefail
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 仓库重组（2026-08）：agentrt-linux → agent-linux
-REPO_ROOT="$SCRIPT_DIR/../airymaxhub/agent-linux/kernel"
+# tools/sync-upstream 位于 airymaxhub/tools 下，kernel 仓库在同级的 agent-linux/kernel
+REPO_ROOT="$SCRIPT_DIR/../../agent-linux/kernel"
 LOG_DIR="$SCRIPT_DIR/logs"
 
 # ── 确保日志目录存在 ────────────────────────────────────────────────────────
