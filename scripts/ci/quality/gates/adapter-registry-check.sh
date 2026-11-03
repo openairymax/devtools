@@ -13,7 +13,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
-ADAPTERS="${PROJECT_ROOT}/agent-workload/agentrt/daemons/llm_d/src/providers/adapters"
+# 0.1.20 §13.17.45 批次七：adapter 面迁出 llm_d，成为 daemons/providers 能力格。
+ADAPTERS="${PROJECT_ROOT}/agent-workload/agentrt/daemons/providers/src/adapters"
 
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'

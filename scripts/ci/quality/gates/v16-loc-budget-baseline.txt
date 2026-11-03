@@ -185,7 +185,13 @@
 #      权限子系统等价于拒绝一切工具调用，ACL 逐条登记永不生效——缺陷归因
 #      修复，不是结构开销。
 # 增长即增长，不称"减重"；余额随 §7.5 收敛表在 0.1.21 配减。
+# 2026-11-03 r125：facade 65785 → 65800（+15），core 与 cupolas 不动。构成是
+# 批次七 llm_d 拆载附带的圈复杂度收口：provider 传输面迁出后，messages 适配层
+# 的事件映射 msg_map_event 按事件语义拆为 start/delta/block-open/block-delta
+# 四个具名处理件（CCN 17 → 10，越过 WARN 阈值 15 的实例消失）。与 r73 同口径：
+# 拆解以行数换圈复杂度，净 +15 有效行；搬运本身净 0（5,702 行从 llm_d 迁入
+# new格 providers，两账同属 facade）。余额随 §7.5 收敛表在配减专项回收。
 core=81273
-facade=65785
+facade=65800
 cupolas=17560
 target=79999
