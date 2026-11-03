@@ -107,11 +107,13 @@ airy_local_model_active() {
 }
 
 # 声明片段按当前安装态收敛：组件可执行且有在位模型才落片，否则清退。
-# 片段是机制面唯一契约（NAME/BIN/EP/ARGS），不含任何 supervisor 私有知识。
+# 片段是机制面唯一契约（NAME/BIN/EP/ARGS/MEM），不含任何 supervisor 私有知识。
 # ARGS 取注册表 model.<name>.args（安装时从目录快照），缺省回落当前目录，
 # 二者皆空则仅用最小启动参数——保证老注册表无需迁移即可继续工作。
+# MEM 取 model.<name>.mem（目录实测常驻量），未登记即出清该键——派生准入
+# 只对声明过的进程设门槛，不替用户猜体量。
 airy_local_decl_sync() {
-    local frag registry server name asset model port args
+    local frag registry server name asset model port args mem
     frag="$(airy_local_managed_file)"
     registry="$(airy_local_registry_file)"
     server="$(airy_config_get "$registry" server)"
@@ -132,12 +134,19 @@ airy_local_decl_sync() {
     port="${AIRY_LOCAL_LLM_PORT:-11435}"
     args="$(airy_config_get "$(airy_local_model_registry)" "model.${name}.args")"
     [[ -n "$args" ]] || args="$(airy_local_model_args "$name")"
+    mem="$(airy_config_get "$(airy_local_model_registry)" "model.${name}.mem")"
+    [[ -n "$mem" ]] || mem="$(airy_local_model_mem "$name")"
     airy_mkdir "$(dirname "$frag")"
     airy_config_set "$frag" "AIRYRT_MANAGED_NAME" "llama_server"
     airy_config_set "$frag" "AIRYRT_MANAGED_BIN" "$server"
     airy_config_set "$frag" "AIRYRT_MANAGED_EP" "tcp:${port}"
     airy_config_set "$frag" "AIRYRT_MANAGED_ARGS" "-m ${model} --host 127.0.0.1 --port ${port}${args:+ ${args}}"
-    airy_log_info "Managed declaration: ${frag} (tcp:${port}, model=${asset}${args:+, args=[${args}]})"
+    if [[ -n "$mem" ]]; then
+        airy_config_set "$frag" "AIRYRT_MANAGED_MEM" "$mem"
+    else
+        airy_config_del "$frag" "AIRYRT_MANAGED_MEM"
+    fi
+    airy_log_info "Managed declaration: ${frag} (tcp:${port}, model=${asset}${args:+, args=[${args}]}${mem:+, mem=${mem}})"
 }
 
 ###############################################################################
@@ -193,6 +202,22 @@ airy_local_model_args() {
     while IFS= read -r list; do
         while IFS='|' read -r f0 f1 f2; do
             if [[ "$f0" == "args" && "$f1" == "$name" ]]; then
+                printf '%s\n' "${f2:-}"
+                return 0
+            fi
+        done < "$list"
+    done < <(airy_local_model_lists)
+    return 0
+}
+
+# 模型常驻量：目录 mem 行（权重 + KV/运行时的实测体量），未声明即空。
+# 该值只作派生准入判据，不参与下载与校验；口径由目录维护者实测给出，
+# 本工具不做体量推算。
+airy_local_model_mem() {
+    local name="$1" list f0 f1 f2
+    while IFS= read -r list; do
+        while IFS='|' read -r f0 f1 f2; do
+            if [[ "$f0" == "mem" && "$f1" == "$name" ]]; then
                 printf '%s\n' "${f2:-}"
                 return 0
             fi
@@ -513,22 +538,29 @@ airy_local_cmd_model_install() {
     fi
     IFS='|' read -r asset size sha repo <<< "$record"
 
-    local models_dir registry tmp_dir target args
+    local models_dir registry tmp_dir target args mem
     models_dir="$(airy_local_models_dir)"
     registry="$(airy_local_model_registry)"
     tmp_dir="$(airy_local_home)/local/tmp"
     target="${models_dir}/${asset}"
     args="$(airy_local_model_args "$name")"
+    mem="$(airy_local_model_mem "$name")"
     airy_mkdir "$models_dir"
     airy_mkdir "$tmp_dir"
 
     # 幂等：注册表与目录一致（size+sha256）且工件在位即早退；
-    # args 单独对账——出厂目录升级后，已安装模型也能拿到新的优化参数
+    # args/mem 单独对账——出厂目录升级后，已安装模型也能拿到新的优化
+    # 参数与常驻量声明，且目录不再声明时同步出清，不留陈旧门槛
     if [[ -f "$target" ]] \
        && [[ "$(airy_config_get "$registry" "model.${name}.sha256")" == "$sha" ]] \
        && [[ "$(airy_config_get "$registry" "model.${name}.size")" == "$size" ]]; then
         if [[ -n "$args" ]]; then
             airy_config_set "$registry" "model.${name}.args" "$args"
+        fi
+        if [[ -n "$mem" ]]; then
+            airy_config_set "$registry" "model.${name}.mem" "$mem"
+        else
+            airy_config_del "$registry" "model.${name}.mem"
         fi
         airy_log_info "Already installed: model ${name} (${asset})"
         airy_local_decl_sync
@@ -557,6 +589,11 @@ airy_local_cmd_model_install() {
     airy_config_set "$registry" "model.${name}.sha256" "$sha"
     if [[ -n "$args" ]]; then
         airy_config_set "$registry" "model.${name}.args" "$args"
+    fi
+    if [[ -n "$mem" ]]; then
+        airy_config_set "$registry" "model.${name}.mem" "$mem"
+    else
+        airy_config_del "$registry" "model.${name}.mem"
     fi
     airy_config_set "$registry" "model.${name}.installed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     # 首个安装的模型自动接管服务，省掉一次 model use
@@ -636,6 +673,7 @@ airy_local_cmd_model_remove() {
     airy_config_del "$registry" "model.${name}.size"
     airy_config_del "$registry" "model.${name}.sha256"
     airy_config_del "$registry" "model.${name}.args"
+    airy_config_del "$registry" "model.${name}.mem"
     airy_config_del "$registry" "model.${name}.installed_at"
     # 卸载的正是服务模型时清 active，避免声明片段指向已删工件
     active="$(airy_config_get "$registry" active_model)"
