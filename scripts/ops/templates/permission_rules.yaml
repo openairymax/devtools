@@ -1,6 +1,10 @@
 # =============================================================================
 # AgentRT 工具级权限规则（Tool-level permission rules）
-# 版本: v1.4.0
+# 版本: v1.5.0
+#
+# v1.5.0：coding_v1 / external 补 tool_create（2026-11-03）。0.1.20 会话内
+# 自制工具：模型用 shell 脚本沉淀可复用工具，工具本体写数据目录 scripts/
+# 并即时登记；未授权则 fail-closed 拒绝，模型无法自救（"很久不会用工具"）。
 #
 # 由 daemon_security 在 daemon 启动时加载（daemon_security_load_rules_file），
 # 写入 tool_d / agent_d 等 daemon 的 ACL 表。判定为 fail-closed：
@@ -97,6 +101,9 @@ rules:
     effect: "allow"
   - agent: "coding_v1"
     tool: "maths_plot"
+    effect: "allow"
+  - agent: "coding_v1"
+    tool: "tool_create"
     effect: "allow"
 
   - agent: "backend_v1"
@@ -486,6 +493,9 @@ rules:
     effect: "allow"
   - agent: "external"
     tool: "maths_plot"
+    effect: "allow"
+  - agent: "external"
+    tool: "tool_create"
     effect: "allow"
 
   # ─── 明确拒绝示例（默认已 fail-closed，无需枚举）────────────────
