@@ -119,7 +119,21 @@
 # 指数退避）。此前四槽 llama.cpp 被压成单流，余下三路立即 CHAIN-BUSY，这是
 # r113 压测吞吐天花板的结构性成因。有效行 +13（物理行 +22，其余为注释）；
 # 余额随 §7.5 收敛表在 0.1.21 llm_d 拆载配减。
-core=81245
-facade=64756
+# 2026-11-03 r116：core 81245 → 81256（+11），facade 64756 → 64846（+90），
+# cupolas 不动。构成是 r113 P-T/P-V 的根因修复，逐笔归因：
+#   ① core +11：atoms 4234a72（T-23 消费侧）——流式回调节点由 void 改为
+#      返回取消意图，适配器置位、取块入口短路、用例侧新增取消回调；
+#      commons 6042c96 的契约改型（void → int）同口径净 0。
+#   ② facade +76：daemons c7eef1d（T-23 传输与服务策略）——取消沿
+#      sse 三段发射、toolstream 累积、adapter 收尾、service_request 守卫、
+#      service_chain 端点记账、RPC 出口逐层传播；用户取消不再记作上游
+#      故障、不再换端点重打。
+#   ③ facade +14：daemons 06e05b6（T-24）——think.process 失败由 result
+#      改走 error.data，诊断对象附 degraded 标记，服务层保留根因码。
+# 三笔换掉的是「客户端断开后上游仍在跑」的槽位与 token 浪费，以及双思考
+# 静默降级的 fail-open；属缺陷归因真功能，增长即增长，不称"减重"；
+# 余额随 §7.5 收敛表在 0.1.21 llm_d 拆载配减。
+core=81256
+facade=64846
 cupolas=17560
 target=79999
