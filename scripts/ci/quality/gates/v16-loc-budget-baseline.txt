@@ -161,7 +161,31 @@
 #      （service_chain.c +14）。
 # 两笔换掉的是「排队与在跑期间零信号像卡死」，属反馈归真功能；余额随
 # §7.5 收敛表在配减专项批次回收。
-core=81256
-facade=65271
+# 2026-11-03 r124：core 81256 → 81273（+17），facade 65271 → 65785（+514），
+# cupolas 不动。构成是社区反馈①「模型不会自制工具」的第三条工具通道
+# tool_create（会话内脚本工具），逐笔归因（有效行，测试不计）：
+#   ① core +17（commons）：airy_tool_schema.h 新增
+#      AIRY_TOOL_JSON_TOOL_CREATE 并纳入 AIRY_TOOLS_JSON_SOURCE（17 工具
+#      全量），与 tool_d 目录的双向一致由 test_registry 关系断言守护；
+#      commons 是 schema SSoT，无替代位置。
+#   ② facade +356（daemons 8fe069f）：tool_d 自制工具机制与登记面——
+#      builtin_toolmake.c +242（名字白名单、shebang 强制、参数表上限、原子
+#      落盘 tmp+rename、登记/替换、ACL 使能、面向模型的回执）、
+#      builtin_toolmake_internal.h +17（机制侧只导出 attach 与参数表释放，
+#      服务侧两动作以参数表交接）、service_builtin.c +49（登记与授权归位
+#      登记域）、registry.c +29（reg_replace 凭 executable 同路径判定可覆盖，
+#      builtin: 前缀兜底拒绝）、service.c +16（service_replace 与 worker
+#      配置定义落位）、builtin.c +2（派发行）、tool_service.h +1、
+#      registry.h +1、svc.c -1（策略侧只赋值）。
+#   ③ facade +154（daemons 6c73318）：agent_d run_loop 动态工具面——会话
+#      启动 list_tools 拉取非 builtin 条目，tool_create 成功即按实参构造
+#      schema 追加，下一轮即可按名调用；tool_d 不可达时退化为静态目录。
+#   ④ facade +4（daemons 3b93ac9）：权限默认面修复（sanitize HIGH、权限与
+#      审计使能、vault 关）。全零 daemon_security_config_t 曾让 fail-closed
+#      权限子系统等价于拒绝一切工具调用，ACL 逐条登记永不生效——缺陷归因
+#      修复，不是结构开销。
+# 增长即增长，不称"减重"；余额随 §7.5 收敛表在 0.1.21 配减。
+core=81273
+facade=65785
 cupolas=17560
 target=79999

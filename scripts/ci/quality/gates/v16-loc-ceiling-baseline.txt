@@ -37,5 +37,15 @@
 # adapter 收尾、service_request 守卫、service_chain 端点记账、RPC 出口逐层
 # 传播，物理行 +99（测试在 tests/ 不计入本口径）。换掉的是客户端断开后上游
 # 仍继续生成、槽位与 token 持续消耗的缺陷；拆载义务不变，0.1.21 首行执行。
-llm_d|14242|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;+6-unknown-key@09f860b;+22-gate-queue@fa0fbfd;+99-cancel-prop@c7eef1d;0.1.21-split-obligation)
-tool_d|11548|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec)
+# 2026-11-03 r124 再登记：tool_d 11548 → 12230（+682），llm_d 14242 → 14260
+# （+18）。两笔构成逐条归因，全部是社区反馈的缺陷真修复，不是结构开销：
+#   ① tool_d +114（r120 b84605c）——两类请求级拒绝改经 result 信封回传，
+#      未知工具给近似建议（each_name 受控遍历 + 前缀/子串评分 top3）；
+#   ② tool_d +38（r122 d135ed2）——执行池等待可见化与 worker 配置面；
+#   ③ tool_d +530（r124）——会话内自制工具 tool_create：builtin_toolmake.c
+#      与内部头、registry 的 reg_replace、service_replace、k_contract/BTOOL
+#      行、登记域两个服务侧动作（service_builtin.c，机制侧不依赖服务接口头）。
+#   ④ llm_d +18（r122 c84a8b5）——本地端点并发闸的等座可见化。
+# 拆载义务不变：llm_d 随 0.1.21 首行拆载，tool_d 的工具作坊随 0.1.21 配减。
+llm_d|14260|table1-llm_d(0.1.20,ledger-360;+16-row-diag@3026b03a8df4;E-2-split@r73;P-A-3state@e43bfbd;P-B/P-C-notready@5e9b05d,a2eaa81;P-E-gen-bound@ecc1928;+6-unknown-key@09f860b;+22-gate-queue@fa0fbfd;+99-cancel-prop@c7eef1d;+18-seat-wait@c84a8b5;0.1.21-split-obligation)
+tool_d|12230|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124)
