@@ -199,7 +199,13 @@
 # 生产侧唯一通道为 daemon_rpc_client（socket + JSON-RPC 2.0），协议与可靠性
 # 组件（jsonrpc_helpers / method_dispatcher / param_validator / circuit_breaker /
 # ipc_backoff）全部保留。里程碑 target 79,999 达成，余量 852 行。
+# 2026-11-04 r129：facade 65800 → 65801（+1），core 与 cupolas 不动。构成是
+# R-0 收尾尾巴①「启动日志版本标识」：DAEMON_VERSION 自 daemons/CMakeLists.txt
+# 定义起从未被任何目标消费，十四个 daemon 的启动横幅无版本，部署排障只能靠
+# 二进制时间戳猜构建版本。修法取单点——目录级 add_compile_definitions 注入，
+# daemon_boot 启动横幅一处消费，不为每个 daemon 复制打点。净增 1 有效行
+# （横幅格式串跨行）；CMake 侧四行为构建面，不入账。
 core=79147
-facade=65800
+facade=65801
 cupolas=17560
 target=79999
