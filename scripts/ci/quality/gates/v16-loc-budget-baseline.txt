@@ -205,7 +205,19 @@
 # 二进制时间戳猜构建版本。修法取单点——目录级 add_compile_definitions 注入，
 # daemon_boot 启动横幅一处消费，不为每个 daemon 复制打点。净增 1 有效行
 # （横幅格式串跨行）；CMake 侧四行为构建面，不入账。
+# 2026-11-04 r131：facade 65801 → 65824（+23），core 与 cupolas 不动。构成是
+# 收尾批次二查出的两处同源缺陷——「同一事实两条通道，后来只补了一条」：
+#   ① 流式终帧 'U' 由 snprintf 手搓、非流式走 response_to_json；补 timings
+#      时只补了 cJSON 那条，流式客户端只见 usage 不见分项耗时。修法=帧体
+#      改由 rpc/response.c 的 resp_usage_json 单点产出，直接复用 timings_add
+#      与 cap_add（response.c +21、response.h +1 原型）。
+#   ② parse_params 被 complete 与 complete_stream 共用，samp_flag 无条件读
+#      stream，complete 把它转发进请求体，上游回 SSE 被按 JSON 解析拒为
+#      -55。修法=解析入口声明方法能力位 PARSE_F_STREAM，非流式方法不再
+#      拥有该键（dispatch.c +4、llm_d_internal.h +2）。
+# methods.c 手搓帧体与两段 seg 拼装退役 −5。净 +23 = 21 + 1 + 4 + 2 − 5。
+# RATCHET-JUSTIFY: 8b5f734 +23 llm_d 帧体与解析入口各自收敛到单点产出
 core=79147
-facade=65801
+facade=65824
 cupolas=17560
 target=79999
