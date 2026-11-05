@@ -630,16 +630,27 @@ upload_asset() {
     # U-1 看门狗（0.1.13 rc9 实证 2026-09-08）：大包单连接长 PUT 可能长时间
     # 零进度后 502 或白等到 --max-time 3600（windows zip 实测 43min 502 /
     # 60min 0 字节 timeout，两次 attempt 共浪费 >2h）。每文件看门狗重试：
-    # curl --speed-limit 1024 --speed-time 240 —— 连续 240s 速率 <1024B/s 即
+    # curl --speed-limit 1024 --speed-time 300 —— 连续 300s 速率 <1024B/s 即
     # 中断（rc=28），杜绝白等；每次重试重新取 upload_url（预签名或已失效/
     # 残留半对象），先删残留同名再 PUT；重试耗尽仍失败才计入 UP_FAIL_LOG。
-    local attempt=0 upjson upurl rc=1
+    # v0.1.20 run3 实证（2026-11-05）：53.5MB 的 windows-x86-64.zip 四轮全败，
+    # 而同批 51.7MB 的 windows-x86-32.zip 单轮通过——是链路随机卡顿，不是
+    # 对象超限；旧日志里的 "curl rc=$?" 写在 `if curl` 复合语句之后，取到的
+    # 是 `if` 自身的退出码 0，真实退出码与 HTTP 状态全被吞掉，四轮失败无法
+    # 归因。两处一并根治：失败分支内取 rc，curl 以 -w 落 HTTP 状态；重试判据
+    # 由"固定次数"改为"次数上限 + 墙钟预算"，慢链路上的偶发卡顿不至于把整条
+    # 发布直接判红，预算内仍失败才 fail-closed。
+    local attempt=0 upjson upurl rc=1 crc=0 code=000 codef="${TMP}/put-code.txt"
+    local max_att="${UPLOAD_RETRY_MAX:-8}" budget="${UPLOAD_BUDGET:-7200}" t0="$SECONDS"
     local -a uphdr=()
-    while [ "$attempt" -lt "${UPLOAD_RETRY:-4}" ]; do
+    while [ "$attempt" -lt "$max_att" ]; do
+        if [ $((SECONDS - t0)) -ge "$budget" ]; then
+            log_warn "上传重试预算耗尽（${budget}s / ${attempt} 次）: ${b}"
+            break
+        fi
         attempt=$((attempt + 1))
         if [ "$attempt" -gt 1 ]; then
-            log_warn "PUT 失败，重试 ${attempt}/${UPLOAD_RETRY:-4}: ${b}"
-            sleep "$((attempt * 12))"
+            sleep "$((attempt * 15))"
             asset_exists "$b" && delete_existing_asset "$b"
         fi
         upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
@@ -651,15 +662,27 @@ upload_asset() {
         mapfile -t uphdr < <(python3 -c 'import json,sys
 for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     print("-H"); print(f"{k}: {v}")' <<<"$upjson")
-        if curl -fsS --connect-timeout 20 --speed-limit 1024 --speed-time 240 \
-            --max-time 3600 -X PUT "${uphdr[@]}" --upload-file "$f" "$upurl" >/dev/null 2>&1; then
+        if curl -fsS --connect-timeout 20 --speed-limit 1024 --speed-time 300 \
+            --max-time 3600 -X PUT "${uphdr[@]}" --upload-file "$f" \
+            -o /dev/null -w '%{http_code}' "$upurl" >"$codef" 2>/dev/null; then
+            rc=0
+            break
+        else
+            crc=$?
+        fi
+        code="$(tr -d '\r\n' < "$codef" 2>/dev/null)"
+        log_warn "PUT 失败(尝试 ${attempt}/${max_att}, curl rc=${crc}, http=${code:-000}): ${b}"
+        # 服务端写成功而响应丢失（OBS 502/504 与最终一致性的已知形态）时，
+        # 直接重传等于把已落地的对象再传一遍：先按下载面核内容，一致即收，
+        # 不一致（含 404 未落地/半对象）才继续下一轮。
+        if remote_matches_local "$f" "$b"; then
+            log_ok "PUT 报错但远端内容已一致（服务端已写入、响应丢失）: ${b}"
             rc=0
             break
         fi
-        log_warn "PUT 失败(尝试 ${attempt}, curl rc=$?): ${b}"
     done
     if [ "$rc" != 0 ]; then
-        log_fail "上传失败(重试耗尽): ${b}"
+        log_fail "上传失败(重试次数或预算耗尽): ${b}"
         return 1
     fi
     # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
