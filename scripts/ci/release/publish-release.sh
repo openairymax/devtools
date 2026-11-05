@@ -667,40 +667,49 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     # 仅比大小会漏 sha256/sig/manifest 等恒长小文件的覆盖失败（新旧
     # 内容等长），故对非 tar.gz 附件追加 sha256 内容比对（大包受
     # --max-time 300 下载约束，维持大小校验 + 文件名可判别覆盖与否）。
-    local local_size dl
+    # v0.1.20 run2 实证（2026-11-05）：DELETE→PUT 成功后 OBS 最终一致
+    # 性窗口内 GET 读到 0 字节或旧内容，13/31 附件校验误红；校验须
+    # 退避重试（VERIFY_RETRY 次、15s×轮次），窗口收敛即过，耗尽才红。
+    local local_size dl vtry=0
     local_size="$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null)"
-    dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
-        "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" 2>/dev/null || echo 0)"
-    if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
-        case "$b" in
-          *.tar.gz|*.zip)
-            log_ok "已上传并校验: ${b}（${dl} 字节）" ;;
-          *)
-            # 恒长小文件（sha256/sig/asc/install.*/manifest）做 sha256 内容
-            # 比对，杜绝"等长旧文件假绿"（0.1.10 同 tag 覆盖未生效实证）。
-            # 下载走临时文件（set -euo pipefail 下 curl|sha256sum 管道
-            # 失败会直接中止脚本而非走失败分支，临时文件 + if 可兜底）。
-            local local_sha dl_sha dlf
-            local_sha="$(sha256sum "$f" | awk '{print $1}')"
-            dlf="$(mktemp)"
-            dl_sha=""
-            if curl -fsSL --connect-timeout 20 --max-time 120 \
-                "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" \
-                -o "$dlf" 2>/dev/null; then
-                dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
-            fi
-            rm -f "$dlf"
-            if [ "$dl_sha" = "$local_sha" ]; then
-                log_ok "已上传并校验: ${b}（sha256 一致）"
-            else
-                log_fail "上传完整性校验失败: ${b}（sha256 不一致，疑似覆盖未生效）"
-                return 1
-            fi ;;
-        esac
-    else
-        log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
-        return 1
-    fi
+    while :; do
+        dl="$(curl -fsSL --connect-timeout 20 --max-time 300 -o /dev/null -w '%{size_download}' \
+            "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" 2>/dev/null || echo 0)"
+        if [ "$dl" = "$local_size" ] && [ "$dl" != "0" ]; then
+            case "$b" in
+              *.tar.gz|*.zip)
+                log_ok "已上传并校验: ${b}（${dl} 字节）"
+                return 0 ;;
+              *)
+                # 恒长小文件（sha256/sig/asc/install.*/manifest）做 sha256 内容
+                # 比对，杜绝"等长旧文件假绿"（0.1.10 同 tag 覆盖未生效实证）。
+                # 下载走临时文件（set -euo pipefail 下 curl|sha256sum 管道
+                # 失败会直接中止脚本而非走失败分支，临时文件 + if 可兜底）。
+                local local_sha dl_sha dlf
+                local_sha="$(sha256sum "$f" | awk '{print $1}')"
+                dlf="$(mktemp)"
+                dl_sha=""
+                if curl -fsSL --connect-timeout 20 --max-time 120 \
+                    "https://atomgit.com/${ATOMGIT_REPO}/releases/download/${CUR_TAG}/${b}" \
+                    -o "$dlf" 2>/dev/null; then
+                    dl_sha="$(sha256sum "$dlf" | awk '{print $1}')"
+                fi
+                rm -f "$dlf"
+                if [ "$dl_sha" = "$local_sha" ]; then
+                    log_ok "已上传并校验: ${b}（sha256 一致）"
+                    return 0
+                fi ;;
+            esac
+        fi
+        vtry=$((vtry + 1))
+        if [ "$vtry" -ge "${VERIFY_RETRY:-4}" ]; then
+            break
+        fi
+        log_warn "校验未过（OBS 一致性窗口，重试 ${vtry}/${VERIFY_RETRY:-4}）: ${b}"
+        sleep "$((vtry * 15))"
+    done
+    log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
+    return 1
 }
 
 # ─── 阶段 4.4：准备 latest/ 发布树（通道全集 + 启动器 + 密钥）─────────────
