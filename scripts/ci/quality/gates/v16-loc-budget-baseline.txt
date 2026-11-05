@@ -237,7 +237,17 @@
 # （主循环按回合结果判失败、chat 回执以返回码表达成败）与帮助面补退出码约定，
 # 6 行有效代码换掉「-p 恒退出 0，脚本无法判定失败」的实证缺陷。
 # RATCHET-JUSTIFY: 101209dc9 +6 CLI 退出码真实化与帮助面退出码约定
-core=79159
-facade=65877
+# 2026-11-05 r136：facade 65877 → 65875（−2），core 与 cupolas 不动。函数名
+# 长度门禁判红（daemon_rpc_call_stream_idle 27 字节 > 20）后改为 rpc_stream_idle，
+# 声明与两处调用各收短一行，属改名去重而非功能增减。
+# RATCHET-JUSTIFY: r136 -2 流式双窗口入口按函数名门禁改名
+# 2026-11-05 r137：core 79159 → 79160（+1），facade 65875 → 65878（+3），
+# cupolas 不动。终态帧补回工具轨迹：run_end 深拷贝 result.tool_trace
+# （agent_run_exec.c +3）、协议键 AIRY_RS_K_TOOL_TRACE 单点定义
+# （airy_run_stream.h +1）。换掉的是「流式客户端 Trace 面板恒空、工具参数
+# 与结果正文不可见」——tool_start/tool_end 只有动作名与成败，正文无第二条通道。
+# RATCHET-JUSTIFY: r137 +4 run_end 下发完整工具轨迹
+core=79160
+facade=65878
 cupolas=17560
 target=79999
