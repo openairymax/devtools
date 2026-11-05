@@ -640,6 +640,16 @@ upload_asset() {
     # 归因。两处一并根治：失败分支内取 rc，curl 以 -w 落 HTTP 状态；重试判据
     # 由"固定次数"改为"次数上限 + 墙钟预算"，慢链路上的偶发卡顿不至于把整条
     # 发布直接判红，预算内仍失败才 fail-closed。
+    # 单文件墙钟上限按体积推导（第三次重跑实证）：固定 3600s 对 53.5MB 是
+    # 1.1GB/h，跨境链路实测 15–25KB/s（attempt 3 用 39.5min 才成功，attempt 2
+    # 则在 http=100 之后被 3600s 打断）——「慢但仍在推进」被当成死链，白烧
+    # 一次重传。改为 size/10KB/s 推导、下限 2400s、上限 7200s，仍由 job 级
+    # timeout 兜底。
+    local sz mt
+    sz="$(stat -c %s "$f" 2>/dev/null || echo 0)"
+    mt=$(( sz / 10240 ))
+    [ "$mt" -lt 2400 ] && mt=2400
+    [ "$mt" -gt 7200 ] && mt=7200
     local attempt=0 upjson upurl rc=1 crc=0 code=000 codef="${TMP}/put-code.txt"
     local max_att="${UPLOAD_RETRY_MAX:-8}" budget="${UPLOAD_BUDGET:-7200}" t0="$SECONDS"
     local -a uphdr=()
@@ -663,7 +673,7 @@ upload_asset() {
 for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     print("-H"); print(f"{k}: {v}")' <<<"$upjson")
         if curl -fsS --connect-timeout 20 --speed-limit 1024 --speed-time 300 \
-            --max-time 3600 -X PUT "${uphdr[@]}" --upload-file "$f" \
+            --max-time "$mt" -X PUT "${uphdr[@]}" --upload-file "$f" \
             -o /dev/null -w '%{http_code}' "$upurl" >"$codef" 2>/dev/null; then
             rc=0
             break
