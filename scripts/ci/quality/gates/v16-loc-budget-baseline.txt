@@ -247,7 +247,12 @@
 # （airy_run_stream.h +1）。换掉的是「流式客户端 Trace 面板恒空、工具参数
 # 与结果正文不可见」——tool_start/tool_end 只有动作名与成败，正文无第二条通道。
 # RATCHET-JUSTIFY: r137 +4 run_end 下发完整工具轨迹
-core=79160
+# 2026-11-05 r141：core 79160 → 79173（+13），facade 与 cupolas 不动。映射装配
+# 预留哨兵槽：yaml_mapping_append 以 *count + 1 >= *cap 判扩容，merge_mapping_into
+# 返回合并后的真实容量并在 ymap_put 回写 builder 容量，换掉「条目数写满容量即
+# 失去 key==NULL 终点、遍历越界读堆残留并当作指针解引用」的线上 SIGSEGV 形态。
+# RATCHET-JUSTIFY: b96008d +13 映射装配预留哨兵槽消除越界读
+core=79173
 facade=65878
 cupolas=17560
 target=79999
