@@ -217,7 +217,23 @@
 #      拥有该键（dispatch.c +4、llm_d_internal.h +2）。
 # methods.c 手搓帧体与两段 seg 拼装退役 −5。净 +23 = 21 + 1 + 4 + 2 − 5。
 # RATCHET-JUSTIFY: 8b5f734 +23 llm_d 帧体与解析入口各自收敛到单点产出
-core=79147
-facade=65824
+# 2026-11-05 r134：core 79147 → 79159（+12），facade 65824 → 65871（+47），
+# cupolas 不动。构成是社区反馈四痛点的源码级根因修复（daemons 9686a7a /
+# ce0e5a1、atoms f5bcb66、commons 9db6464），逐笔归因：
+#   ① core +12：commons 流式双窗口入口（daemon_rpc_client.h 16 物理行 /
+#      12 有效行）与 atoms 适配器改走该入口（llm_svc_adapter +8、ops 表
+#      +6、上限宏 +4，扣除原单窗口调用 −6）。此前 request_timeout_ms 既是
+#      沉默窗口又是整条流墙钟上限，长推理长回答在 90s 被腰斩。
+#   ② facade +47：providers 工具分片归并（toolstream.c +33 有效行：缺
+#      index 时按 id 归并、无名槽丢弃；adapter.c 完整性与 flush 次序调换
+#      ±0 有效行）；agent_d 轮次预算终态移交与动态工具 schema 键名
+#      （agent_run_loop.c +18、engine.h +4、internal.h +1）；daemon 侧
+#      双窗口实现与 ops 表接线（daemon_rpc_client.c +26、bootstrap +1）。
+# 三笔换掉的是「工具调用恒报参数非法」「长回答被腰斩」「轮次耗尽即丢全部
+# 产物」「自制工具跨轮失效」四类实证故障，属缺陷归因真修复而非结构开销；
+# 增长即增长，不称"减重"；余额随 §7.5 收敛表在配减专项批次回收。
+# RATCHET-JUSTIFY: 591bb2869 +59 工具调用流式归并、双窗口预算与轮次终态移交
+core=79159
+facade=65871
 cupolas=17560
 target=79999
