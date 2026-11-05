@@ -252,7 +252,11 @@
 # 返回合并后的真实容量并在 ymap_put 回写 builder 容量，换掉「条目数写满容量即
 # 失去 key==NULL 终点、遍历越界读堆残留并当作指针解引用」的线上 SIGSEGV 形态。
 # RATCHET-JUSTIFY: b96008d +13 映射装配预留哨兵槽消除越界读
-core=79173
+# 2026-11-05 r144：core 79173 → 79185（+12），facade 与 cupolas 不动。运行时
+# 目录覆盖优先级：paths_resolve_run 以显式非空 AIRY_RUNTIME_DIR 为权威、未设
+# 时回落到 $AIRY_HOME/run 派生，换掉「平台层无条件覆盖使 -r 被静默丢弃、daemon
+# 绑定与编排探测分叉导致健康检查必红群停」的契约分叉形态。
+core=79185
 facade=65878
 cupolas=17560
 target=79999

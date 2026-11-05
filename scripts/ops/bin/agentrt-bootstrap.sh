@@ -22,7 +22,9 @@
 #   -b <bindir>    指定 daemon 二进制目录 (默认: $AIRY_HOME/bin)；目录不在
 #                  安装根内时二进制以实体复制归位到 $AIRY_HOME/bin（不建
 #                  外部软链，构建树易失会让安装产物静默换字节）
-#   -r <runtimedir> 指定运行时目录 (默认: /tmp/agentrt)
+#   -r <runtimedir> 指定运行时目录 (默认: $AIRY_HOME/run)；显式值时即
+#                  daemon 的权威 socket 目录（导出 AIRY_RUNTIME_DIR，平台层
+#                  优先于安装根派生，健康检查与 daemon 绑定同源）
 #   -t <timeout>   全局健康检查超时秒数 (默认: 120)
 #   -w / --watchdog  全部拉起后进入 watchdog 自愈巡检循环（默认每 10s，
 #                     死亡 daemon 按启动顺序自动重启，60s 内单 daemon 最多 3 次）
