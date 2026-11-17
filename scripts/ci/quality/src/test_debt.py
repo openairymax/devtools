@@ -2,11 +2,16 @@
 # -*- coding: utf-8 -*-
 # AgentRT 测试债反查（0.1.21 L-12 / §16.20.6）
 #
-# 判据：头文件里声明的每个 `airy_*` 导出符号，必须在测试树中被至少引用一次；
-#   未被引用者即「测试债」，按符号名排序输出，形成可逐条销账的台账底稿。
+# 判据：头文件里以**函数原型**声明的每个 `airy_*` 导出符号，必须在测试树中
+#   被至少引用一次；未被引用者即「测试债」，按符号名排序输出，形成可逐条
+#   销账的台账底稿。
 #
 # 为何以头文件为准：定义可能有多份实现或条件编译，而头文件是调用方唯一可见
 #   的契约面——测试没碰过头文件里的符号，就等于没测过该契约。
+#
+# 为何只认原型：`static inline` 是取用方自带实现的私有件，宏体与函数体里的
+#   `airy_*(` 是调用而非声明。把头文件里出现的每个 `airy_*(` 都算导出符号，
+#   会把私有件与调用混进账（daemons 曾因此虚报 3 条缺口），账不真实也无法销账。
 #
 # 为何不判「覆盖率百分比」：百分比会被已有大文件的用例稀释，缺口仍藏得住；
 #   逐符号反查是离散账，能把「新加了一个没人测的 API」直接顶到面前。
@@ -16,13 +21,20 @@
 #   test_debt.py --root <根> --check --base <ref>  新增符号无测试引用即非零退出
 # 退出码: 0 = 通过/仅报告；1 = 新增符号无测试引用；2 = 环境错误
 import argparse
+import io
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tarfile
+import tempfile
 
 BASE_SKIP = {".git", "build", "third_party", "cmake", "packaging", "latest"}
-SYM_RE = re.compile(r"\b(airy_[a-z0-9_]+)\s*\(")
+DECL_RE = re.compile(
+    r"^\s*(?:extern\s+)?[A-Za-z_][A-Za-z0-9_\s\*]*?[\s\*](airy_[a-z0-9_]+)\s*\("
+)
+HDR_SKIP = ("#", "typedef", "static", "return", 'extern "C"')
 
 
 def walk(root, exts, in_tests=None):
@@ -39,21 +51,54 @@ def walk(root, exts, in_tests=None):
                 yield os.path.join(base, name)
 
 
+def logical(text):
+    """按逻辑行切开：跨行原型拼回一行，宏续行并回一行，到 ; { } 收口。"""
+    buf = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not buf:
+            if not line or line.startswith(HDR_SKIP):
+                continue
+            buf = line
+        else:
+            buf = f"{buf} {line}"
+        if buf.endswith("\\"):
+            buf = buf[:-1].rstrip()
+            continue
+        if buf.endswith((";", "{", "}")):
+            yield buf
+            buf = ""
+    if buf:
+        yield buf
+
+
+def scan_text(text):
+    """从一段头文件源码里取导出原型集合。"""
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    text = re.sub(r"//[^\n]*", "", text)
+    found = set()
+    for line in logical(text):
+        m = DECL_RE.match(line)
+        if m:
+            found.add(m.group(1))
+    return found
+
+
+def scan(path):
+    """单个头文件的导出原型集合；注释先剥掉，私有件与调用不算导出。"""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return scan_text(fh.read())
+    except OSError:
+        return set()
+
+
 def declared(root):
-    """返回 {符号: 首个声明头文件}；只认看起来像函数原型的行。"""
+    """返回 {符号: 首个声明头文件}；只认函数原型。"""
     found = {}
     for path in walk(root, {".h"}, in_tests=False):
-        try:
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    s = line.strip()
-                    if not s or s.startswith(("#", "//", "/*", "*", "typedef", "static", "extern \"C\"")):
-                        continue
-                    if SYM_RE.search(s):
-                        for sym in SYM_RE.findall(s):
-                            found.setdefault(sym, os.path.relpath(path, root))
-        except OSError:
-            continue
+        for sym in sorted(scan(path)):
+            found.setdefault(sym, os.path.relpath(path, root))
     return found
 
 
@@ -69,20 +114,58 @@ def corpus(root):
     return "\n".join(chunks)
 
 
-def added_syms(root, base):
-    """从 base 起的头文件新增行里取符号，用于 --check。"""
+def _git(root, *args):
+    """成功返回 stdout 字节，失败返回 None（由调用方区分「无变更」与「出错」）。"""
     try:
-        out = subprocess.run(
-            ["git", "-C", root, "diff", "-U0", base, "--", "*.h"],
-            capture_output=True, text=True, check=False,
-        ).stdout
+        p = subprocess.run(["git", "-C", root, *args], capture_output=True, check=False)
     except OSError:
         return None
-    syms = set()
-    for line in out.splitlines():
-        if line.startswith("+") and not line.startswith("+++"):
-            syms.update(SYM_RE.findall(line))
-    return syms
+    return p.stdout if p.returncode == 0 else None
+
+
+def _tree_syms(root, rev):
+    """某个提交全部头文件的原型集合；用归档导出，不碰工作树。"""
+    arc = _git(root, "archive", "--format=tar", rev, "--", "*.h")
+    if arc is None:
+        return None
+    tmp = tempfile.mkdtemp(prefix="test-debt-")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(arc), mode="r:") as tar:
+            tar.extractall(tmp, filter="data")
+        return set(declared(tmp))
+    except (tarfile.TarError, OSError):
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def declared_at(root, base):
+    """base 侧全部导出原型；子模块按 base 记录的 gitlink 各自回看。
+
+    只比 base..HEAD 的变更行会把「头文件搬家」误判成新增 API，因此取 base
+    全树的原型集合做差；子模块是独立仓，`git show base:path` 取不到其中
+    头文件，必须按 gitlink 提交在子仓里导出。
+    """
+    found = _tree_syms(root, base)
+    if found is None:
+        print(f"test-debt: 基线 {base} 不可读", file=sys.stderr)
+        return None
+    tree = _git(root, "ls-tree", "-r", base)
+    if tree is None:
+        print(f"test-debt: 基线 {base} 的树不可读", file=sys.stderr)
+        return None
+    for line in tree.decode("utf-8", "replace").splitlines():
+        meta, _, path = line.partition("\t")
+        parts = meta.split()
+        if len(parts) < 3 or parts[0] != "160000":
+            continue
+        old = parts[2]
+        got = _tree_syms(os.path.join(root, path), old)
+        if got is None:
+            print(f"test-debt: 子模块 {path} 在基线 {old} 不可读", file=sys.stderr)
+            return None
+        found |= got
+    return found
 
 
 def main():
@@ -98,8 +181,8 @@ def main():
         return 2
     decls = declared(args.root)
     text = corpus(args.root)
-    if not decls:
-        print("test-debt: 未发现任何导出符号（检查根目录是否正确）", file=sys.stderr)
+    if not decls and not any(True for _ in walk(args.root, {".h"}, in_tests=False)):
+        print("test-debt: 根目录下没有任何头文件（检查 --root 是否正确）", file=sys.stderr)
         return 2
 
     hit = {s for s in decls if re.search(r"\b" + re.escape(s) + r"\b", text)}
@@ -109,17 +192,19 @@ def main():
     print(f"symbols={total}")
     print(f"tested={len(hit)}")
     print(f"uncovered={len(miss)}")
-    print(f"ratio={100.0 * len(hit) / total:.1f}%")
+    print(f"ratio={100.0 * len(hit) / total:.1f}%" if total else "ratio=0.0%")
     for sym in miss[: args.limit]:
         print(f"gap {sym} {decls[sym]}")
 
     rc = 0
     if args.check and args.base:
-        new = added_syms(args.root, args.base)
-        if new is None:
-            print("test-debt: git 调用失败，无法判定新增符号", file=sys.stderr)
+        base_decls = declared_at(args.root, args.base)
+        if base_decls is None:
+            print(f"test-debt: 基线 {args.base} 不可读，新增符号无法判定", file=sys.stderr)
             return 2
-        bare = sorted(s for s in new if not re.search(r"\b" + re.escape(s) + r"\b", text))
+        bare = sorted(s for s in set(decls) - base_decls
+                      if not re.search(r"\b" + re.escape(s) + r"\b", text))
+        print(f"check-base={args.base} new-symbols={len(set(decls) - base_decls)}")
         for sym in bare:
             print(f"new-uncovered {sym}")
         if bare:
