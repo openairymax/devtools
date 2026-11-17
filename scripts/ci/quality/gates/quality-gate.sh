@@ -1598,6 +1598,38 @@ gate_eco46() {
     fi
 }
 
+# Gate 47: GPU 验收分档（0.1.21 B-5）
+# CI 常跑 L0：只判探测快照合法（verdict ∈ r1/r2/r3）。L1/L2 依赖真实加速器
+# 与长压测回执，无卡 runner 不判定——脚本以 rc=3 回报 SKIP，此处按 skip 入账，
+# 绝不计为 PASS（§17.2 铁律：SKIP 与 PASS 分列）。
+gate_gpu_tiers47() {
+    section "Gate 47: GPU Acceptance Tiers (0.1.21, gate:ci)"
+    local cli="${QUALITY_GATE_BUILD_DIR}/tools/airy_cli/airy_cli"
+    local rc=0
+    "$SCRIPT_DIR/b5-gpu-tiers.sh" --tier L0 --cli "$cli" 2>&1 | gate_view || rc=$?
+    case "$rc" in
+        0) check_gate "GPUTiers47" 0 ;;
+        3) skip_b5=true; log_warn "GATE: GPUTiers47 - SKIPPED (L0 未达，见上)" ;;
+        2) log_warn "GPU tiers: environment error (rc=2)"; check_gate "GPUTiers47" 2 ;;
+        *) check_gate "GPUTiers47" 1 ;;
+    esac
+}
+
+# Gate 48: 非 GPU 路径不减配（0.1.21 B-7）
+# 复跑 0.1.20 CPU 自托管用例 + 断言无 CUDA/ROCm 硬依赖 + 九平台原生判定；
+# 非本机平台由 release.yml 对应腿承担，脚本内已按 SKIP 具名分列。
+gate_cpu_parity48() {
+    section "Gate 48: CPU Path Parity (0.1.21, gate:ci)"
+    local rc=0
+    "$SCRIPT_DIR/b7-cpu-parity.sh" --build-dir "$QUALITY_GATE_BUILD_DIR" 2>&1 | gate_view || rc=$?
+    case "$rc" in
+        0) check_gate "CPUParity48" 0 ;;
+        3) skip_b7=true; log_warn "GATE: CPUParity48 - SKIPPED (见上)" ;;
+        2) log_warn "CPU parity: environment error (rc=2)"; check_gate "CPUParity48" 2 ;;
+        *) check_gate "CPUParity48" 1 ;;
+    esac
+}
+
 # ============================================================================
 # 主函数
 # ============================================================================
@@ -1616,6 +1648,8 @@ main() {
     local skip_form_count=false
     local skip_version_consistency=false
     local skip_loc_budget=false
+    local skip_b5=false
+    local skip_b7=false
     local skip_stub_scan=false
     local skip_file_length=false
     local skip_clone=false
@@ -1700,6 +1734,14 @@ main() {
                 ;;
             --skip-loc-budget)
                 skip_loc_budget=true
+                shift
+                ;;
+            --skip-b5)
+                skip_b5=true
+                shift
+                ;;
+            --skip-b7)
+                skip_b7=true
                 shift
                 ;;
             --skip-stub-scan)
@@ -1815,7 +1857,7 @@ main() {
                 shift
                 ;;
             --help|-h)
-                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--skip-canary] [--skip-blast] [--skip-kill] [--skip-g46] [--strict]"
+                echo "Usage: $0 [--security-scan] [--skip-security] [--skip-cross-repo] [--skip-complexity] [--skip-corekern-runtime] [--skip-name-length] [--skip-loc-ceiling] [--skip-propagation] [--skip-header-shadow] [--skip-adapter-registry] [--skip-sample-form] [--skip-version-consistency] [--skip-loc-budget] [--skip-b5] [--skip-b7] [--skip-stub-scan] [--skip-file-length] [--skip-clone] [--skip-port-coord] [--skip-policy-payload] [--skip-layer] [--skip-fanout] [--skip-symbol] [--skip-logic-g38] [--skip-g30] [--skip-g37] [--skip-facade] [--skip-ratchet] [--skip-g42] [--skip-meta44] [--skip-doc45] [--skip-t36] [--skip-hotpath] [--skip-g33] [--skip-g32] [--skip-g34] [--skip-g35] [--skip-g31] [--skip-canary] [--skip-blast] [--skip-kill] [--skip-g46] [--strict]"
                 echo ""
                 echo "Quality Gates:"
                 echo "  1. Compilation Check (0e0w)"
@@ -1878,6 +1920,8 @@ main() {
                 echo "  --skip-form-count     Skip fleet form-count check (G16/G17)"
                 echo "  --skip-version-consistency  Skip version consistency check (SSoT)"
                 echo "  --skip-loc-budget     Skip G2 LOC budget (milestone ladder) check"
+                echo "  --skip-b5             Skip G47 GPU acceptance tiers (0.1.21 B-5) check"
+                echo "  --skip-b7             Skip G48 CPU path parity (0.1.21 B-7) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
                 echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
                 echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
@@ -1945,6 +1989,8 @@ main() {
         $skip_form_count || gate_form_count
         $skip_version_consistency || gate_version_consistency
         $skip_loc_budget || gate_loc_budget
+        $skip_b5 || gate_gpu_tiers47
+        $skip_b7 || gate_cpu_parity48
         $skip_stub_scan || gate_stub_scan
         $skip_file_length || gate_file_length
         $skip_clone || gate_clone
