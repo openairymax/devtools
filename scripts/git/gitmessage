@@ -1,0 +1,11 @@
+
+# <subsystem>: <祈使句摘要，无句号，≤72 列>
+#
+# 说清「为什么改」而不只是「改了什么」；结论与证据放这里，不复述 diff。
+#
+# Fixes: <短 hash ≥12 位>（仅 fix/hotfix/bugfix 类必填）
+# Gate-change: <门禁类提交必填：删弱了什么、为什么>
+# Submodule: <repo> <old>..<new>（子模块指针 bump 必填）
+# Split-: <跨 ≥3 子系统时的拆分说明>
+#
+# Signed-off-by: <自然人姓名> <邮箱>

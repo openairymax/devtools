@@ -1,0 +1,30 @@
+#!/bin/bash
+# AgentRT 提交信息钩子（0.1.21 L-11 / §16.20.5）
+#
+# 规则实现在 commit-rules.sh（单一真相），本文件只负责取到它并调用；
+#   钩子由 scripts/git/install.sh 安装，规则文件随之复制进 .git/hooks/。
+# 跳过：AIRY_COMMIT_GATE=off 仅限本地，CI 的 g47 不读取该变量。
+# 退出码：0 放行；1 拒绝；2 环境错误（规则文件缺失即拒绝，不静默放过）。
+set -uo pipefail
+export LC_ALL=C
+
+[ "${AIRY_COMMIT_GATE:-on}" = off ] && exit 0
+
+MSG_FILE="${1:-}"
+[ -n "$MSG_FILE" ] || { echo "commit-msg: 缺少消息文件参数" >&2; exit 2; }
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+RULES="${HOOK_DIR}/commit-rules.sh"
+[ -r "$RULES" ] || { echo "commit-msg: 规则文件缺失：${RULES}" >&2; exit 2; }
+# shellcheck source=commit-rules.sh
+. "$RULES"
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "commit-msg: 不在 git 仓库内" >&2; exit 2; }
+PATHS=$(mktemp "${TMPDIR:-/tmp}/airy-paths.XXXXXX") || exit 2
+trap 'rm -f "$PATHS"' EXIT
+
+staged=$(git diff --cached --name-only)
+printf '%s\n' "$staged" >"$PATHS"
+git diff --cached --raw | awk '$2 == "160000" && $1 ~ /^:/ {print "SUBMODULE", $6}' >>"$PATHS"
+
+cr_msg "$MSG_FILE" "$PATHS"
