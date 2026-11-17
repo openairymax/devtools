@@ -29,6 +29,11 @@
 #           文本），断言 gateway online、无任何 offline、汇总行 N==M 且 M>0。
 #   阶段 5  收尾：stop daemon 群（失败仅告警，容器 --rm 兜底回收），打印
 #           PASS 证据（glibc 基线 / N=M / gateway 端口）。
+#   阶段 6  （A-2，0.1.21）安装清单与卸载语义：清单存在且 schema/release 合法
+#           → entries 逐件存在 + sha256 一致（无 python，纯 sed/awk）→
+#           `--dry-run` 零副作用且 `[PLAN]` 集合与 `--keep-data` 实删逐行一致
+#           → data/ 保留、安装件与 releases/ 消失 → `--purge` 后仅剩 data/
+#           → 反例：伪造 install.env 重定向必须非零退出且受害根零删除。
 #   阶段 U  （U9，可选，第三参 prev tarball 存在时执行）：**旧版升级路径**——
 #           旧版离线安装（--from-file）→ 写用户配置 marker → airymaxrt
 #           update --file 新版（python-free 离线路径）→ 断言版本升级 + 用户
@@ -214,3 +219,70 @@ bash "$AH/bin/agentrt-bootstrap.sh" stop -s >/dev/null 2>&1 \
     || echo "::warning::daemon 群停止失败（容器 --rm 兜底回收，不阻断）"
 GLIBC="$(ldd --version 2>/dev/null | head -1 || echo 'glibc ?')"
 echo "[OK] 洁净 e2e 通过: $GLIBC | $SUMMARY | gateway 127.0.0.1:$GWP"
+
+# ─── 阶段 6（A-2）：安装清单 + 卸载语义 ───────────────────────────────────
+# 判定三值：以下任一断言失败即 FAIL；全部通过才落 [OK] a2。容器无 python，
+# 清单为单行 JSON 条目，纯 sed/awk 抽取（与 manifest_write 的发射格式同源）。
+info "阶段 6 安装清单与卸载语义（A-2）"
+MF="$AH/install-manifest.json"
+[ -f "$MF" ] || fail "A-2: 缺安装清单 $MF"
+grep -q '"schema": 1' "$MF" || fail "A-2: 清单 schema 非 1"
+REL="$(sed -n 's/^  "release": "\([^"]*\)",$/\1/p' "$MF" | head -1)"
+[ -n "$REL" ] || fail "A-2: 清单缺 release 字段"
+grep -q '"release_env_sha256": "[0-9a-f]\{64\}"' "$MF" \
+    || fail "A-2: 清单缺 release.env 摘要"
+grep '^  "build": "v[^"]*"' "$MF" >/dev/null || fail "A-2: 清单缺 build 字段"
+CNT=0
+while IFS= read -r L; do
+    P="$(printf '%s' "$L" | sed -n 's/^  {"path": "\([^"]*\)".*/\1/p')"
+    S="$(printf '%s' "$L" | sed -n 's/.*"sha256": "\([0-9a-f]*\)".*/\1/p')"
+    [ -n "$P" ] || continue
+    [ -f "$AH/$P" ] || fail "A-2: 清单件缺失: $P"
+    [ "$(sha256sum "$AH/$P" | awk '{print $1}')" = "$S" ] \
+        || fail "A-2: 清单摘要不一致: $P"
+    CNT=$((CNT + 1))
+done <<EOF
+$(grep '^  {"path":' "$MF")
+EOF
+[ "$CNT" -ge 20 ] || fail "A-2: 清单条目过少（$CNT），未覆盖安装面"
+info "清单逐件校验通过: $REL，$CNT 件"
+
+DATAF="$AH/data/e2e-keep.txt"
+mkdir -p "$AH/data" && echo keep > "$DATAF"
+bash "$INSTALLER" --uninstall --keep-data --dry-run --yes > /tmp/a2-dry.log 2>&1 \
+    || fail "A-2: --dry-run 失败"
+[ -f "$AH/bin/airy_cli" ] || fail "A-2: --dry-run 产生副作用（安装件被删）"
+grep '^\[PLAN\]' /tmp/a2-dry.log | sort > /tmp/a2-dry.plan
+[ "$(wc -l < /tmp/a2-dry.plan)" -gt 10 ] || fail "A-2: --dry-run 待删集合过小"
+bash "$INSTALLER" --uninstall --keep-data --yes > /tmp/a2-real.log 2>&1 \
+    || fail "A-2: --keep-data 卸载失败"
+grep '^\[PLAN\]' /tmp/a2-real.log | sort > /tmp/a2-real.plan
+cmp -s /tmp/a2-dry.plan /tmp/a2-real.plan \
+    || fail "A-2: 干跑集合 != 实删集合（逐行 diff 不一致）"
+[ -f "$DATAF" ] || fail "A-2: --keep-data 未保留 data/"
+[ ! -f "$MF" ] || fail "A-2: 卸载后清单仍存在"
+[ ! -e "$AH/releases" ] || fail "A-2: 卸载后 releases/ 残留"
+info "--keep-data 通过: 集合一致、data/ 保留、安装件清净"
+
+echo stray > "$AH/e2e-stray.txt"
+bash "$INSTALLER" --uninstall --purge --yes > /tmp/a2-purge.log 2>&1 \
+    || fail "A-2: --purge 失败"
+[ -f "$DATAF" ] || fail "A-2: --purge 未保留 data/"
+LEFT="$(find "$AH" -mindepth 1 -maxdepth 1 ! -name data | wc -l)"
+[ "$LEFT" -eq 0 ] || fail "A-2: --purge 后仍有 $LEFT 项残留（要求仅剩 data/）"
+info "--purge 通过: 仅剩 data/"
+
+VICTIM="$HOME/e2e-victim"
+FORGED="$HOME/e2e-forged"
+# 伪造根必须具备本产品自证物（data/agentrt）才会走到 install.env 校验，
+# 否则只证明了「非安装根拒绝」而非「重定向拒绝」。
+mkdir -p "$VICTIM/releases/x/bin" "$FORGED/config" "$FORGED/data/agentrt"
+echo keep > "$VICTIM/releases/x/bin/keep"
+echo "AIRY_HOME=$VICTIM" > "$FORGED/config/install.env"
+if bash "$INSTALLER" --prefix "$FORGED" --uninstall --yes > /tmp/a2-forged.log 2>&1; then
+    fail "A-2: 伪造 install.env 重定向未被拒绝"
+fi
+[ -f "$VICTIM/releases/x/bin/keep" ] || fail "A-2: 伪造重定向造成误删"
+info "反例通过: 伪造 install.env 被拒且零删除"
+
+echo "[OK] a2: 清单 $CNT 件 | 干跑/实删集合一致 | keep-data 保留 data/"
