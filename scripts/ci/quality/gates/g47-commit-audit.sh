@@ -63,6 +63,7 @@ while IFS= read -r sha; do
     subj=$(git -C "$REPO" log -1 --format='%s' "$sha")
     {
         git -C "$REPO" diff-tree --no-commit-id --name-only -r --root "$sha"
+        git -C "$REPO" diff-tree --no-commit-id --name-only -r --root --diff-filter=D "$sha" | sed 's/^/DELETED /'
         git -C "$REPO" diff-tree --raw --no-commit-id -r --root "$sha" \
             | awk '$2 == "160000" && $1 ~ /^:/ {print "SUBMODULE", $6}'
     } >"$TMP"

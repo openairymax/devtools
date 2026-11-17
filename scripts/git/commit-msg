@@ -25,6 +25,7 @@ trap 'rm -f "$PATHS"' EXIT
 
 staged=$(git diff --cached --name-only)
 printf '%s\n' "$staged" >"$PATHS"
+git diff --cached --name-only --diff-filter=D | sed 's/^/DELETED /' >>"$PATHS"
 git diff --cached --raw | awk '$2 == "160000" && $1 ~ /^:/ {print "SUBMODULE", $6}' >>"$PATHS"
 
 cr_msg "$MSG_FILE" "$PATHS"

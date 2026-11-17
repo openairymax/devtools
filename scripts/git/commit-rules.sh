@@ -125,23 +125,26 @@ cr_path() {
 # R4 只告警：跨子系统常是正当的协同改动，阻断会逼人拆出无法独立绿的提交。
 cr_scope() {
     local msg="$1" paths="$2" n
-    n=$(printf '%s\n' "$paths" | sed '/^$/d' | cut -d/ -f1 | sort -u | grep -c . || true)
+    n=$(printf '%s\n' "$paths" | grep -v '^SUBMODULE ' | sed 's/^DELETED //' | sed '/^$/d' | cut -d/ -f1 | sort -u | grep -c . || true)
     [ "$n" -ge 3 ] || return 0
     printf '%s\n' "$msg" | grep -qE "$CR_SPLIT_RE" && return 0
     cr_warn "R4 跨 ${n} 个顶层子系统且无 'Split-' 声明"
 }
 
-# R5 强红：改门禁可以，但必须自成一体并说明理由，否则门禁会在「顺手改」中失效。
+# R5 强红：改门禁可以，但必须自成一体；删除门禁还要说明理由——
+#   否则门禁会在「顺手改」中悄悄失效。纯新增流水线不在此列，新增不等于弱化。
 cr_gate() {
-    local msg="$1" paths="$2" others gates
-    gates=$(printf '%s\n' "$paths" | grep -E '(^|/)\.github/workflows/|[^/]*gate[^/]*\.(sh|yml|yaml)$|[^/]*check[^/]*\.sh$' || true)
+    local msg="$1" paths="$2" gates others del
+    gates=$(printf '%s\n' "$paths" | sed 's/^DELETED //' | grep -E '(^|/)\.github/workflows/|[^/]*gate[^/]*\.(sh|yml|yaml)$|[^/]*check[^/]*\.sh$' || true)
     [ -n "$gates" ] || return 0
-    others=$(printf '%s\n' "$paths" | grep -vE '(^|/)\.github/workflows/|[^/]*gate[^/]*\.(sh|yml|yaml)$|[^/]*check[^/]*\.sh$' | grep -vE '\.md$' || true)
+    others=$(printf '%s\n' "$paths" | sed 's/^DELETED //' | grep -vE '(^|/)\.github/workflows/|[^/]*gate[^/]*\.(sh|yml|yaml)$|[^/]*check[^/]*\.sh$' | grep -vE '\.md$' || true)
     if [ -n "$others" ]; then
         cr_err "R5 门禁变更与业务变更混在同一提交，须拆分"
         return 0
     fi
-    printf '%s\n' "$msg" | grep -qE "$CR_GATE_RE" || cr_err "R5 门禁提交 body 缺少 'Gate-change:' 说明"
+    del=$(printf '%s\n' "$paths" | grep '^DELETED ' | sed 's/^DELETED //' | grep -E '(^|/)\.github/workflows/|[^/]*gate[^/]*\.(sh|yml|yaml)$|[^/]*check[^/]*\.sh$' || true)
+    [ -n "$del" ] || return 0
+    printf '%s\n' "$msg" | grep -qE "$CR_GATE_RE" || cr_err "R5 删除/弱化门禁的提交 body 缺少 'Gate-change:' 说明"
 }
 
 # R8 依赖 git 的 raw diff（mode 160000）判定，故由调用方给出子模块变更清单。
