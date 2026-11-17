@@ -68,15 +68,24 @@ cr_subj() {
 }
 
 # 自然人判定：代理/机器人/发布账号一律不认；正例不设白名单，避免新同事被挡。
-cr_person() {
+# 拆成纯谓词 cr_sig_bad 供普查复用，避免 survey 与钩子出现两套「谁算机器」。
+cr_sig_bad() {
     local name="$1" mail="$2" ln lm
     ln=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
     lm=$(printf '%s' "$mail" | tr '[:upper:]' '[:lower:]')
-    case "$lm" in noreply@* | *@noreply.*) cr_err "R2 禁 noreply 署名：${name} <${mail}>"; return 1 ;; esac
+    case "$lm" in noreply@* | *@noreply.*) return 0 ;; esac
     case "$ln" in
-        *bot* | *agent* | *automation* | *robot*) cr_err "R2 禁机器身份署名：${name}"; return 1 ;;
-        'spharx ltd' | 'agentrt release') cr_err "R2 禁组织/发布账号署名：${name}"; return 1 ;;
+        *bot* | *agent* | *automation* | *robot* | 'spharx ltd') return 0 ;;
     esac
+    return 1
+}
+
+cr_person() {
+    local name="$1" mail="$2"
+    if cr_sig_bad "$name" "$mail"; then
+        cr_err "R2 禁机器/组织身份署名：${name} <${mail}>"
+        return 1
+    fi
     return 0
 }
 
