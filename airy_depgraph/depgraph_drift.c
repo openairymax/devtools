@@ -63,6 +63,10 @@ void dg_index_build(dg_index_t *idx, const dg_manifest_t *mf)
             snprintf(path, sizeof(path), "%s/platform/include", idx->root);
             dg_index_scan_dir(idx, path, name);
         } else if (strcmp(name, "include") == 0) {
+            /* [SC] 契约头物理宿主为内核 UAPI 路径 include/linux/airymax/
+             * （IRON-9 v2 字节同一），旧布局 include/airymax/ 兼容保留。 */
+            snprintf(path, sizeof(path), "%s/include/linux/airymax", idx->root);
+            dg_index_scan_dir(idx, path, name);
             snprintf(path, sizeof(path), "%s/include/airymax", idx->root);
             dg_index_scan_dir(idx, path, name);
             snprintf(path, sizeof(path), "%s/include", idx->root);
@@ -132,7 +136,9 @@ static const char *dg_owner_of(const dg_manifest_t *mf, const dg_index_t *idx,
         token += (token[0] == '.' && token[1] == '.' && token[2] == '/') ? 3 : 2;
     const char *slash = strchr(token, '/');
     if (slash) {
-        if (strncmp(token, "airymax/", 8) == 0)
+        /* 契约层前缀：linux/airymax/（[SC] UAPI 宿主）与 airymax/（旧布局） */
+        if (strncmp(token, "linux/airymax/", 14) == 0 ||
+            strncmp(token, "airymax/", 8) == 0)
             return "include";
         for (size_t i = 0; i < mf->domain_count; i++) {
             size_t len = strlen(mf->domains[i].name);

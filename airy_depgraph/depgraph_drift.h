@@ -17,7 +17,8 @@
 
 /**
  * @brief 依据 manifest 节点名建立公共头索引（utils/<域>/、platform/include、
- *        include/ + include/airymax 契约层）。0d 扁平化后 utils/<域>/ 即公共头目录。
+ *        include/ + include/linux/airymax 契约层）。0d 扁平化后 utils/<域>/
+ *        即公共头目录；[SC] 契约头物理宿主为内核 UAPI 路径。
  */
 void dg_index_build(dg_index_t *idx, const dg_manifest_t *mf);
 
