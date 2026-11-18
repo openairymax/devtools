@@ -238,8 +238,15 @@ while IFS= read -r L; do
     S="$(printf '%s' "$L" | sed -n 's/.*"sha256": "\([0-9a-f]*\)".*/\1/p')"
     [ -n "$P" ] || continue
     [ -f "$AH/$P" ] || fail "A-2: 清单件缺失: $P"
-    [ "$(sha256sum "$AH/$P" | awk '{print $1}')" = "$S" ] \
-        || fail "A-2: 清单摘要不一致: $P"
+    # 归属由清单声明（install.sh rt_owned）：运行期自有件在首次启动时被启动器
+    # 改写，装机摘要必然过期，断言存在性与卸载语义即可；其余件仍按字节比对。
+    case "$L" in
+        *'"mutable": 1'*) ;;
+        *)
+            [ "$(sha256sum "$AH/$P" | awk '{print $1}')" = "$S" ] \
+                || fail "A-2: 清单摘要不一致: $P"
+            ;;
+    esac
     CNT=$((CNT + 1))
 done <<EOF
 $(grep '^  {"path":' "$MF")
