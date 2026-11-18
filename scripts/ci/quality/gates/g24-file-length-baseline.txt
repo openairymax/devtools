@@ -1,0 +1,7 @@
+atoms/coreloopthree/include/cognition.h
+daemons/agent_d/src/run/agent_run_exec.c
+daemons/agent_d/src/run/agent_run_loop.c
+daemons/llm_d/src/rpc/service.c
+daemons/llm_d/src/rpc/service_request.c
+daemons/supervisor_d/src/proc/proc.c
+daemons/think_d/src/service/think_service.c
