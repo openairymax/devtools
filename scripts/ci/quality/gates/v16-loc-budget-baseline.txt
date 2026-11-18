@@ -276,6 +276,6 @@
 # 已接受形状（提交前先复制 plan，absorb 失败只 trace 不阻断 submit）。
 # RATCHET-JUSTIFY: 0.1.21-r8 +26 DAG 接受后回灌 L2 路线图
 core=79428
-facade=78592
+facade=78581
 cupolas=17604
 target=79999

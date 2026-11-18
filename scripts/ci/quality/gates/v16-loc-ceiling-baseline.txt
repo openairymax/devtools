@@ -53,7 +53,7 @@
 # 服务语义与 RPC。这不是把行数挪到另一个账本：传输面本来就不属于服务域，
 # 搬运后两格各自可独立编译、独立测试，且消除 14k 单体的链接期耦合。
 # 剩 tool_d 一条豁免，维持只减不增。
-# 2026-11-18 0.1.21 再登记：tool_d 12230 → 17125（+4895），llm_d 8538 → 9572
+# 2026-11-18 0.1.21 再登记：tool_d 12230 → 17127（+4897），llm_d 8538 → 9572
 # （+1034，r125 拆载后的净增）。两笔逐条归因，均为 0.1.21 的功能真增长：
 #   tool_d +1801（79da570）——网络通信族归位 tool_d/src/net（R-8 机制核
 #     减重：commons 交出传输实现，服务域留工具侧），不是复制而是搬运；
@@ -65,7 +65,9 @@
 #     工具结果信封；llm_d +1034 为 slots 单源（964ea9e）、端点探针与统计
 #     （f0f75ae/7560b0d/e4a3ee2）、本地模式模型映射（74eaa74）、上下文
 #     容量登记（bece34f/31a495a/43257e4）。
+#   tool_d +3（cf82c18）——R-8 重复代码归并：作业取槽的加锁/驱逐/重取 prologue
+#     收为 job_alloc，helper 定义减去两处重复体后净增 3 行。
 # 结论：这是 0.1.21 的功能面扩张，不是清理过渡态；拆载义务记入 0.1.22
 # 首行（llm_d 传输/运行时已另立 providers 能力格，tool_d 的 job 面待分格）。
-tool_d|17124|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a)
+tool_d|17127|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18)
 llm_d|9571|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a)
