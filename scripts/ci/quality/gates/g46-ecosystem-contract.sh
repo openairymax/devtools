@@ -44,11 +44,12 @@ precheck() {
     command -v python3 >/dev/null 2>&1 || missing="python3"
     python3 -c 'import yaml' 2>/dev/null || missing="${missing} python3-yaml"
     python3 -c 'import aiohttp' 2>/dev/null || missing="${missing} python3-aiohttp"
+    python3 -c 'import pytest_asyncio' 2>/dev/null || missing="${missing} python3-pytest-asyncio"
     python3 -m pytest --version >/dev/null 2>&1 || missing="${missing} python3-pytest"
     if [ -n "$missing" ]; then
         echo "g46: FAIL 解释器依赖缺失:${missing}" >&2
         echo "g46: 安装: sudo apt-get install -y --no-install-recommends \\" >&2
-        echo "g46:   python3 python3-yaml python3-pytest python3-aiohttp" >&2
+        echo "g46:   python3 python3-yaml python3-pytest python3-pytest-asyncio python3-aiohttp" >&2
         echo "g46: 缺依赖即判红（fail-closed，不 skip；§12.4 #9）" >&2
         return 1
     fi
