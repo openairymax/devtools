@@ -1,2 +1,8 @@
 # 0.1.19 G30 TUI single-file length baseline (<= 800 lines/file)
 # Paths relative to agent-workload/sdk/tui/src/; new over-limit files outside this list FAIL.
+# 0.1.21 登记（只降不升）：三者主体是同一 `impl App` 的会话/事件方法簇，
+#   Rust 字段私有使方法跨模块拆分须先改可见性或加访问器，属结构性重构，
+#   不在发行收尾期动；待 0.1.22 按「一个 impl 一个文件」重排后逐条消账。
+app/poll.rs
+app/task.rs
+client/tests.rs
