@@ -1630,6 +1630,22 @@ gate_cpu_parity48() {
     esac
 }
 
+# Gate 49: 不做项与回退守卫（0.1.21 B-6）
+# 七条不做项各配一条代码面负面守卫 + 命令面 fail-closed 守卫；无加速器主机
+# 另验回退落点。含加速器的主机回退需实机演练，rc=3 按 skip 入账，不计 PASS。
+gate_scope_guard49() {
+    section "Gate 49: Scope Guards (0.1.21, gate:ci)"
+    local rc=0
+    "$SCRIPT_DIR/b6-scope-guard.sh" \
+        --cli "${QUALITY_GATE_BUILD_DIR}/tools/airy_cli/airy_cli" 2>&1 | gate_view || rc=$?
+    case "$rc" in
+        0) check_gate "ScopeGuard49" 0 ;;
+        3) skip_b6=true; log_warn "GATE: ScopeGuard49 - SKIPPED (回退面未达，见上)" ;;
+        2) log_warn "scope guard: environment error (rc=2)"; check_gate "ScopeGuard49" 2 ;;
+        *) check_gate "ScopeGuard49" 1 ;;
+    esac
+}
+
 # ============================================================================
 # 主函数
 # ============================================================================
@@ -1650,6 +1666,7 @@ main() {
     local skip_loc_budget=false
     local skip_b5=false
     local skip_b7=false
+    local skip_b6=false
     local skip_stub_scan=false
     local skip_file_length=false
     local skip_clone=false
@@ -1742,6 +1759,10 @@ main() {
                 ;;
             --skip-b7)
                 skip_b7=true
+                shift
+                ;;
+            --skip-b6)
+                skip_b6=true
                 shift
                 ;;
             --skip-stub-scan)
@@ -1991,6 +2012,7 @@ main() {
         $skip_loc_budget || gate_loc_budget
         $skip_b5 || gate_gpu_tiers47
         $skip_b7 || gate_cpu_parity48
+        $skip_b6 || gate_scope_guard49
         $skip_stub_scan || gate_stub_scan
         $skip_file_length || gate_file_length
         $skip_clone || gate_clone
