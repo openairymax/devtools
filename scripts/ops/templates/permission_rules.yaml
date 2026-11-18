@@ -497,6 +497,12 @@ rules:
   - agent: "external"
     tool: "tool_create"
     effect: "allow"
+  # 特权通道：本条仅放行到工具入口，真正执行仍须同时满足「root + 命令白
+  # 名单 + 审批通过 + 本 ACL」四重条件（tool_d priv_exec 内部判定），任一
+  # 不满足即拒绝，因此与普通 shell_run 不等价。
+  - agent: "external"
+    tool: "priv_exec"
+    effect: "allow"
 
   # ─── 明确拒绝示例（默认已 fail-closed，无需枚举）────────────────
   # - agent: "coding_v1"
