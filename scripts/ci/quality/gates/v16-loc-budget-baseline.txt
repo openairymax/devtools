@@ -256,7 +256,22 @@
 # 目录覆盖优先级：paths_resolve_run 以显式非空 AIRY_RUNTIME_DIR 为权威、未设
 # 时回落到 $AIRY_HOME/run 派生，换掉「平台层无条件覆盖使 -r 被静默丢弃、daemon
 # 绑定与编排探测分叉导致健康检查必红群停」的契约分叉形态。
-core=79185
-facade=65878
-cupolas=17560
+# 2026-11-18 0.1.21 批次末三账总落账（方案 §19.2 L-1 回执）。三账一次收敛：
+#  ① core 79185 → 79428（+243）：0.1.21 机制侧真增长与减重后的净值。
+#     迁出 commons/utils/ime（209 有效行）：终端输入法属纯体验面，唯一消费者
+#     是 tools/airy_cli 的 TUI，现随宿主落 tools/airy_cli/src/tui/ime/，
+#     词典安装位置不变（share/agentrt/ime）。
+#     归位 commons/utils/network（1,182 有效行）：语义是传输机制，但唯一消费者
+#     是 tool_d 的 builtin_net（形态面单点私有实现），现落 daemons/tool_d/src/net/，
+#     头文件不再进 SDK include 树。两项合计 1,391 行离开机制核，
+#     机制核实测 80,819 → 79,428，对 target=79,999 余量 571 行。
+#  ② facade 65878 → 78554（+12,676）：R-0~R-7i 全批形态面累积的批次末总落账
+#     （方案 §10.1 批次表 361 卡 / 36,100 行预算内的落地量，含本轮迁入的
+#     ime 209 与 network 1,182）。逐批交付物见 §19.2 各任务回执，无单笔无主增量。
+#  ③ cupolas 17560 → 17604（+44）：D-14/D-15 壳层观测出口收尾（事件流帧在
+#     TUI 侧的读数与降级标记）。
+# RATCHET-JUSTIFY: 0.1.21-close +12963 全批形态面累积与机制核减重后总落账
+core=79428
+facade=78554
+cupolas=17604
 target=79999
