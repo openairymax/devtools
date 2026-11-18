@@ -271,7 +271,11 @@
 #  ③ cupolas 17560 → 17604（+44）：D-14/D-15 壳层观测出口收尾（事件流帧在
 #     TUI 侧的读数与降级标记）。
 # RATCHET-JUSTIFY: 0.1.21-close +12963 全批形态面累积与机制核减重后总落账
+# 2026-11-18 0.1.21 R-8 收口：facade 78554 → 78580（+26），core 与 cupolas
+# 不动。CLI 在 DAG 被调度器接受后经 sched.absorb 回灌计划，让 L2 路线图复用
+# 已接受形状（提交前先复制 plan，absorb 失败只 trace 不阻断 submit）。
+# RATCHET-JUSTIFY: 0.1.21-r8 +26 DAG 接受后回灌 L2 路线图
 core=79428
-facade=78554
+facade=78580
 cupolas=17604
 target=79999
