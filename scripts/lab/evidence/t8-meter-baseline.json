@@ -1,0 +1,155 @@
+{
+  "schema": "airy.t8.meter/1",
+  "measured_at": "2026-11-19T17:05:55Z",
+  "machine": "089f7fe751a3e230",
+  "backend": "cpu",
+  "model": "Qwen3-0.6B-Q8_0",
+  "llm_d_bin": "AgentRT llm_d (llm)",
+  "llama_bin": "/home/amuser/.airymaxrt/local/llamacpp/bin/llama-server",
+  "sample_note": "n<100 只报原始值（基线 SSoT §3）",
+  "tiers": {
+    "a_single": {
+      "n": 12,
+      "report_ratio": 1.0,
+      "r2_dev_max": 0.0,
+      "prefix_ratio_max": 0.0471,
+      "decode_tps_raw": [
+        69.04,
+        68.72,
+        74.88,
+        74.38,
+        68.59,
+        74.37,
+        75.68,
+        69.1,
+        74.99,
+        68.98,
+        68.84,
+        74.27
+      ],
+      "prefill_ms_raw": [
+        850.0,
+        985.4,
+        986.8,
+        953.0,
+        978.3,
+        970.0,
+        955.3,
+        948.1,
+        950.9,
+        965.5,
+        956.7,
+        983.6
+      ],
+      "evidence": "A",
+      "mem_kb": 1936504
+    },
+    "b_dual": {
+      "n": 12,
+      "report_ratio": 1.0,
+      "r2_dev_max": 0.0,
+      "prefix_ratio_max": 0.0417,
+      "decode_tps_raw": [
+        46.04,
+        45.84,
+        46.51,
+        46.51,
+        45.37,
+        44.07,
+        44.06,
+        44.14,
+        44.06,
+        44.79,
+        47.84,
+        47.64
+      ],
+      "prefill_ms_raw": [
+        2408.5,
+        2409.0,
+        2202.4,
+        2202.7,
+        2289.1,
+        2290.0,
+        2189.0,
+        2188.1,
+        2148.0,
+        2148.4,
+        2244.9,
+        2244.6
+      ],
+      "evidence": "A",
+      "mem_kb": 2249156,
+      "meas_samples": 12,
+      "agg_tps": 16.89,
+      "wave_wall_ms_raw": [
+        3061,
+        3110,
+        2912,
+        2823,
+        2780,
+        2822
+      ],
+      "wave_tps_raw": [
+        90.37,
+        91.82,
+        85.3,
+        86.52,
+        86.0,
+        93.68
+      ]
+    },
+    "c_long": {
+      "n": 12,
+      "report_ratio": 1.0,
+      "r2_dev_max": 0.0,
+      "prefix_ratio_max": 0.0037,
+      "decode_tps_raw": [
+        32.52,
+        34.11,
+        32.47,
+        28.03,
+        33.34,
+        33.48,
+        33.45,
+        33.56,
+        32.33,
+        33.45,
+        33.42,
+        33.35
+      ],
+      "prefill_ms_raw": [
+        16465.5,
+        16312.8,
+        15782.2,
+        16275.3,
+        16079.1,
+        16293.8,
+        16245.8,
+        16229.9,
+        16110.4,
+        16051.5,
+        16053.8,
+        16299.4
+      ],
+      "evidence": "A",
+      "mem_kb": 5379420
+    }
+  },
+  "verdict": {
+    "r1_report_ratio": true,
+    "r2_metering_scale": true,
+    "r3_prefix_discernible": true,
+    "r4_aggregate_plus": true,
+    "r6_concurrency_floor": true,
+    "agg_b_tps": 16.89,
+    "r6_wave_tps_raw": [
+      90.37,
+      91.82,
+      85.3,
+      86.52,
+      86.0,
+      93.68
+    ]
+  },
+  "evidence": "A"
+}
