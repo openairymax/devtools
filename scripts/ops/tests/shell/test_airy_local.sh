@@ -236,6 +236,46 @@ test_resolve_key_fallback() {
     assert_equal "${base}" "$key" "sycl should fall back to bare key"
 }
 
+# 断言汇聚：框架断言只返回状态、不中断用例；若只看最后一条命令，
+# 中间断言失败会被后续成功掩盖（假绿灯）。must 记失败，用例末尾统一返回。
+_t_fail=0
+must() { "$@" || _t_fail=1; }
+
+test_unsupported_arch_explicit() {
+    _t_fail=0
+    local pin="${FIXTURE_ROOT}/pin-unsupported.list"
+    {
+        echo "version|btest"
+        echo "unsupported|linux-riscv64|官方未发布 linux/riscv64 预编译包"
+    } > "$pin"
+
+    local out
+    out="$(
+        airy_platform_detect() { echo linux; }
+        airy_arch_detect() { echo riscv64; }
+        airy_local_resolve_key "$pin" "sycl" 2>&1
+        echo "rc=$?"
+    )"
+    must assert_contains "$out" "该架构暂无预置资产" "unsupported arch must be named explicitly"
+    must assert_contains "$out" "linux-riscv64" "unsupported message must carry the key"
+    must assert_contains "$out" "rc=1" "unsupported arch must fail the resolution"
+    return "$_t_fail"
+}
+
+test_pin_template_declares_archs() {
+    _t_fail=0
+    local pin="${AGENTRT_SCRIPTS_DIR}/templates/llama-pin.list"
+    must assert_file_exists "$pin" "shipped pin template must exist"
+    must assert_contains "$(cat "$pin")" "unsupported|linux-riscv64" \
+        "riscv64 must be declared unsupported (no fabricated digest)"
+    must assert_contains "$(cat "$pin")" "unsupported|win-x86-32" \
+        "win 32-bit must be declared unsupported (no fabricated digest)"
+    local bad
+    bad="$(awk -F'|' '$1 == "pin" && ($4 !~ /^[0-9]+$/ || $5 !~ /^[0-9a-f]{64}$/)' "$pin")"
+    must assert_equal "" "$bad" "every pin entry needs numeric size and 64-hex sha256"
+    return "$_t_fail"
+}
+
 test_fetch_verify_semantics() {
     local f="${FIXTURE_ROOT}/payload/${FIXTURE_ASSET}"
 
@@ -273,6 +313,8 @@ run_all_tests() {
         "test_remove_clean"
         "test_status_states"
         "test_resolve_key_fallback"
+        "test_unsupported_arch_explicit"
+        "test_pin_template_declares_archs"
         "test_fetch_verify_semantics"
         "test_all_sources_fail"
     )

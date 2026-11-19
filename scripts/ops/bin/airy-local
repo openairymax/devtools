@@ -220,6 +220,22 @@ airy_local_pin_version() {
     awk -F'|' '$1 == "version" { print $2; exit }' "$1"
 }
 
+# 无预置资产声明：`unsupported|<key>|<理由>` 由 pin 清单显式登记。
+# 缺资产必须是明示结论——既不能退化成内部措辞 "No pin for ..."，
+# 也不能靠下载 404 事后暴露（用户侧表现为"装不上且不知为何"）。
+airy_local_pin_unsupported() {
+    local pin_file="$1" key="$2"
+    local f0 f1 f2
+    [[ -f "$pin_file" ]] || return 1
+    while IFS='|' read -r f0 f1 f2; do
+        if [[ "$f0" == "unsupported" && "$f1" == "$key" ]]; then
+            printf '%s\n' "${f2:-未登记原因}"
+            return 0
+        fi
+    done < "$pin_file"
+    return 1
+}
+
 # 查一条模型 pin：输出 "asset|size|sha256|repo"（repo 可空），未命中返回 1
 airy_local_model_lookup() {
     local pin_file="$1" name="$2"
@@ -340,8 +356,10 @@ airy_local_resolve_key() {
     case "$(airy_arch_detect)" in
         x86_64)        arch="x64" ;;
         arm64|aarch64) arch="arm64" ;;
+        riscv64)       arch="riscv64" ;;
+        x86_32)        arch="x86-32" ;;
         *)
-            airy_log_error "Unsupported arch: $(airy_arch_detect)"
+            airy_log_error "该架构暂无预置资产（无法识别架构 $(airy_arch_detect)）"
             return 1
             ;;
     esac
@@ -353,7 +371,13 @@ airy_local_resolve_key() {
         fi
     done
 
-    airy_log_error "No pin for ${plat}-${arch} (variant: ${variant})"
+    local why
+    if why="$(airy_local_pin_unsupported "$pin_file" "${plat}-${arch}")"; then
+        airy_log_error "该架构暂无预置资产（${plat}-${arch}）：${why}"
+        airy_log_error "可改用源码构建（--mode source）或等待该架构发布后再试"
+        return 1
+    fi
+    airy_log_error "该架构暂无预置资产（${plat}-${arch}，variant: ${variant}）"
     return 1
 }
 
@@ -873,7 +897,7 @@ airy_local_main() {
 
 export -f airy_local_home airy_local_component_dir airy_local_registry_file
 export -f airy_local_pin_file airy_local_pin_lookup airy_local_pin_version
-export -f airy_local_pin_mirrors airy_local_resolve_key
+export -f airy_local_pin_unsupported airy_local_pin_mirrors airy_local_resolve_key
 export -f airy_local_models_dir airy_local_model_registry airy_local_model_pin_file
 export -f airy_local_model_curated_file airy_local_model_lists
 export -f airy_local_model_lookup airy_local_model_resolve airy_local_model_args
