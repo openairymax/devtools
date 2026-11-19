@@ -297,7 +297,14 @@
 # RATCHET-JUSTIFY: d5cbf2b +31 在途工具取消沿令牌下探到等待循环
 # RATCHET-JUSTIFY: 9d98f5f +23 安全穹顶失败拒启（boot 判定 + 两守护返回检查 + vault 硬失败）
 # RATCHET-JUSTIFY: 351166d +52 凭据库缺口令拒绝打开（口令解析含安装面 install.env）
-core=79448
+# 2026-11-19 0.1.21 B4 R15：core 79448 → 79493（+45），facade 与 cupolas
+# 不动。hall 写路径的三份编号实现（commons 写侧、atoms 运行态、gateway）收敛
+# 到单一入口 hall_evt_commit，atoms 删除私有 seq/gseq/prev/落盘四件改整体委托，
+# 同根多写者不再撞号。commons 侧 hall_event.c 已 528 行，超单文件 500 行上限，
+# 按「编号机制 / 格式落盘」拆出 hall_evt_gseq.{c,h}（201 + 48 行）；拆分净增
+# 45 行为文件头与声明面开销，无新增行为。
+# RATCHET-JUSTIFY: 9acd1770b +45 hall 写路径编号机制独立成件以守单文件 500 行上限
+core=79493
 facade=78729
 cupolas=17656
 target=79999
