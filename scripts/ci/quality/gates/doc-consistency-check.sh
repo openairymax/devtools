@@ -14,10 +14,11 @@
 #     1 <= n1 且 (n2|n1) <= total_lines + 3；多候选任一命中即绿）
 #   B 证据清单逐项存在且非空（0 字节证据 = 未验收）
 #   C 主仓子模块指针无漂移（根非 git 仓时隔离模式跳过）
+#   D 过期数字与旧口径零命中（0.1.21 方案 §19.2 L-7；历史语境行豁免）
 #
 # 用法: doc-consistency-check.sh
 # 环境变量（selfcheck 隔离注入用）：DOC_CONSISTENCY_ROOT / DOC_CONSISTENCY_DOCS
-#   / DOC_CONSISTENCY_EVIDENCE；未注入时走仓根默认值（生产形态）。
+#   / DOC_CONSISTENCY_EVIDENCE / DOC_CONSISTENCY_STALE；未注入时走仓根默认值（生产形态）。
 # 退出码: 0 = 通过；1 = 存在违例；2 = 环境错误（清单或受辖文档缺席，fail-closed）
 set -euo pipefail
 export LC_ALL=C
@@ -26,6 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${DOC_CONSISTENCY_ROOT:-$(cd "$SCRIPT_DIR/../../../../.." && pwd)}"
 DOCS_MANIFEST="${DOC_CONSISTENCY_DOCS:-${SCRIPT_DIR}/doc-consistency-docs.txt}"
 EVIDENCE_MANIFEST="${DOC_CONSISTENCY_EVIDENCE:-${SCRIPT_DIR}/doc-evidence-files.txt}"
+STALE_MANIFEST="${DOC_CONSISTENCY_STALE:-${SCRIPT_DIR}/doc-stale-patterns.txt}"
 
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
@@ -41,6 +43,7 @@ VIOLATIONS=0
 # ── 环境前置（fail-closed：清单/受辖文档缺席 = 环境错误 rc=2）──
 [ -f "$DOCS_MANIFEST" ] || { echo "受辖文档清单缺失: $DOCS_MANIFEST"; exit 2; }
 [ -f "$EVIDENCE_MANIFEST" ] || { echo "证据清单缺失: $EVIDENCE_MANIFEST"; exit 2; }
+[ -f "$STALE_MANIFEST" ] || { echo "过期口径清单缺失: $STALE_MANIFEST"; exit 2; }
 [ -d "$PROJECT_ROOT" ] || { echo "审计根缺失: $PROJECT_ROOT"; exit 2; }
 
 DOC_COUNT=0
@@ -194,11 +197,38 @@ else
     log_info "C 根非 git 工作树，Q13 不适用（隔离模式）"
 fi
 
+# ── 子检查 D：过期数字与旧口径零命中（0.1.21 §19.2 L-7）─────
+section "D: stale numbers zero-hit (L-7)"
+# 历史语境豁免：勘误表、账本对照、判据描述里对旧值的引用不算现行口径。
+STALE_EXEMPT='(过期|冲突|勘误|缺陷|历史|判据|已删|旧|vs|r1[0-9][0-9]|0\.1\.20)'
+D_BAD=0
+D_ROWS=0
+while IFS='|' read -r rel pat desc; do
+    case "$rel" in ''|'#'*) continue ;; esac
+    D_ROWS=$((D_ROWS + 1))
+    f="${PROJECT_ROOT}/${rel}"
+    [ -f "$f" ] || { echo "D 受检文档缺席（fail-closed）: $rel"; exit 2; }
+    hits="$(grep -nE "$pat" "$f" 2>/dev/null | grep -Ev "$STALE_EXEMPT" || true)"
+    if [ -n "$hits" ]; then
+        printf '%s\n' "$hits" | sed "s|^|${rel}:|" | cut -c1-200
+        log_err "D 过期口径未标注历史语境: ${pat}（${desc}）"
+        D_BAD=$((D_BAD + $(printf '%s\n' "$hits" | wc -l)))
+    fi
+done < "$STALE_MANIFEST"
+if [ "$D_ROWS" -eq 0 ]; then
+    echo "过期口径清单为空（fail-closed）"; exit 2
+fi
+if [ "$D_BAD" -eq 0 ]; then
+    log_ok "D 过期数字与旧口径零命中（${D_ROWS} 条规则，历史语境行豁免）"
+else
+    VIOLATIONS=$((VIOLATIONS + D_BAD))
+fi
+
 # ── 裁决 ────────────────────────────────────────────────────
 section "Verdict"
 if [ "$VIOLATIONS" -gt 0 ]; then
     log_err "Gate 45 文档-代码一致性违例 ${VIOLATIONS} 项"
     exit 1
 fi
-log_ok "Gate 45 文档-代码一致性通过（A/B/C 三合一）"
+log_ok "Gate 45 文档-代码一致性通过（A/B/C/D 四合一）"
 exit 0
