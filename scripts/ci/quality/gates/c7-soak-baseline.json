@@ -1,0 +1,69 @@
+{
+  "machine": {
+    "cpu_count": 16,
+    "machine": "x86_64",
+    "node": "airymax-pc",
+    "python": "3.11.6",
+    "release": "6.6.161-alk.13",
+    "system": "Linux"
+  },
+  "measured_at": "2026-11-19T19:10:22Z",
+  "params": {
+    "base_url": "http://127.0.0.1:21480/v1",
+    "concurrency": 1,
+    "duration_s": 1800,
+    "model": "/home/amuser/.airymaxrt/local/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf",
+    "pid": 27872,
+    "sample_interval_s": 30
+  },
+  "profile": "local_cpu",
+  "release": "0.1.21",
+  "schema": "airy.c7.soak/1",
+  "summary": {
+    "decode_tps": {
+      "min": 10.51,
+      "p50": 11.58
+    },
+    "fail_rate": 0.0,
+    "requests_failed": 0,
+    "requests_ok": 322,
+    "requests_total": 322,
+    "resources": {
+      "fd_count": {
+        "first": 4,
+        "last": 5,
+        "peak": 5
+      },
+      "rss_mb": {
+        "first": 7983.5,
+        "last": 7990.1,
+        "peak": 7990.1
+      },
+      "samples_n": 61
+    },
+    "tokens_total": 20608,
+    "total_ms": {
+      "p50": 5533.2,
+      "p95": 5913.2,
+      "p99": 6174.3
+    },
+    "ttft_ms": {
+      "max": 736.7,
+      "p50": 90.5,
+      "p95": 140.9,
+      "p99": 694.2
+    },
+    "wall_duration_s": 1830.0
+  },
+  "thresholds": {
+    "ci_min_duration_s": 300,
+    "max_fail_rate": 0.02,
+    "max_fd_peak": 512,
+    "max_rss_growth_mb": 256,
+    "max_ttft_p50_ms": 2000,
+    "max_ttft_p99_ms": 30000,
+    "min_decode_tps_p50": 5.0,
+    "runtime_min_duration_s": 1800
+  },
+  "verdict": "measured"
+}
