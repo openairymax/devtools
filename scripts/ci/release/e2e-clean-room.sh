@@ -214,6 +214,63 @@ if [ "$N" != "$M" ] || [ "$M" -le 0 ]; then
 fi
 info "CLI 冒烟通过: $SUMMARY"
 
+# ─── 阶段 4b（R17）：真实业务链路（工具执行 + 审计/台账 + run_stream） ────
+# 判据出处：docs-closed/agent-workload-dev/0.1.21-架构改进方案.md §24.2 R17
+# —— 原 e2e 止于 /daemons 只读视图，业务链路（工具执行、审计落盘、会话
+# 流式终结）无任何出证。洁净机无模型，run_stream 一轮只能收敛到"模型
+# 缺失"终态，故断言锚定协议信封与终结帧（失败必须显式归因），模型输出
+# 本身不作断言，避免以桩/假绿灯换取通过。
+info "阶段 4b 真实链路: 工具目录 → 工具执行 → 台账/审计 → run_stream"
+CLI="$AH/bin/airy_cli"
+
+# 4b-1 工具目录（只读面，不经审批门）：tool_d 注册表经 gateway 可达。
+TOOLS="$(timeout 60 "$CLI" -p '/rpc tool.list_tools' 2>&1 | tr -d '\r')"
+printf '%s' "$TOOLS" | grep -q 'fs_list' \
+    || fail "R17: tool.list_tools 未返回内置工具（$(printf '%s' "$TOOLS" | head -2)）"
+
+# 4b-2 工具执行：fs_list 无参=列 daemon 工作区自身（不依赖既有内容，也不
+# 触碰网络/外部 daemon）。builtin 对 tool_d 主体默认放行，成功即应同时
+# 留下作业台账与审计两条持久化痕迹——三面同时出证才算通过。
+EXEC="$(timeout 60 "$CLI" -p \
+    '/rpc tool.execute_tool {"tool_id":"fs_list","params":{}}' 2>&1 | tr -d '\r')"
+printf '%s' "$EXEC" | grep -Eq '"success"[[:space:]]*:[[:space:]]*1' \
+    || fail "R17: tool.execute_tool 失败（$(printf '%s' "$EXEC" | head -2)）"
+JOB_ID="$(printf '%s' "$EXEC" \
+    | sed -n 's/.*"job_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+[ -n "$JOB_ID" ] || fail "R17: execute_tool 未回带 job_id（作业台账未建）"
+JOBF="$AH/data/agentrt/jobs/$JOB_ID.json"
+[ -f "$JOBF" ] || fail "R17: 作业台账未落盘: $JOBF"
+grep -q 'fs_list' "$JOBF" || fail "R17: 台账未记录 tool_id（$JOBF）"
+AUD="$AH/data/agentrt/logs/daemon_audit.log"
+[ -f "$AUD" ] || fail "R17: 审计日志未落盘: $AUD"
+grep 'operation=tool_execute' "$AUD" | grep -q 'resource=fs_list' \
+    || fail "R17: 审计缺 tool_execute/fs_list 记录（$AUD）"
+info "工具链路通过: fs_list job_id=$JOB_ID（台账+审计双面落盘）"
+
+# 4b-3 run_stream：CLI 事件出口 → gateway /api/v1/agent/run/stream →
+# agent_d task_submit_stream。断言帧头 schema==1、payload 键在（信封为
+# 合法 JSON，NDJSON 消费方可直接解析）、payload 带 run_id 键、终结帧
+# run_end；终态为 completed 或显式 error+reason，禁止静默收流。
+RUN="$(timeout 150 "$CLI" --events ndjson --quiet \
+    -p "e2e r17 stream probe" 2>&1 | tr -d '\r' || true)"
+printf '%s' "$RUN" | grep -q '"schema":1' \
+    || fail "R17: run_stream 无事件帧（$(printf '%s' "$RUN" | head -2)）"
+printf '%s' "$RUN" | grep -q '"payload":' \
+    || fail "R17: 事件帧缺 payload 键（信封非法 JSON，NDJSON 消费方无法解析）"
+printf '%s' "$RUN" | grep -q '"run_id"' \
+    || fail "R17: run_stream 帧缺 run_id 键（非真实会话帧）"
+printf '%s' "$RUN" | grep -q '"run_end"' \
+    || fail "R17: run_stream 缺终结帧 run_end（流未收敛）"
+if printf '%s' "$RUN" | grep -q '"completed"'; then
+    info "run_stream 通过: 正常完成"
+elif printf '%s' "$RUN" | grep -q '"error"'; then
+    printf '%s' "$RUN" | grep -q '"reason"' \
+        || fail "R17: run_stream 失败帧缺 reason（不可归因）"
+    info "run_stream 通过: 洁净机无模型，按可归因失败终态收敛"
+else
+    fail "R17: run_stream 终态既非 completed 也非显式 error"
+fi
+
 # ─── 阶段 5：收尾 ─────────────────────────────────────────────────────────
 bash "$AH/bin/agentrt-bootstrap.sh" stop -s >/dev/null 2>&1 \
     || echo "::warning::daemon 群停止失败（容器 --rm 兜底回收，不阻断）"
