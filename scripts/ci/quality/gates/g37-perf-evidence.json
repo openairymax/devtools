@@ -1,0 +1,91 @@
+{
+  "machine": {
+    "cpu_count": 16,
+    "machine": "x86_64",
+    "node": "airymax-pc",
+    "processor": "x86_64",
+    "python": "3.11.6",
+    "release": "6.6.161-alk.13",
+    "system": "Linux"
+  },
+  "measured_at": "2026-11-19T18:10:59Z",
+  "measurements": {
+    "cloud": {
+      "backend": "openai",
+      "decode_tps": 101.27,
+      "endpoint": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "perf_mode": "unknown",
+      "runs": [
+        {
+          "completion_tokens": 10,
+          "decode_tps": 90.20474221354529,
+          "ttft_ms": 410.29392200107395
+        },
+        {
+          "completion_tokens": 10,
+          "decode_tps": 145.34080496755388,
+          "ttft_ms": 364.251578999756
+        },
+        {
+          "completion_tokens": 10,
+          "decode_tps": 42.77713799802874,
+          "ttft_ms": 299.93003599884105
+        },
+        {
+          "completion_tokens": 10,
+          "decode_tps": 101.2745138752484,
+          "ttft_ms": 460.59065199915494
+        },
+        {
+          "completion_tokens": 10,
+          "decode_tps": 127.7456079642585,
+          "ttft_ms": 275.1515689997177
+        }
+      ],
+      "samples": 5,
+      "tier": "cloud",
+      "ttft_ms": 364.3
+    },
+    "local_cpu": {
+      "backend": "cpu",
+      "decode_tps": 12.57,
+      "endpoint": "http://127.0.0.1:21480/v1",
+      "model": "qwen2.5-7b-instruct-q4_k_m",
+      "perf_mode": "lightweight",
+      "runs": [
+        {
+          "completion_tokens": 11,
+          "decode_tps": 13.269348675555642,
+          "ttft_ms": 88.20237099826045
+        },
+        {
+          "completion_tokens": 11,
+          "decode_tps": 12.42004467382291,
+          "ttft_ms": 107.30943199996545
+        },
+        {
+          "completion_tokens": 11,
+          "decode_tps": 12.574905046918825,
+          "ttft_ms": 90.2368219994969
+        },
+        {
+          "completion_tokens": 11,
+          "decode_tps": 12.556597229658601,
+          "ttft_ms": 90.08705599990208
+        },
+        {
+          "completion_tokens": 11,
+          "decode_tps": 12.586864849304463,
+          "ttft_ms": 90.58263099905162
+        }
+      ],
+      "samples": 5,
+      "tier": "local_cpu",
+      "ttft_ms": 90.2
+    }
+  },
+  "probe_sha256": "e987f25957546f8740b88bdddd20adb5f3da301a519763be2e607c76ff767310",
+  "release": "0.1.21",
+  "schema": "airy.g37.perf/1"
+}
