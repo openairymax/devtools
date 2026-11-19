@@ -289,7 +289,13 @@
 # （decl +18、proc +9、内头 +4），换掉「重启窗口内受管服务被判死并退出」。
 # RATCHET-JUSTIFY: 8cdb553b9 +20 atoms 图引擎初始化与 heapstore 批量写回滚
 # RATCHET-JUSTIFY: 8d01c83 +78 上游失败明细上屏与受管服务启动宽限
+# 2026-11-19 0.1.21 B4 首卡：facade 78675 → 78706（+31），core 与 cupolas
+# 不动。在途工具取消：会话持取消令牌（engine 头 +4 / engine +7），工具执行
+# 由阻塞调用改走可取消入口并在取消时立刻脱身、按 canceled 收口本轮
+# （loop +20）。换掉的是「取消后仍要等工具预算跑满才见响应」的实证形态；
+# 服务侧按自身预算收尾，回执随连接关闭丢弃，不影响审计。
+# RATCHET-JUSTIFY: d5cbf2b +31 在途工具取消沿令牌下探到等待循环
 core=79448
-facade=78675
+facade=78706
 cupolas=17604
 target=79999
