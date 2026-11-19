@@ -92,7 +92,7 @@ for h in "${CL3_INTERNAL_HEADERS[@]}"; do
         [ -z "$f" ] && continue
         log_err "内部头 $h 被外部引用: $f"
         exit_code=1
-    done < <(grep -rln "#include[[:space:]]*[\"<]$h[\">]" \
+    done < <(grep -rln "#include[[:space:]]*[\"<]${h}[\">]" \
                  --include="*.c" --include="*.h" --include="*.cpp" --include="*.hpp" \
                  --exclude-dir=coreloopthree \
                  "${scan_dirs[@]}" 2>/dev/null || true)
@@ -119,7 +119,7 @@ for h in "${CL3_PUBLIC_HEADERS[@]}"; do
         else
             log_warn "$msg"
         fi
-    done < <(grep -rln "#include[[:space:]]*[\"<]$h[\">]" \
+    done < <(grep -rln "#include[[:space:]]*[\"<]${h}[\">]" \
                  --include="*.c" --include="*.h" --include="*.cpp" --include="*.hpp" \
                  --exclude-dir=coreloopthree \
                  "${scan_dirs[@]}" 2>/dev/null || true)

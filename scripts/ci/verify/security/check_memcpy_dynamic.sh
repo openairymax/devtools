@@ -159,7 +159,7 @@ if [[ -n "$REPORT_FILE" ]]; then
         echo '    "violations": '$total_violations
         echo '  },'
         echo '  "violations": ['
-        local first=true
+        first=true
         for v in "${VIOLATIONS[@]}"; do
             $first || echo ','
             first=false
