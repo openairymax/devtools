@@ -149,8 +149,10 @@ wait_epoch() { # $1=sock $2=logfile $3=期望 epoch
 start_daemon() { # $1=sandbox $2=logfile  (+env: KILL_ENV="VAR=val" 经 env 命令注入)
     mkdir -p "$1/run"
     # 展开产生的 VAR=val 单词不会被 shell 识别为赋值前缀（POSIX 语义，
-    # 会被误当命令名），须经 env 命令注入
-    AIRY_HOME="$1" env ${KILL_ENV:+$KILL_ENV} "$CUPOLAS_D" >"$2" 2>&1 &
+    # 会被误当命令名），须经 env 命令注入。
+    # 沙箱 AIRY_HOME 无 config/install.env，凭据库按生产口径会拒启，故实验室
+    # 显式 opt-in 空口令（仅本门禁的临时沙箱，不涉及任何真实数据）。
+    AIRY_HOME="$1" AIRY_ALLOW_EMPTY_VAULT=1 env ${KILL_ENV:+$KILL_ENV} "$CUPOLAS_D" >"$2" 2>&1 &
     PIDS+=($!)
     local deadline=$(( $(date +%s) + 10 ))
     while [ "$(date +%s)" -lt "$deadline" ]; do
