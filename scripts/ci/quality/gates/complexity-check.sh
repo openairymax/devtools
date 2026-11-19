@@ -127,8 +127,15 @@ scan_full() {
     elif [ "$fail_count" -gt 0 ]; then
         echo -e "${COLOR_RED}❌ COMPLEXITY FAIL: ${fail_count} function(s) with CCN > ${CCN_WARN}${COLOR_RESET}"
         exit 1
+    elif [ "${CCN_WARN_BASELINE:-0}" -gt 0 ] && [ "$warn_count" -gt "$CCN_WARN_BASELINE" ]; then
+        echo -e "${COLOR_RED}❌ COMPLEXITY RATCHET: WARN ${warn_count} > baseline ${CCN_WARN_BASELINE}${COLOR_RESET}"
+        echo -e "${COLOR_RED}   存量 WARN 只降不升（L-2）；请拆解新增 WARN 而不是上调基线${COLOR_RESET}"
+        exit 1
     elif [ "$warn_count" -gt 0 ]; then
-        echo -e "${COLOR_YELLOW}⚠️  COMPLEXITY WARN: ${warn_count} function(s) with CCN > ${CCN_PASS}${COLOR_RESET}"
+        echo -e "${COLOR_YELLOW}⚠️  COMPLEXITY WARN: ${warn_count} function(s) with CCN > ${CCN_PASS} (baseline ${CCN_WARN_BASELINE})${COLOR_RESET}"
+        if [ "${CCN_WARN_BASELINE:-0}" -gt 0 ] && [ "$warn_count" -lt "$CCN_WARN_BASELINE" ]; then
+            log_ok "棘轮改善: ${warn_count} < ${CCN_WARN_BASELINE}，请手动下调 thresholds.conf 的 CCN_WARN_BASELINE"
+        fi
         exit 2
     else
         echo -e "${COLOR_GREEN}✅ COMPLEXITY PASS: All functions within CCN ≤ ${CCN_PASS}${COLOR_RESET}"
