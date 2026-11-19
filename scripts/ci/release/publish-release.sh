@@ -1013,6 +1013,20 @@ fi
 # 两次）。根修不是盲目重试 push，而是先拉齐远端再重放快照：reset 到远端
 # 顶点、只回填 latest/ 子树后重新提交，他人的改动不受影响。返回 0=首推
 # 成功，2=拉齐后重放成功，1=仍失败（fail-soft，不阻断发布主链路）。
+# 快照提交身份与署名（R2 / COMMIT-AUDIT §4 / .mailmap）：发布自动化账号
+# （agentrt-bot）不得出现在 Signed-off-by 中。发布通道配置 AIRY_SNAP_NAME/
+# AIRY_SNAP_EMAIL（发布操作者自然人身份）时，以该身份提交并 -s 落署名；
+# 缺省退回 agentrt-bot 历史行为（新增提交将由 g47 留红提示配置缺失）。
+snap_commit() {
+    if [ -n "${AIRY_SNAP_NAME:-}" ] && [ -n "${AIRY_SNAP_EMAIL:-}" ]; then
+        git -C "$LATEST_DIR" -c user.name="$AIRY_SNAP_NAME" -c user.email="$AIRY_SNAP_EMAIL" \
+            commit -s "$@"
+    else
+        git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
+            commit "$@"
+    fi
+}
+
 latest_sync() {
     local remote="$1" snap="$2" logfile="$3" msg="$4"
     git -C "$LATEST_DIR" push "$remote" HEAD:main >"$logfile" 2>&1 && return 0
@@ -1021,8 +1035,7 @@ latest_sync() {
     git -C "$LATEST_DIR" rm -r -q -f --ignore-unmatch latest/ >>"$logfile" 2>&1 || true
     git -C "$LATEST_DIR" checkout "$snap" -- latest/ >>"$logfile" 2>&1 || return 1
     git -C "$LATEST_DIR" add -A -f latest/ >>"$logfile" 2>&1 || return 1
-    git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
-        commit -m "$msg" >>"$logfile" 2>&1 || return 1
+    snap_commit -m "$msg" >>"$logfile" 2>&1 || return 1
     git -C "$LATEST_DIR" push "$remote" HEAD:main >>"$logfile" 2>&1 || return 1
     return 2
 }
@@ -1032,8 +1045,7 @@ if [ "$LATEST_READY" = "1" ]; then
     # 仓库 .gitignore 为白名单制（默认忽略一切），latest/ 天然被忽略，
     # 必须 -f 强制加入，否则 add 静默失败且 set -e 中止整个发布。
     git -C "$LATEST_DIR" add -A -f latest/
-    if git -C "$LATEST_DIR" -c user.name="agentrt-bot" -c user.email="release@agentrt.airymax.io" \
-        commit -m "$SNAP_MSG" >/dev/null 2>&1; then
+    if snap_commit -m "$SNAP_MSG" >/dev/null 2>&1; then
         log_info "latest/ 归档快照已提交"
     else
         log_warn "latest/ 无变更（快照沿用当前 HEAD）"
