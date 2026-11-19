@@ -1084,6 +1084,40 @@ gate_perf_g37() {
 }
 
 # ============================================================================
+# Gate 50: C-7 soak baseline（0.1.21 方案 §18.1 C-7）
+# airy.c7.soak/1 基线报告阈值裁决，阈值全部取 c7-soak-budget.txt SSoT。
+# ci 档 = gate:ci 短压测档（进流水线）；runtime 档（>=30min）不进发版阻断，
+# 仅作 B-5 L2 档前提（回退条款）。无报告 = 未验证，按告警入账不放行。
+# 退出码: 0=达标 1=违例 2=报告/环境错误(告警) 3=无报告(未验证)
+# ============================================================================
+gate_soak_c7() {
+    section "Gate 50: C-7 Soak Baseline (0.1.21)"
+
+    local c7_script="${SCRIPT_DIR}/c7-soak-gate.sh"
+    if [ ! -f "$c7_script" ]; then
+        log_err "c7 soak gate script not found: ${c7_script}"
+        check_gate "SoakBaselineC7" 1
+        return 1
+    fi
+
+    log_info "Running C-7 soak baseline gate (ci mode)..."
+    local c7_out c7_rc=0
+    c7_out=$(bash "$c7_script" --mode ci 2>&1) || c7_rc=$?
+    echo "$c7_out" | gate_view
+    if [ "$c7_rc" -eq 0 ]; then
+        check_gate "SoakBaselineC7" 0
+    elif [ "$c7_rc" -eq 3 ]; then
+        log_warn "c7 soak gate: baseline report absent, unverified"
+        check_gate "SoakBaselineC7" 2
+    elif [ "$c7_rc" -eq 2 ]; then
+        log_warn "c7 soak gate: report/budget error, manual review required"
+        check_gate "SoakBaselineC7" 2
+    else
+        check_gate "SoakBaselineC7" 1
+    fi
+}
+
+# ============================================================================
 # Gate 30: 0.1.19 G16/G17 全队列户形态计数（方案 §6.3 五件套机械执法）
 # resident C daemon 五件套逐户断言 + scripts 户登记断言；户数与入口行数
 # 预算取 thresholds.conf SSoT（FORM_DAEMON_COUNT / FORM_MAIN_MAX）。
@@ -1709,6 +1743,7 @@ main() {
     local skip_logic_g38=false
     local skip_g30=false
     local skip_g37=false
+    local skip_c7=false
     local skip_facade=false
     local skip_ratchet=false
     local skip_g42=false
@@ -1846,6 +1881,10 @@ main() {
                 ;;
             --skip-g37)
                 skip_g37=true
+                shift
+                ;;
+            --skip-c7)
+                skip_c7=true
                 shift
                 ;;
             --skip-facade)
@@ -1995,6 +2034,7 @@ main() {
                 echo "  --skip-logic-g38      Skip G38 logic-completeness (0.1.19, five checklists) check"
                 echo "  --skip-g30            Skip G30 experience gate (0.1.19, TUI + CLI surface) check"
                 echo "  --skip-g37            Skip G37 performance budget (0.1.19, three-tier TTFT) check"
+                echo "  --skip-c7             Skip Gate 50 C-7 soak baseline (0.1.21, airy.c7.soak/1) check"
                 echo "  --skip-facade         Skip Gate 43 facade-attribution (0.1.20, ops family registry) check"
                 echo "  --skip-ratchet        Skip Gate 41 ratchet drift audit (0.1.20, pin history) check"
                 echo "  --skip-g42            Skip Gate 42 ledger consistency (0.1.20, three-ledger parity) check"
@@ -2067,6 +2107,7 @@ main() {
         $skip_logic_g38 || gate_logic_g38
         $skip_g30 || gate_g30_experience
         $skip_g37 || gate_perf_g37
+        $skip_c7 || gate_soak_c7
         $skip_facade || gate_facade_attribution
         $skip_ratchet || gate_ratchet
         $skip_g42 || gate_ledger

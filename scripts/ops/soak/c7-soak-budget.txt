@@ -1,0 +1,21 @@
+# C-7 soak budget (airy.c7.soak/1) — thresholds SSoT, consumed by c7-soak-gate.sh
+# key=value per profile prefix; values evidence-anchored:
+#   G37 R23b local_cpu single-stream median ttft 90.2ms / decode 12.57 tps
+#   r113 10h soak lane medians 8.17 tps (9B) under concurrent load
+# duration floors: ci = short gate tier, runtime = long baseline tier (>=30min)
+local_cpu.ci_min_duration_s=300
+local_cpu.runtime_min_duration_s=1800
+local_cpu.max_fail_rate=0.02
+local_cpu.max_ttft_p50_ms=2000
+local_cpu.max_ttft_p99_ms=30000
+local_cpu.min_decode_tps_p50=5.0
+local_cpu.max_fd_peak=512
+local_cpu.max_rss_growth_mb=256
+cloud.ci_min_duration_s=120
+cloud.runtime_min_duration_s=600
+cloud.max_fail_rate=0.02
+cloud.max_ttft_p50_ms=3000
+cloud.max_ttft_p99_ms=15000
+cloud.min_decode_tps_p50=20.0
+cloud.max_fd_peak=512
+cloud.max_rss_growth_mb=0
