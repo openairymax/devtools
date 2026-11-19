@@ -6,7 +6,7 @@
 # ——pin 解析、变体回退链、来源序列组装、落位布局与注册表管理。
 # 机制与策略分离：取件、续传与双校验机制由 lib/fetch.sh 提供，
 # 本文件不感知任何网络与哈希实现细节；pin 数据独立于 templates/。
-# 用法：airy-local install|status|remove [--variant cpu|sycl] [--pin <file>]
+# 用法：airy-local setup|install|status|remove [--variant cpu|sycl] [--pin <file>]
 
 set -euo pipefail
 
@@ -146,7 +146,57 @@ airy_local_decl_sync() {
     else
         airy_config_del "$frag" "AIRYRT_MANAGED_MEM"
     fi
+    # 启动宽限（秒）：llama.cpp 要把权重读入内存后才监听端口，7B+ 模型
+    # 常需数十秒到数分钟；supervisor 缺省 15s 假死窗口会在预热期直接
+    # SIGKILL，表现为「装好了却永远不可达」。宽限到期后恢复正常判定。
+    airy_config_set "$frag" "AIRYRT_MANAGED_READY" "${AIRY_LOCAL_READY_SEC:-180}"
     airy_log_info "Managed declaration: ${frag} (tcp:${port}, model=${asset}${args:+, args=[${args}]}${mem:+, mem=${mem}})"
+}
+
+###############################################################################
+# setup：交互式向导（无图形/TUI 也能完成自托管）
+###############################################################################
+
+# 候选模型名单：用户清单优先，出厂目录补齐，去重后保持声明序
+airy_local_model_catalog() {
+    local list
+    while IFS= read -r list; do
+        awk -F'|' '$1 == "model" { print $2 }' "$list"
+    done < <(airy_local_model_lists) | awk '!seen[$0]++'
+}
+
+airy_local_cmd_setup() {
+    if [[ ! -t 0 ]]; then
+        airy_log_error "setup 需要交互终端；非交互请用: airy-local install / airy-local model install <name>"
+        return 2
+    fi
+    local variant arch ans name installed
+    variant="$(airy_local_default_variant)"
+    arch="$(airy_arch_detect)"
+    printf '\n== AirymaxRT 本地模型向导 ==\n'
+    printf '平台: %s / %s\n' "$(airy_platform_detect)" "$arch"
+    printf '推荐后端: %s（可用 --variant 覆盖）\n' "$variant"
+    printf '安装 llama.cpp (%s)? [Y/n] ' "$variant"
+    read -r ans
+    case "${ans:-y}" in
+        y|Y|yes|"") ;;
+        *) printf '已取消\n'; return 0 ;;
+    esac
+    _AIRY_LOCAL_VARIANT="$variant"
+    airy_local_cmd_install || return $?
+
+    installed="$(airy_local_cmd_model_list 2>/dev/null || true)"
+    if [[ -z "$installed" ]]; then
+        printf '\n可选模型:\n'
+        airy_local_model_catalog | sed 's/^/  - /'
+    fi
+    printf '\n输入要安装的模型名（回车跳过）: '
+    read -r name
+    if [[ -n "$name" ]]; then
+        airy_local_cmd_model install "$name" || return $?
+        airy_local_cmd_model use "$name" || true
+    fi
+    printf '\n完成。重启运行时后生效: airymaxrt stop && airymaxrt\n'
 }
 
 ###############################################################################
@@ -248,6 +298,31 @@ airy_local_pin_mirrors() {
 # 覆盖全部 pin 键形态（含 macos/win 的裸键与 linux 的 -cpu 键）
 ###############################################################################
 
+# 变体判定：显式 --variant / AIRY_LOCAL_VARIANT 优先；否则按硬件自动选择。
+# 历史上缺省恒为 sycl，在没有 Intel GPU 的机器上装完冒烟即失败——这是
+# 「有的机器怎么都装不上 llama」的主因之一。仅检测到 Intel 显示设备时
+# 选 sycl，其余一律 cpu（通用可跑）。
+airy_local_default_variant() {
+    if [[ -n "${_AIRY_LOCAL_VARIANT:-}" ]]; then
+        printf '%s\n' "$_AIRY_LOCAL_VARIANT"
+        return 0
+    fi
+    if [[ -n "${AIRY_LOCAL_VARIANT:-}" ]]; then
+        printf '%s\n' "$AIRY_LOCAL_VARIANT"
+        return 0
+    fi
+    local d vendor
+    for d in /sys/class/drm/card*/device/vendor; do
+        [[ -r "$d" ]] || continue
+        vendor="$(cat "$d" 2>/dev/null || true)"
+        if [[ "$vendor" == "0x8086" ]]; then
+            printf 'sycl\n'
+            return 0
+        fi
+    done
+    printf 'cpu\n'
+}
+
 airy_local_resolve_key() {
     local pin_file="$1" variant="$2"
     local plat arch key
@@ -294,7 +369,7 @@ airy_local_cmd_install() {
     fi
 
     local key
-    key="$(airy_local_resolve_key "$pin_file" "${_AIRY_LOCAL_VARIANT:-sycl}")"
+    key="$(airy_local_resolve_key "$pin_file" "$(airy_local_default_variant)")"
 
     local record asset size sha
     record="$(airy_local_pin_lookup "$pin_file" "$key")"
@@ -378,26 +453,29 @@ airy_local_cmd_install() {
         airy_log_fatal "Empty archive: $asset"
     fi
 
-    # 校验全通过后才 wipe 旧安装并落位。单目录 bin/：发行包为平铺布局，
-    # 可执行文件与动态库自解析（linux $ORIGIN / mac @loader_path /
-    # win 同目录搜索）不容拆分——bin/lib 分离会使二进制失联其依赖。
-    rm -rf "$comp_dir"
-    airy_mkdir "$bin_dir"
+    # 非破坏落位：先在新目录装配并冒烟，通过后再整目录切换——旧安装只在
+    # 新版本确认可用后才被替换。此前是先 rm -rf 旧目录再落位，冒烟失败时
+    # 用户连原本可用的 llama-server 一起丢失，等于没有回滚。
+    local new_dir="${comp_dir}.new.$$"
+    local old_dir="${comp_dir}.old.$$"
+    local new_bin="${new_dir}/bin"
+    rm -rf "$new_dir" "$old_dir"
+    airy_mkdir "$new_bin"
 
     local name placed_server=""
     for f in "${all_files[@]}"; do
         name="$(basename "$f")"
         case "$name" in
             llama-server*)
-                mv -f "$f" "${bin_dir}/${name}"
-                placed_server="${bin_dir}/${name}"
+                mv -f "$f" "${new_bin}/${name}"
+                placed_server="${new_bin}/${name}"
                 ;;
             *.so|*.so.*|*.dylib|*.dll|*.a)
-                mv -f "$f" "${bin_dir}/${name}"
+                mv -f "$f" "${new_bin}/${name}"
                 ;;
             *)
                 if [[ -x "$f" ]]; then
-                    mv -f "$f" "${bin_dir}/${name}"
+                    mv -f "$f" "${new_bin}/${name}"
                 fi
                 ;;
         esac
@@ -405,22 +483,37 @@ airy_local_cmd_install() {
     rm -rf "$stage"
 
     if [[ -z "$placed_server" ]]; then
-        rm -rf "$comp_dir" "$dest"
+        rm -rf "$new_dir" "$dest"
         airy_log_fatal "llama-server not found in archive: $asset"
     fi
 
     local bin_f
-    for bin_f in "${bin_dir}"/*; do
+    for bin_f in "${new_bin}"/*; do
         if [[ -f "$bin_f" ]]; then
             chmod 0755 "$bin_f"
         fi
     done
 
-    # 冒烟：二进制必须能自报版本
+    # 冒烟：二进制必须能自报版本（此时旧安装仍在原位，失败不损害可用性）
     if ! "$placed_server" --version &> /dev/null; then
-        rm -rf "$comp_dir" "$dest"
-        airy_log_fatal "Smoke check failed: ${placed_server} --version"
+        rm -rf "$new_dir" "$dest"
+        airy_log_fatal "Smoke check failed: ${placed_server} --version (previous install kept)"
     fi
+
+    # 切换：旧目录让位 → 新目录就位；任一步失败都回滚旧目录
+    if [[ -d "$comp_dir" ]]; then
+        if ! mv "$comp_dir" "$old_dir"; then
+            rm -rf "$new_dir" "$dest"
+            airy_log_fatal "Cannot move aside previous install: $comp_dir"
+        fi
+    fi
+    if ! mv "$new_dir" "$comp_dir"; then
+        [[ -d "$old_dir" ]] && mv "$old_dir" "$comp_dir"
+        rm -rf "$new_dir" "$dest"
+        airy_log_fatal "Activate failed, previous install restored: $comp_dir"
+    fi
+    rm -rf "$old_dir"
+    placed_server="${bin_dir}/$(basename "$placed_server")"
 
     airy_config_set "$registry" "component" "$AIRY_LOCAL_COMPONENT"
     airy_config_set "$registry" "version" "$version"
@@ -710,6 +803,7 @@ airy_local_usage() {
 airy-local - AgentRT self-hosted component manager
 
 Usage:
+  airy-local setup                 interactive wizard (recommended first run)
   airy-local install  [--variant cpu|sycl] [--pin <file>]
   airy-local status
   airy-local remove
@@ -717,7 +811,7 @@ Usage:
   airy-local model list
 
 Options:
-  --variant <name>  backend variant (default: sycl, cpu as fallback)
+  --variant <name>  backend variant (default: auto, sycl only on Intel GPU)
   --pin <file>      pin list override
   -h, --help        show this help
 
@@ -732,12 +826,12 @@ EOF
 }
 
 airy_local_main() {
-    _AIRY_LOCAL_VARIANT="${AIRY_LOCAL_VARIANT:-sycl}"
+    _AIRY_LOCAL_VARIANT="${AIRY_LOCAL_VARIANT:-}"
 
     local cmd=""
     while [[ ${#} -gt 0 ]]; do
         case "$1" in
-            install|status|remove)
+            install|status|remove|setup)
                 cmd="$1"
                 shift
                 ;;
@@ -766,6 +860,7 @@ airy_local_main() {
     done
 
     case "$cmd" in
+        setup)   airy_local_cmd_setup ;;
         install) airy_local_cmd_install ;;
         status)  airy_local_cmd_status ;;
         remove)  airy_local_cmd_remove ;;

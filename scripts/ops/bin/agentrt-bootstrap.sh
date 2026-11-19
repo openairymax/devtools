@@ -783,11 +783,11 @@ sup_core_drop() {
 # 片段非法（缺名、路径不可执行、EP 形态非法）跳过并告警——与 decl.c 的
 # fail-closed 同源，配置面错误不得放大为整群启动失败。
 # 收敛：profile.env 记 AIRYRT_LAUNCH_MANAGED 名单，片段撤销后对应 BIN/EP/
-# ARGS/MEM 键与 CORE 名单同步出清，不留悬挂声明。
+# ARGS/MEM/READY 键与 CORE 名单同步出清，不留悬挂声明。
 sup_ingest_managed() {
     local decl_file="$1"
     local frag_dir="${AIRY_HOME}/config/managed.d"
-    local old_names new_names="" frag name bin ep args mem core
+    local old_names new_names="" frag name bin ep args mem ready core
     old_names="$(decl_get "$decl_file" AIRYRT_LAUNCH_MANAGED)"
 
     if [[ -d "$frag_dir" ]]; then
@@ -798,6 +798,7 @@ sup_ingest_managed() {
             ep="$(decl_get "$frag" AIRYRT_MANAGED_EP)"
             args="$(decl_get "$frag" AIRYRT_MANAGED_ARGS)"
             mem="$(decl_get "$frag" AIRYRT_MANAGED_MEM)"
+            ready="$(decl_get "$frag" AIRYRT_MANAGED_READY)"
             if [[ -z "$name" || -z "$bin" || ! -x "$bin" ]]; then
                 log_warn "managed.d: skip $(basename "$frag") (name/bin absent or not executable)"
                 continue
@@ -819,6 +820,13 @@ sup_ingest_managed() {
             else
                 decl_del "$decl_file" "AIRYRT_LAUNCH_MEM_${name}"
             fi
+            # 启动宽限（秒）：自托管模型加载权重期间不监听端口，supervisor
+            # 需据此抑制假死判定，否则大模型会在预热阶段被 SIGKILL。
+            if [[ "$ready" =~ ^[0-9]+$ ]] && (( ready > 0 )); then
+                upsert_profile_var "$decl_file" "AIRYRT_LAUNCH_READY_${name}" "$ready"
+            else
+                decl_del "$decl_file" "AIRYRT_LAUNCH_READY_${name}"
+            fi
             new_names="${new_names:+$new_names }${name}"
             log_info "managed.d: ${name} <- $(basename "$frag")"
         done
@@ -833,6 +841,7 @@ sup_ingest_managed() {
         decl_del "$decl_file" "AIRYRT_LAUNCH_EP_${stale}"
         decl_del "$decl_file" "AIRYRT_LAUNCH_ARGS_${stale}"
         decl_del "$decl_file" "AIRYRT_LAUNCH_MEM_${stale}"
+        decl_del "$decl_file" "AIRYRT_LAUNCH_READY_${stale}"
         sup_core_drop "$decl_file" "$stale"
         log_info "managed.d: retired ${stale}"
     done
