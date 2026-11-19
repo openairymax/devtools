@@ -1646,6 +1646,21 @@ gate_scope_guard49() {
     esac
 }
 
+# Gate 50: INV-10 原子写不变量（0.1.21 L-4）
+# 静态枚举生产代码的"打开文件写句柄"点，逐条在清单中声明类别（atomic/
+# append/reviewed/exempt）；未声明、清单失效或 atomic 缺 airy_file_rename
+# 见证即判红。自证矩阵用 --self-test（植入未声明写点必红）。
+gate_inv10() {
+    section "Gate 50: INV-10 Atomic-Write (0.1.21, gate:ci)"
+    local rc=0
+    "$SCRIPT_DIR/inv10-atomic-write-check.sh" 2>&1 | gate_view | tail -20 || rc=$?
+    case "$rc" in
+        0) check_gate "INV10-AtomicWrite" 0 ;;
+        2) log_warn "INV-10: environment error (rc=2)"; check_gate "INV10-AtomicWrite" 2 ;;
+        *) check_gate "INV10-AtomicWrite" 1 ;;
+    esac
+}
+
 # ============================================================================
 # 主函数
 # ============================================================================
@@ -1667,6 +1682,7 @@ main() {
     local skip_b5=false
     local skip_b7=false
     local skip_b6=false
+    local skip_inv10=false
     local skip_stub_scan=false
     local skip_file_length=false
     local skip_clone=false
@@ -1763,6 +1779,10 @@ main() {
                 ;;
             --skip-b6)
                 skip_b6=true
+                shift
+                ;;
+            --skip-inv10)
+                skip_inv10=true
                 shift
                 ;;
             --skip-stub-scan)
@@ -1943,6 +1963,7 @@ main() {
                 echo "  --skip-loc-budget     Skip G2 LOC budget (milestone ladder) check"
                 echo "  --skip-b5             Skip G47 GPU acceptance tiers (0.1.21 B-5) check"
                 echo "  --skip-b7             Skip G48 CPU path parity (0.1.21 B-7) check"
+                echo "  --skip-inv10          Skip G50 INV-10 atomic-write (0.1.21 L-4) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
                 echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
                 echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
@@ -2013,6 +2034,7 @@ main() {
         $skip_b5 || gate_gpu_tiers47
         $skip_b7 || gate_cpu_parity48
         $skip_b6 || gate_scope_guard49
+        $skip_inv10 || gate_inv10
         $skip_stub_scan || gate_stub_scan
         $skip_file_length || gate_file_length
         $skip_clone || gate_clone
