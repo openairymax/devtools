@@ -295,7 +295,9 @@
 # （loop +20）。换掉的是「取消后仍要等工具预算跑满才见响应」的实证形态；
 # 服务侧按自身预算收尾，回执随连接关闭丢弃，不影响审计。
 # RATCHET-JUSTIFY: d5cbf2b +31 在途工具取消沿令牌下探到等待循环
+# RATCHET-JUSTIFY: 9d98f5f +23 安全穹顶失败拒启（boot 判定 + 两守护返回检查 + vault 硬失败）
+# RATCHET-JUSTIFY: 351166d +52 凭据库缺口令拒绝打开（口令解析含安装面 install.env）
 core=79448
-facade=78706
-cupolas=17604
+facade=78729
+cupolas=17656
 target=79999
