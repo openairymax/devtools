@@ -1,0 +1,54 @@
+# INV-10 存量写点白名单（0.1.21 L-4）
+# 键 = 相对仓库根路径 + 归一化写行 SHA8（对行号漂移免疫）；TAB 分隔四列：relpath / hash8 / category / reason
+# 类别：atomic（tmp+rename 落地）/ append（仅追加日志或审计轨迹）/ reviewed（人工评审非原子但机制可接受）/ exempt（调试转储、终端或 /dev/null、非业务文件）
+# 新增写点未在此声明即判红；逐条登记，禁止按文件整包豁免；同一 (relpath,hash8) 重复出现即对应源码中的多处写点
+# 口径与判据见 inv10-atomic-write-check.sh 文件头注释
+agent-workload/agentrt/atoms/coreloopthree/src/dispatch/roadmap/rs_semantic_cache_persist.c	7da4d129	atomic	rs_write_dump：临时文件 + fflush + fsync + airy_file_rename 落地，中断只留 .tmp
+agent-workload/agentrt/atoms/coreloopthree/src/work_hall/work_hall_persist.c	8ee9d0f2	atomic	wh_state_write：tmp + fwrite + fsync + airy_file_rename，主文件永远是完整 JSON
+agent-workload/agentrt/atoms/coreloopthree/src/workspace/workspace.c	21a34169	reviewed	ws_copy_file：按块直写工作区副本，属执行期临时副本，随工作区销毁清理，非持久状态
+agent-workload/agentrt/atoms/syscall/src/skill/skill_code.c	c8fae58d	reviewed	code_tmp：mkstemp 生成唯一临时脚本，随即被子进程执行并在 code_unlink 中删除，非持久数据
+agent-workload/agentrt/atoms/syscall/src/skill/skill_file.c	a5e558f3	reviewed	file_do_write：fs_write 工具语义即覆盖用户指定文件，直写为对外约定行为
+agent-workload/agentrt/commons/utils/execution/checkpoint_persist.c	731afb5b	atomic	airy_checkpoint_save：tmp 写入后 airy_file_rename 落地，失败保留旧检查点
+agent-workload/agentrt/commons/utils/execution/checkpoint_snapshot.c	bd1362ed	reviewed	airy_snapshot_create：一次性明文快照写到调用方路径，读完由 magic/END 标记校验，非原地更新状态文件
+agent-workload/agentrt/commons/utils/hall/hall_evt_gseq.c	a9976f99	reviewed	evt_reserve：以 "a" 只打开锁文件取 flock 句柄，不写数据；水位线经 airy_io_write_file 原子落盘
+agent-workload/agentrt/commons/utils/io/file_utils.c	a1c34683	atomic	airy_io_write_file：同目录 tmp + fsync + airy_file_rename，崩溃不留半截文件
+agent-workload/agentrt/commons/utils/logging/logging_backend_file.c	a334b1dd	append	log_internal_file_open：日志文件追加打开，轮转前 fsync 旧文件
+agent-workload/agentrt/commons/utils/logging/logging_backend_file.c	a334b1dd	append	轮转后以追加模式重开日志文件
+agent-workload/agentrt/commons/utils/memory/memory_debug_core.c	3407a2ff	exempt	memory_dump_debug_info：内存调试转储，可选写文件或 stderr，仅在 debug_enabled 时启用
+agent-workload/agentrt/commons/utils/observability/alert_manager.c	614cbaa1	append	告警文件通道逐条追加 "[时间][级别] 名称: 消息"，不做原地覆盖
+agent-workload/agentrt/commons/utils/sd/service_discovery_backend_file.c	8ee9d0f2	atomic	注册表快照：tmp 写入后 airy_file_rename 覆盖，读者看不到半截 JSON
+agent-workload/agentrt/daemons/agent_d/src/service/service_child.c	31853db5	append	子进程 stderr 重定向到 agent 日志，启动 O_TRUNC 清空后仅顺序追加
+agent-workload/agentrt/daemons/channel_d/src/io/channel_io.c	85945171	exempt	chan_pipe_send：打开 FIFO 端点写 IPC 帧，非文件持久化
+agent-workload/agentrt/daemons/common/src/security/daemon_security.c	8ed14ae2	append	审计日志以追加模式打开，轮转由 aud_rot 负责
+agent-workload/agentrt/daemons/common/src/security/daemon_security_rotate.c	1861b3ae	reviewed	rot_aes_unpack：解密输出写新建目标文件，GCM tag 校验通过才算成功，失败 rot_close_pair remove
+agent-workload/agentrt/daemons/common/src/security/daemon_security_rotate.c	36eacfaa	reviewed	rot_compress_step：压缩到独占新建目标（"wbx" 防覆盖），失败由上层 remove 半成品
+agent-workload/agentrt/daemons/common/src/security/daemon_security_rotate.c	4a4d676f	reviewed	rot_open_pair：轮转/解压输出写到新建目标名，失败由 rot_close_pair remove 半成品，成功后由 rot_file rename 落地
+agent-workload/agentrt/daemons/common/src/security/daemon_security_rotate.c	da7076dc	append	轮转结束后重开审计日志追加句柄（fopen "a"），失败则保留原文件继续追加
+agent-workload/agentrt/daemons/common/src/svc/svc_model_watch.c	2a769335	reviewed	mw_mark_set：runtime 目录单行 marker 整体覆写，仅进程间存活标记，崩溃后可重建
+agent-workload/agentrt/daemons/llm_d/src/accounting/cost_tracker.c	00085291	atomic	cost_write：tmp + fflush + (可选) fsync + airy_file_rename，失败保留 dirty 待重试
+agent-workload/agentrt/daemons/maths_d/src/backend/python_backend.c	fdab434a	exempt	子进程 stderr 重定向到 /dev/null
+agent-workload/agentrt/daemons/mem_d/src/engine/mem_persist.c	6fbeafb7	atomic	mem_atomic_write：tmp + fsync + airy_file_rename 整体重写，崩溃不截断已有文件
+agent-workload/agentrt/daemons/mem_d/src/engine/mem_persist.c	fc5d4010	append	mem_persist_append_record：jsonl 记录追加句柄
+agent-workload/agentrt/daemons/supervisor_d/src/admit/admit.c	e60918c7	exempt	子进程 stderr 重定向到 /dev/null，评审结果经 pipe 回传
+agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	50c01655	append	子进程输出泵（proc_monitor_pump）以 "a" 建日志并持续追加，EOF/错误即关档回收槽位
+agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	5be9097e	reviewed	sup_pidfile_write："w" 整体覆写单行 PID 文件，仅启动存活判据，重启可重建
+agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	7f01a361	append	子进程 STDOUT/STDERR 直连日志文件（O_WRONLY|O_CREAT|O_APPEND），仅顺序追加
+agent-workload/agentrt/daemons/tool_d/src/builtin/builtin_toolmake.c	b3472b43	reviewed	make_write_script：先写 .tmp 再 rename(2) 落地并 chmod 0700，失败 remove（未走 airy_file_rename 封装）
+agent-workload/agentrt/heapstore/src/heapstore_log.c	12f43088	append	get_main_log_file：主日志以 "a" 打开
+agent-workload/agentrt/heapstore/src/heapstore_log.c	45bdeb16	append	heapstore_log_init：初始化主日志追加句柄
+agent-workload/agentrt/heapstore/src/heapstore_log.c	b6ac2cf7	append	get_service_log_file：按服务名新建并追加服务日志
+agent-workload/agentrt/heapstore/src/heapstore_log.c	b9366717	append	轮转完成后重开主日志追加句柄
+agent-workload/agentrt/heapstore/src/heapstore_migration.c	67711a99	reviewed	set_version：tmp + mig_fsync_file + heapstore_atomic_replace(rename) 落地，中途崩溃不留空版本文件
+agent-workload/agentrt/heapstore/src/heapstore_migration.c	f8db4d1f	reviewed	mig_backup_data_file：备份副本顺序写 + fsync，写失败即报错不采用，恢复走 heapstore_atomic_replace
+agent-workload/agentrt/heapstore/src/heapstore_trace.c	4a7b1b59	exempt	span 导出：按时间戳新建 JSON 转储文件，属诊断输出，不承载业务状态
+agent-workload/agentrt/tools/airy_cli/src/chat/cli_chat_history.c	a7d4b452	append	reasoning 日志追加，写入前经 airy_file_rename 轮转到 .1
+agent-workload/agentrt/tools/airy_cli/src/cmd/airy_cli_cmd_cognition.c	6241985a	atomic	ak_store：tmp + chmod 0600 + airy_file_rename 写回 secrets.env
+agent-workload/agentrt/tools/airy_cli/src/cmd/cli_daemon_lifecycle.c	8bcc487c	append	daemon 子进程 STDOUT/STDERR 以 O_APPEND 重定向到日志文件
+agent-workload/agentrt/tools/airy_cli/src/cmd/cli_key.c	16f92d52	atomic	airy_cli_secret_store：tmp + fsync + airy_file_rename，权限 0600
+agent-workload/agentrt/tools/airy_cli/src/core/main.c	85a3c758	append	cli_boot_log：stderr 以追加模式重定向到 airy_cli.log，失败回退终端
+agent-workload/agentrt/tools/airy_cli/src/model/cli_model_store.c	ef51ff7c	atomic	mr_save：tmp + fflush + fsync + airy_file_rename
+agent-workload/agentrt/tools/airy_cli/src/tui/tui_history.c	8ee9d0f2	atomic	tui_cmd_hist_save：tmp 写入历史后 airy_file_rename 覆盖，失败 remove
+agent-workload/products/cupolas/src/audit/audit_overflow.c	5bd38b35	append	open_new_overflow_file：溢出审计文件以唯一新名追加打开，不覆盖既有文件
+agent-workload/products/cupolas/src/audit/audit_rotator.c	5c579bc5	append	cupolas_audit_open_current_file：审计日志追加打开，尺寸用于轮转判据
+agent-workload/products/cupolas/src/security/cupolas_runtime_protection_memory.c	3c751d9f	exempt	写 /proc/sys/kernel/randomize_va_space 内核开关，非文件数据持久化
+agent-workload/products/cupolas/src/security/cupolas_vault_io.c	2c7dd723	reviewed	cupolas_vault_export：一次性加密容器直接写调用方路径，各失败分支 remove 半成品，不覆盖既有凭证状态
