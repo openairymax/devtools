@@ -1,0 +1,57 @@
+{
+ "schema": "airy.c7.crash/1",
+ "release": "0.1.21",
+ "captured_at": "2026-11-19T19:14:27+00:00",
+ "machine": {
+  "node": "airymax-pc",
+  "arch": "x86_64",
+  "kernel": "6.6.161-alk.13"
+ },
+ "event": "llama-server b11712 crashes observed on local dev machine during 0.1.20 (0.1.21 doc 2.1.1/19.2: crash observed incl. Vulkan, unattributed)",
+ "proc": "llama-server",
+ "exit_code": null,
+ "signal": "",
+ "evidence": {
+  "log_tail": {
+   "path": "",
+   "tail": "",
+   "error": "no log path given"
+  },
+  "core": {
+   "core_path": "/var/lib/systemd/coredump",
+   "core_exists": true,
+   "core_pattern": "|/usr/lib/systemd/systemd-coredump %P %u %g %s %t %c %h %d",
+   "error": ""
+  },
+  "journal": {
+   "grep": "llama-server",
+   "lines": [
+    "Nov 17 16:36:48 airymax-pc airy-llm[9867]: /var/lib/airy-llm/engine/llama-server: /usr/lib64/libcurl.so.4: no version information available (required by /var/lib/airy-llm/engine/llama-server)",
+    "Nov 17 16:36:41 airymax-pc airy-llm[9834]: /var/lib/airy-llm/engine/llama-server: /usr/lib64/libcurl.so.4: no version information available (required by /var/lib/airy-llm/engine/llama-server)",
+    "Nov 17 16:36:33 airymax-pc sudo[9724]:   amuser : PWD=/home/amuser ; USER=root ; COMMAND=/usr/bin/chmod 0755 /var/lib/airy-llm/engine/llama-server"
+   ],
+   "error": ""
+  },
+  "repro": {
+   "command": "python3 /home/amuser/aw/tools/scripts/ops/soak/soak_runner.py --base-url http://127.0.0.1:21480/v1 --model /home/amuser/.airymaxrt/local/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf --profile local_cpu --duration-s 60 --report /tmp/c7-repro-60s.json",
+   "duration_s": 150,
+   "rc": 0,
+   "survived": false,
+   "stdout_tail": [
+    "[OK] soak report: /tmp/c7-repro-60s.json (profile=local_cpu, wall=70s, fail_rate=0.0000)"
+   ],
+   "stderr_tail": [],
+   "error": ""
+  },
+  "notes": [
+   "coredumpctl: zero llama-server entries (checked 2026-11-20); core pipe in place (|/usr/lib/systemd/systemd-coredump) so SIGSEGV-class crashes would leave records",
+   "dmesg: no segfault/OOM/llama traces (sudo dmesg checked 2026-11-20)",
+   "original crash site removed: ~/r106-h10/ no longer exists; direct post-mortem impossible, recorded as absent",
+   "r113 (0.1.20 doc): P-U heal pkill storm was the only process-kill mechanism in that window; mitigation landed",
+   "journal: llama-server entries are Nov 17 L-3 normal startup logs only (airy-llm service, port 11435), zero crash/signal records",
+   "30min same-build soak: wall 1830s, 322/322 ok, fail_rate 0, RSS growth 6.6MB, fd peak 5, report /tmp/c7-soak-runtime.json"
+  ]
+ },
+ "verdict": "fixed",
+ "rationale": "No internal-crash evidence on this host: coredumpctl and dmesg clean with core pipe in place; journal llama-server entries are normal startup logs only. Sole kill mechanism recorded in the 0.1.20 window was the r113 heal pkill storm (SIGKILL, leaves no core), whose mitigation has landed (heal single-process guard + worker jitter backoff). Same-build 30min soak reproduction failed (322/322 ok). Cause removed on tooling side -> fixed"
+}

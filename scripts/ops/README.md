@@ -65,6 +65,10 @@ ops/
 │   ├── error.sh                           #   统一错误码体系（1000-2999+）
 │   ├── log.sh                             #   多级别日志输出（DEBUG/INFO/WARN/ERROR/FATAL）
 │   └── platform.sh                        #   平台检测（OS 类型/CPU 架构）
+├── soak/                                  # 长压测与崩溃归因（C-7，airy.c7.soak/1 + airy.c7.crash/1）
+│   ├── soak_runner.py                     #   可复跑长压测驱动（SSE 流式 TTFT/tps + RSS/fd 采样）
+│   ├── c7-soak-budget.txt                 #   判定阈值 SSoT（local_cpu/cloud 双 profile，与驱动同目录部署）
+│   └── crash_triage.py                    #   崩溃归因证据采集器（日志尾/core/journal/复现，verdict 由操作者给定）
 └── tests/                                 # 运维脚本测试套件
     ├── python/                            # Python 测试（6 个文件）
     │   ├── conftest.py                    #   pytest 配置（slow/integration/security 标记）
@@ -113,6 +117,14 @@ Docker 容器化部署方案已迁移至 `deploy/docker/`，采用单 Dockerfile
 - **error.sh**：统一错误码体系，定义 1000-2999+ 范围的错误码常量和错误处理函数。错误码按模块分段分配，确保全局唯一。
 - **log.sh**：多级别日志输出，支持 DEBUG、INFO、WARN、ERROR、FATAL 五个级别。支持彩色终端输出和日志文件持久化。
 - **platform.sh**：平台检测，自动识别操作系统类型（Linux/macOS/Windows/WSL）和 CPU 架构（x86_64/ARM64），为其他脚本提供平台相关的条件判断。
+
+### soak/ — 长压测与崩溃归因（C-7）
+
+可复跑长压测基线与崩溃归因证据链，报告契约 `airy.c7.soak/1` / `airy.c7.crash/1`，由 CI 门禁 Gate 50（`scripts/ci/quality/gates/c7-soak-gate.sh`）按 `c7-soak-budget.txt` 阈值裁决：
+
+- **soak_runner.py**：长压测驱动。SSE 流式直测真实 OpenAI 兼容端点（TTFT / decode tps / total 时延分位数），周期采样目标进程 RSS 与 fd 数；请求分布固化（同参数重跑同请求序列）；端点不可达即失败，绝不产出估算值。verdict 只写 `measured`，裁决权在门禁。
+- **c7-soak-budget.txt**：判定阈值 SSoT，`local_cpu` 与 `cloud` 双 profile（时长下限 / 失败率上限 / TTFT p50/p99 上限 / tps p50 下限 / fd 峰值 / RSS 增长上限）。部署时须与 `soak_runner.py` 同目录放置（`--budget` 默认取同目录）。
+- **crash_triage.py**：崩溃归因证据采集器。采集末 200 行日志、core 文件与 `core_pattern`、journalctl 检索命中、复现尝试记录，打包为证据报告；证据面缺席本身记入 error 字段（绝不伪造占位）；三选一结论（fixed / workaround / upstream）与理由由操作者依证据给定，工具不自判。
 
 ### tests/ — 运维脚本测试套件
 
@@ -197,6 +209,27 @@ python3 scripts/ops/bin/agentrt-e2e.py --role product_manager --input "请介绍
 
 # 多 Agent 协作闭环验证（走 sched_d socket，PM → 后端接力）
 python3 scripts/ops/bin/agentrt-multiagent.py --timeout 600
+```
+
+### 长压测与崩溃归因
+
+需先有一个真实的 OpenAI 兼容流式端点（如 llama-server），阈值以 `c7-soak-budget.txt` 为准：
+
+```bash
+# 30min 长压测（gate:runtime 档；目标进程 RSS/fd 同步采样）
+python3 scripts/ops/soak/soak_runner.py \
+    --base-url http://127.0.0.1:21480/v1 --model <gguf-or-model-id> \
+    --profile local_cpu --duration-s 1800 --pid <llama-server-pid> \
+    --report /tmp/c7-soak-runtime.json
+
+# 门禁裁决（ci / runtime 双档；无报告 rc=3 不静默放行）
+bash scripts/ci/quality/gates/c7-soak-gate.sh \
+    --report scripts/ci/quality/gates/c7-soak-baseline.json --mode runtime
+
+# 崩溃归因证据采集（verdict 由操作者依证据给定）
+python3 scripts/ops/soak/crash_triage.py --event "<事件描述>" --proc <进程名> \
+    --journal-grep <模式> --verdict fixed --rationale "<依据>" \
+    --report /tmp/c7-crash-triage.json
 ```
 
 ### 运维测试
