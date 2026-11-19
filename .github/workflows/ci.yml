@@ -1,0 +1,48 @@
+name: CI
+
+# tools 是超仓的工具仓（ci/deploy/git/ops 脚本 toolkit + 测试基建）。
+# 其组装级测试面（contract/integration/benchmarks）依赖 monorepo 布局
+# （tests/conftest.py 上溯三级定位 sdk/agentrt/ecosystem 同级仓），由
+# agentrt 主仓流水线在完整组装下执行；本仓独立 CI 只守护零依赖静态面。
+# 流水线体系 L1 仓内快速门禁，1 作业 = 静态面失败域：
+#   - bash -n 全量脚本语法（fail-closed）
+#   - shellcheck error 级（ubuntu-latest 预装）
+#   - python3 compileall 全仓语法
+# 作业数 ≤3 是本仓流水线判据；纯文档变更跳过。
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax gate (fail-closed)
+        run: |
+          rc=0
+          while IFS= read -r -d '' f; do
+            bash -n "$f" || { echo "::error::bash -n failed: $f"; rc=1; }
+          done < <(find scripts tests -name '*.sh' -print0 2>/dev/null)
+          exit $rc
+      - name: Shellcheck (error severity)
+        run: shellcheck --severity=error $(find scripts -name '*.sh')
+      - name: Python syntax gate
+        run: |
+          python3 -m compileall -q scripts tests \
+            || { echo "::error::compileall failed"; exit 1; }
