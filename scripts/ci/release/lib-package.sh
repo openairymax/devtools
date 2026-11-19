@@ -119,6 +119,16 @@ pkg_stage_bootstrap() {
     # install.env 时的唯一事实源），缺失即包不完整 → fail-closed。
     cp -f "$root/agent-workload/agentrt/VERSION" "$out/VERSION" \
         || { echo "[FAIL] 版本 SSoT（agentrt/VERSION）缺失，包不完整"; return 1; }
+    # 自托管工具链整棵落 share/ops/：二进制包不含源码树，install.sh 的
+    # ${AIRY_SRC_DIR}/tools/scripts/ops 分支在纯净机器上永不命中；若不随包
+    # 落地，airymaxrt local setup 恒报「安装包缺少 airy-local」，用户侧表现
+    # 为「llama 装不上」。airy-local 以 ../{lib,templates} 解析依赖与 pin
+    # 清单，故 bin/lib/templates 必须同构保留。
+    mkdir -p "$out/share/ops"
+    cp -rf "$root/tools/scripts/ops/bin" "$root/tools/scripts/ops/lib" \
+           "$root/tools/scripts/ops/templates" "$out/share/ops/" \
+        || { echo "[FAIL] 自托管工具链（tools/scripts/ops）缺失，包不完整"; return 1; }
+    chmod +x "$out/share/ops/bin/airy-local" 2>/dev/null || true
 }
 
 # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖）
