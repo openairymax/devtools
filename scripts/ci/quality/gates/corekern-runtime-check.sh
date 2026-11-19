@@ -67,6 +67,13 @@ probe() {
     local outfile
     outfile="$(mktemp "${TMPDIR:-/tmp}/corekern-gate-${name}.XXXXXX")"
 
+    # cupolas_d 无口令时按生产口径拒启；本门禁是源码树运行时探针，没有安装面
+    # （config/install.env）时显式 opt-in，有安装面则由穹顶自行读口令。
+    if [ "$name" = "cupolas_d" ] && [ -z "${AIRY_VAULT_PASSWORD:-}" ] &&
+        [ ! -f "${AIRY_HOME:-$HOME/.airymaxrt}/config/install.env" ]; then
+        export AIRY_ALLOW_EMPTY_VAULT=1
+    fi
+
     "$bin" "$@" >"$outfile" 2>&1 </dev/null &
     local pid=$!
     local verdict="no-evidence"

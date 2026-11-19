@@ -690,6 +690,13 @@ wait_for_daemon() {
 # 环境，supervisor 启动后再 export 对子进程无效）。
 prepare_daemon_env() {
     local name="$1"
+    # 凭证库口令：环境变量优先，其次由穹顶自读 ${AIRY_HOME}/config/install.env。
+    # 源码树/沙箱没有安装面，显式声明开发口径，否则 cupolas_d 按生产口径拒启。
+    if [[ "$name" == "cupolas_d" && -z "${AIRY_VAULT_PASSWORD:-}" \
+          && ! -f "${AIRY_HOME}/config/install.env" ]]; then
+        export AIRY_ALLOW_EMPTY_VAULT=1
+        log_info "cupolas_d: no install.env — AIRY_ALLOW_EMPTY_VAULT=1 (dev sandbox)"
+    fi
     if [[ "$name" == "agent_d" ]]; then
         if [[ -z "${AIRY_AGENT_MODEL:-}" && -n "${AGENTRT_MODEL_CONFIG:-}" && -f "${AGENTRT_MODEL_CONFIG:-}" ]]; then
             local _def_model
