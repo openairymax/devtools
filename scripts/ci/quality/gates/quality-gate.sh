@@ -1661,6 +1661,20 @@ gate_inv10() {
     esac
 }
 
+# Gate 51: L-9 补丁回流（0.1.21 L-9；§16.19.6 判据）
+# 五项逐条判定：done 必须指到仓内且在 HEAD 祖先链上的 commit，na 必须给
+# 理由；工作区残留 *.patch/*.rej/*.orig/*.bak 视为未回流的可观测形态。
+gate_l9_reflow() {
+    section "Gate 51: L-9 Patch Reflow (0.1.21, gate:ci)"
+    local rc=0
+    "$SCRIPT_DIR/l9-patch-reflow-gate.sh" 2>&1 | gate_view | tail -20 || rc=$?
+    case "$rc" in
+        0) check_gate "L9-PatchReflow" 0 ;;
+        2) log_warn "L-9: environment error (rc=2)"; check_gate "L9-PatchReflow" 2 ;;
+        *) check_gate "L9-PatchReflow" 1 ;;
+    esac
+}
+
 # ============================================================================
 # 主函数
 # ============================================================================
@@ -1683,6 +1697,7 @@ main() {
     local skip_b7=false
     local skip_b6=false
     local skip_inv10=false
+    local skip_l9=false
     local skip_stub_scan=false
     local skip_file_length=false
     local skip_clone=false
@@ -1783,6 +1798,10 @@ main() {
                 ;;
             --skip-inv10)
                 skip_inv10=true
+                shift
+                ;;
+            --skip-l9)
+                skip_l9=true
                 shift
                 ;;
             --skip-stub-scan)
@@ -1964,6 +1983,7 @@ main() {
                 echo "  --skip-b5             Skip G47 GPU acceptance tiers (0.1.21 B-5) check"
                 echo "  --skip-b7             Skip G48 CPU path parity (0.1.21 B-7) check"
                 echo "  --skip-inv10          Skip G50 INV-10 atomic-write (0.1.21 L-4) check"
+                echo "  --skip-l9             Skip G51 L-9 patch-reflow (0.1.21) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
                 echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
                 echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
@@ -2035,6 +2055,7 @@ main() {
         $skip_b7 || gate_cpu_parity48
         $skip_b6 || gate_scope_guard49
         $skip_inv10 || gate_inv10
+        $skip_l9 || gate_l9_reflow
         $skip_stub_scan || gate_stub_scan
         $skip_file_length || gate_file_length
         $skip_clone || gate_clone
