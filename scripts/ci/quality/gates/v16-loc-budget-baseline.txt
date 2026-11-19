@@ -304,7 +304,14 @@
 # 按「编号机制 / 格式落盘」拆出 hall_evt_gseq.{c,h}（201 + 48 行）；拆分净增
 # 45 行为文件头与声明面开销，无新增行为。
 # RATCHET-JUSTIFY: 9acd1770b +45 hall 写路径编号机制独立成件以守单文件 500 行上限
+# 2026-11-19 0.1.21 B4 R16：facade 78729 → 78892（+163），core 与 cupolas
+# 不动。执行中语义复核的挂载点：机制（编排 + 确定性格 + 降级链）早已在
+# coreloopthree，但 t2/t1-f 委托全仓只有测试注入、think.review 无客户端，
+# 能力对真实 run 不可达。agent_d 侧新增 agent_review.{c,h}（构造入参 → RPC
+# → 取判定），并在判据复核通过后调用，判定入 hall 事件流、终裁拒绝按未达
+# 判据收尾。策略仍留在 think_d，本侧只是最小消费者。
+# RATCHET-JUSTIFY: a73c0c2 +163 语义复核挂载点落地（t2/t1-f 委托 think.review）
 core=79493
-facade=78729
+facade=78892
 cupolas=17656
 target=79999
