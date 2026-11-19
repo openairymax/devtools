@@ -2,6 +2,7 @@
 # 版本钉扎：b11712，全部条目取自 GitHub API digest 字段实测（零猜测、零下载）。
 # 格式：
 #   pin|key|asset|size|sha256        key 为 os-arch[-variant]；size 为字节尺寸
+#   unsupported|key|理由              该架构无官方预置资产，解析命中必须显式失败
 #   version|<tag>                    组件版本
 #   mirror|<name>|<url-template>     {asset} 为占位符，按序列依序尝试
 # 镜像序列纪律：GitHub 直连不入序列（0.1.19 交付通道硬约束——目标网段
@@ -16,6 +17,11 @@ pin|macos-x64|llama-b11712-bin-macos-x64.tar.gz|11738039|72155b245d2fadf488c27eb
 pin|win-x64-sycl|llama-b11712-bin-win-sycl-x64.zip|149133988|5ef12afeb5bbeb49e3dd99b4c5112553d10c2a1c6a9dfd42927a5fd63a0a9a83
 pin|win-x64-cpu|llama-b11712-bin-win-cpu-x64.zip|19613101|cc8454164d885e6826a06abd6100aa040b5b5139d527ae49058ec7c449011b68
 pin|win-arm64-cpu|llama-b11712-bin-win-cpu-arm64.zip|12502793|84f9332248b6a0aa6894da6dd3f207f821e7eb70d6b23efc337898702c01be0a
+# 无预置资产声明（unsupported|key|理由）：官方 b11712 资产清单实查（GitHub API，
+# 2026-11-19）不含以下架构，禁止臆造 digest。命中即显式报错退出，不以"无 pin"
+# 或下载 404 静默失败——用户需看到"该架构暂无预置资产"的确定结论。
+unsupported|linux-riscv64|官方 b11712 仅发布 x64/arm64/s390x，未提供 linux/riscv64 预编译包
+unsupported|win-x86-32|官方 b11712 仅发布 x64/arm64，未提供 win/32 位预编译包
 mirror|atomgit|https://atomgit.com/openairymax/agentrt/releases/download/llamacpp-b11712/{asset}
 mirror|ghfast|https://ghfast.top/https://github.com/ggml-org/llama.cpp/releases/download/b11712/{asset}
 mirror|ghproxy|https://gh-proxy.com/https://github.com/ggml-org/llama.cpp/releases/download/b11712/{asset}

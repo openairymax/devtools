@@ -131,6 +131,22 @@ pkg_stage_bootstrap() {
     chmod +x "$out/share/ops/bin/airy-local" 2>/dev/null || true
 }
 
+# 自托管工具链落包自证（0.1.21-R06）：只 cp 不校验会让缺件包出库——
+# 0.1.20 发行包缺 share/ops/bin/airy-local，用户侧表现为 `airymaxrt local
+# setup` 报「安装包缺少 airy-local」。缺件一律 fail-closed，禁止出包。
+pkg_verify_ops_assets() {
+    local out="$1" miss=0 f
+    [ -x "$out/share/ops/bin/airy-local" ] \
+        || { echo "[FAIL] 包内缺可执行 share/ops/bin/airy-local"; miss=1; }
+    for f in llama-pin.list permission_rules.yaml secrets.env.example; do
+        [ -f "$out/share/ops/templates/$f" ] \
+            || { echo "[FAIL] 包内缺 share/ops/templates/$f"; miss=1; }
+    done
+    ls "$out"/share/ops/lib/*.sh >/dev/null 2>&1 \
+        || { echo "[FAIL] 包内缺 share/ops/lib/*.sh（airy-local 依赖库）"; miss=1; }
+    return "$miss"
+}
+
 # 数学计算后端（maths-toolkit：纯 Python + 安装器，无架构依赖）
 pkg_stage_toolkit() {
     local out="$1" root="$2"
@@ -274,6 +290,9 @@ pkg_assemble_full() {
     pkg_stage_config "$out" "$root"
     pkg_stage_bootstrap "$out" "$root"
     pkg_stage_toolkit "$out" "$root"
+    if ! pkg_verify_ops_assets "$out"; then
+        echo "[FAIL] 自托管工具链不完整，构建中止"; exit 1
+    fi
     pkg_make_manifest "$out" "$version" "$platform"
     pkg_clean_pyc "$out"
     # 架构标记单一：stage 目录三架构共用（build.sh stage-<ver>），

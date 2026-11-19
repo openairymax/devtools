@@ -20,6 +20,8 @@ declare -r PLATFORM_UNKNOWN="unknown"
 declare -r ARCH_X86_64="x86_64"
 declare -r ARCH_ARM64="arm64"
 declare -r ARCH_AARCH64="aarch64"
+declare -r ARCH_RISCV64="riscv64"
+declare -r ARCH_X86_32="x86_32"
 declare -r ARCH_UNKNOWN="unknown"
 
 ###############################################################################
@@ -153,6 +155,12 @@ airy_arch_detect() {
             ;;
         aarch64)
             _AGENTRT_ARCH="$ARCH_AARCH64"
+            ;;
+        riscv64)
+            _AGENTRT_ARCH="$ARCH_RISCV64"
+            ;;
+        i386|i486|i586|i686|x86)
+            _AGENTRT_ARCH="$ARCH_X86_32"
             ;;
         *)
             _AGENTRT_ARCH="$ARCH_UNKNOWN"
