@@ -27,9 +27,14 @@
 # 同名报告重跑覆盖（tmp + os.replace 原子落盘）；同文件可追加不同 profile。
 
 import argparse
+import http.client
 import json
 import os
+import platform
 import sys
+import threading
+import time
+import urllib.parse
 from datetime import datetime, timezone
 
 SCHEMA = "airy.c7.soak/1"
@@ -80,47 +85,236 @@ def parse_args(argv):
 
 
 def read_text(path):
-    raise NotImplementedError("C-7 implementation slice")
+    with open(path, "r", encoding="utf-8") as stream:
+        return stream.read().strip()
 
 
 def load_budget(path, profile):
     """读 SSoT 并按 profile 取阈值；返回 dict，键去掉档位前缀。"""
-    raise NotImplementedError("C-7 implementation slice")
+    prefix = profile + "."
+    out = {}
+    with open(path, "r", encoding="utf-8") as stream:
+        for line in stream:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            if not key.startswith(prefix):
+                continue
+            name = key[len(prefix):]
+            try:
+                out[name] = float(value) if "." in value else int(value)
+            except ValueError:
+                out[name] = value.strip()
+    if not out:
+        raise OSError("no budget keys for profile %s in %s" % (profile, path))
+    return out
 
 
 def machine_fp():
-    raise NotImplementedError("C-7 implementation slice")
+    uname = platform.uname()
+    return {"system": uname.system, "release": uname.release,
+            "machine": uname.machine, "node": uname.node,
+            "cpu_count": os.cpu_count(),
+            "python": platform.python_version()}
 
 
 def probe_once(base_url, model, prompt, max_tokens, temperature,
                timeout_s, api_key):
     """单请求流式测量；返回 {ok, ttft_ms, total_ms, decode_tps,
-    completion_tokens, error}。"""
-    raise NotImplementedError("C-7 implementation slice")
+    completion_tokens, error}。失败不抛异常，记录 error 由统计口径消化。"""
+    record = {"ok": False, "ttft_ms": None, "total_ms": None,
+              "decode_tps": None, "completion_tokens": 0, "error": ""}
+    parts = urllib.parse.urlsplit(base_url)
+    path = (parts.path or "").rstrip("/")
+    if not path.endswith("/chat/completions"):
+        path += "/chat/completions"
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        record["error"] = "invalid base url"
+        return record
+    body = {"model": model, "stream": True, "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}]}
+    headers = {"Content-Type": "application/json",
+               "Accept": "text/event-stream", "Connection": "close"}
+    if api_key:
+        headers["Authorization"] = "Bearer " + api_key
+    cls = (http.client.HTTPSConnection if parts.scheme == "https"
+           else http.client.HTTPConnection)
+    conn = cls(parts.hostname, parts.port, timeout=timeout_s)
+    t0 = time.perf_counter()
+    try:
+        conn.request("POST", path, body=json.dumps(body), headers=headers)
+        resp = conn.getresponse()
+        if resp.status != 200:
+            record["error"] = "HTTP %d" % resp.status
+            resp.read()
+            return record
+        first = None
+        last = None
+        blocks = 0
+        tokens = 0
+        while True:
+            line = resp.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", "replace").strip()
+            if not text.startswith("data:"):
+                continue
+            data = text[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                event = json.loads(data)
+            except ValueError:
+                continue
+            usage = event.get("usage") or {}
+            if isinstance(usage.get("completion_tokens"), int):
+                tokens = usage["completion_tokens"]
+            for choice in event.get("choices") or []:
+                if (choice.get("delta") or {}).get("content"):
+                    now = time.perf_counter()
+                    if first is None:
+                        first = now
+                    last = now
+                    blocks += 1
+        if first is None:
+            record["error"] = "stream produced no content"
+            return record
+        window = max(last - first, 1e-9)
+        count = tokens if tokens else blocks
+        record.update(ok=True, ttft_ms=(first - t0) * 1000.0,
+                      total_ms=(last - t0) * 1000.0,
+                      decode_tps=max(count - 1, 0) / window,
+                      completion_tokens=count)
+        return record
+    except (OSError, http.client.HTTPException) as exc:
+        record["error"] = str(exc)[:120]
+        return record
+    finally:
+        conn.close()
 
 
 def sample_resources(pid):
     """采样 /proc/<pid>；pid 无效返回 None。"""
-    raise NotImplementedError("C-7 implementation slice")
+    try:
+        rss = 0.0
+        with open("/proc/%d/status" % pid, "r", encoding="utf-8") as stream:
+            for line in stream:
+                if line.startswith("VmRSS:"):
+                    rss = float(line.split()[1]) / 1024.0
+                    break
+        fd_count = len(os.listdir("/proc/%d/fd" % pid))
+        return {"rss_mb": round(rss, 1), "fd_count": fd_count}
+    except OSError:
+        return None
 
 
 def quantile(sorted_values, q):
     """线性插值分位数；空表返回 None。"""
-    raise NotImplementedError("C-7 implementation slice")
+    if not sorted_values:
+        return None
+    pos = q * (len(sorted_values) - 1)
+    low = int(pos)
+    high = min(low + 1, len(sorted_values) - 1)
+    frac = pos - low
+    return sorted_values[low] * (1.0 - frac) + sorted_values[high] * frac
 
 
 def run_soak(args, budget, api_key):
     """主循环：到 --duration-s 为止按并发驱动 probe_once，周期采样资源；
     返回 (summary, raw_records)。"""
-    raise NotImplementedError("C-7 implementation slice")
+    profile = PROFILES[args.profile]
+    started = time.monotonic()
+    deadline = started + args.duration_s
+    raw = []
+    lock = threading.Lock()
+
+    def worker(index):
+        slot = 0
+        while time.monotonic() < deadline:
+            prompt = PROMPTS[(index + slot) % len(PROMPTS)]
+            record = probe_once(args.base_url, args.model, prompt,
+                                profile["max_tokens"], profile["temperature"],
+                                args.timeout_s, api_key)
+            record["worker"] = index
+            with lock:
+                raw.append(record)
+            slot += 1
+
+    threads = [threading.Thread(target=worker, args=(i,))
+               for i in range(max(args.concurrency, 1))]
+    for thread in threads:
+        thread.start()
+    samples = []
+    while any(thread.is_alive() for thread in threads):
+        if args.pid:
+            snap = sample_resources(args.pid)
+            if snap:
+                snap["t_s"] = round(time.monotonic() - started, 1)
+                samples.append(snap)
+        time.sleep(args.sample_interval_s)
+    for thread in threads:
+        thread.join()
+
+    ok_rows = [r for r in raw if r["ok"]]
+    total = len(raw)
+    ttfts = sorted(r["ttft_ms"] for r in ok_rows)
+    totals = sorted(r["total_ms"] for r in ok_rows)
+    tps = sorted(r["decode_tps"] for r in ok_rows)
+    rss_vals = [s["rss_mb"] for s in samples]
+    fd_vals = [s["fd_count"] for s in samples]
+    summary = {
+        "requests_total": total,
+        "requests_ok": len(ok_rows),
+        "requests_failed": total - len(ok_rows),
+        "fail_rate": round((total - len(ok_rows)) / total, 4) if total else 1.0,
+        "wall_duration_s": round(time.monotonic() - started, 1),
+        "ttft_ms": {"p50": round(quantile(ttfts, 0.50), 1),
+                    "p95": round(quantile(ttfts, 0.95), 1),
+                    "p99": round(quantile(ttfts, 0.99), 1),
+                    "max": round(ttfts[-1], 1) if ttfts else None},
+        "total_ms": {"p50": round(quantile(totals, 0.50), 1),
+                     "p95": round(quantile(totals, 0.95), 1),
+                     "p99": round(quantile(totals, 0.99), 1)},
+        "decode_tps": {"p50": round(quantile(tps, 0.50), 2),
+                       "min": round(tps[0], 2) if tps else None},
+        "tokens_total": sum(r["completion_tokens"] for r in raw),
+        "resources": {"samples_n": len(samples),
+                      "rss_mb": {"first": rss_vals[0] if rss_vals else None,
+                                 "last": rss_vals[-1] if rss_vals else None,
+                                 "peak": max(rss_vals) if rss_vals else None},
+                      "fd_count": {"first": fd_vals[0] if fd_vals else None,
+                                   "last": fd_vals[-1] if fd_vals else None,
+                                   "peak": max(fd_vals) if fd_vals else None}},
+    }
+    return summary, raw
 
 
 def build_report(args, budget, summary):
-    raise NotImplementedError("C-7 implementation slice")
+    return {"schema": SCHEMA,
+            "release": read_text(args.release_file),
+            "measured_at": datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"),
+            "machine": machine_fp(),
+            "profile": args.profile,
+            "params": {"base_url": args.base_url, "model": args.model,
+                       "duration_s": args.duration_s,
+                       "concurrency": args.concurrency,
+                       "sample_interval_s": args.sample_interval_s,
+                       "pid": args.pid},
+            "thresholds": budget,
+            "summary": summary,
+            "verdict": "measured"}
 
 
 def write_json(path, data):
-    raise NotImplementedError("C-7 implementation slice")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as stream:
+        json.dump(data, stream, ensure_ascii=False, indent=2, sort_keys=True)
+        stream.write("\n")
+    os.replace(tmp, path)
 
 
 def main(argv):
@@ -129,6 +323,9 @@ def main(argv):
         budget = load_budget(args.budget, args.profile)
         api_key = os.environ.get(args.api_key_env, "") if args.api_key_env else ""
         summary, raw = run_soak(args, budget, api_key)
+        if summary["requests_ok"] == 0:
+            raise OSError("endpoint unreachable: all %d requests failed"
+                          % summary["requests_total"])
         write_json(args.report, build_report(args, budget, summary))
         if args.raw_out:
             write_json(args.raw_out, {"schema": SCHEMA, "records": raw})
