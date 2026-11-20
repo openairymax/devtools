@@ -41,6 +41,17 @@ if [ -z "$ANCHOR" ]; then
     fi
 fi
 
+# 浅克隆下「脚本入库提交」会退化为浅边界：历史被截断后审计循环一次不跑，
+# 门禁空转即过。判据缺席比判据误红更危险，故此处 fail-closed，要求调用方
+# 带历史检出（CI 侧以 --filter=blob:none 取全量提交图）。
+if [ "$(git -C "$REPO_ROOT" rev-parse --is-shallow-repository)" = "true" ]; then
+    BOUNDARY="$(git -C "$REPO_ROOT" rev-list --max-parents=0 HEAD | head -n1)"
+    if [ "$ANCHOR" = "$BOUNDARY" ]; then
+        echo "g41: shallow history truncated at ${ANCHOR:0:12}; clone with history to audit the ratchet" >&2
+        exit 2
+    fi
+fi
+
 pin_at() {
     git -C "$REPO_ROOT" show "${1}:${BASELINE_REL}" 2>/dev/null |
         sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=\([0-9][0-9]*\)[[:space:]]*$/\1 \2/p'
