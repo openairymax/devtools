@@ -322,7 +322,18 @@
 # 属 0.1.21 功能面而非结构开销。后续批次增量须同批配减，不再抬 pin。
 # RATCHET-JUSTIFY: cc9a54ce4 +415 折回 90 个单次使用 helper 后的复核面余量
 # RATCHET-JUSTIFY: 47832cc5f +582 复核流水线宿主、可重试性判定与 R18 复杂度拆分
+# 2026-11-20 0.1.21 X1 事件管道补账：facade 79474 → 79581（+107），core 与
+# cupolas 不动。构成是事件输入帧的逐轮选项（airy_cli 1e8afad58 / 616015c24），
+# 逐文件有效行：cli_ev_frame +75（cli_ev_obj 与配平括号跨度扫描，字符串态与
+# 转义内不计数，避免把 payload 内的括号当结构）、cli_ev_in +32（in_opts_set
+# 与 cli_ev_in_opts，选项与文本同帧入队、消费即清）、cli_ev.h +5、cli_ev_turn
+# −5（取行处改读帧内选项，删去重复的启动期选项入参）。
+# 该增量换掉的是「CLI 只认启动期选项，事件帧无法表达每轮 model/messages/
+# session_id/resume_token」——TUI 经事件管道下发对话轮必须逐轮携带会话语义，
+# 否则续跑与模型切换在事件路径上不可达。属 X1 真功能而非结构开销；后续批次
+# 增量同批配减，不再抬 pin。
+# RATCHET-JUSTIFY: 1e8afad58 +107 事件输入帧携带逐轮选项以承接 TUI 会话语义
 core=79908
-facade=79474
+facade=79581
 cupolas=17656
 target=79999
