@@ -42,7 +42,7 @@ agent-workload/agentrt/heapstore/src/heapstore_migration.c	67711a99	reviewed	set
 agent-workload/agentrt/heapstore/src/heapstore_migration.c	f8db4d1f	reviewed	mig_backup_data_file：备份副本顺序写 + fsync，写失败即报错不采用，恢复走 heapstore_atomic_replace
 agent-workload/agentrt/heapstore/src/heapstore_trace.c	4a7b1b59	exempt	span 导出：按时间戳新建 JSON 转储文件，属诊断输出，不承载业务状态
 agent-workload/agentrt/tools/airy_cli/src/chat/cli_chat_history.c	a7d4b452	append	reasoning 日志追加，写入前经 airy_file_rename 轮转到 .1
-agent-workload/agentrt/tools/airy_cli/src/cmd/airy_cli_cmd_cognition.c	6241985a	atomic	ak_store：tmp + chmod 0600 + airy_file_rename 写回 secrets.env
+agent-workload/agentrt/tools/airy_cli/src/cmd/airy_cli_cmd_cognition.c	16f92d52	atomic	ak_store：tmp + chmod 0600 + airy_file_rename 写回 secrets.env
 agent-workload/agentrt/tools/airy_cli/src/cmd/cli_daemon_lifecycle.c	8bcc487c	append	daemon 子进程 STDOUT/STDERR 以 O_APPEND 重定向到日志文件
 agent-workload/agentrt/tools/airy_cli/src/cmd/cli_key.c	16f92d52	atomic	airy_cli_secret_store：tmp + fsync + airy_file_rename，权限 0600
 agent-workload/agentrt/tools/airy_cli/src/core/main.c	85a3c758	append	cli_boot_log：stderr 以追加模式重定向到 airy_cli.log，失败回退终端
