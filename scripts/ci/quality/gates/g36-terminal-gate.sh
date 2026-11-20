@@ -163,7 +163,8 @@ log_ok "B3 用例注册与构建目标齐备（$(printf '%s\n' "$FNS" | wc -l | 
 # ── D1: 未知可观测（事件携带 status）────────────────────────
 section "D1: unknown observable in mechanism event"
 D1_BAD=0
-grep -q 'grad_out.stats.status' "$EVENT" || {
+# 成员访问既可能是值（x.stats）也可能是指针（p->stats），只锚定字段路径。
+grep -qE 'stats\.status' "$EVENT" || {
     fail "D1 机制面事件未携带 stats.status，未知态不可区分"
     D1_BAD=1
 }
