@@ -179,7 +179,8 @@ grep -qE "add_test\(NAME ${CASE_NAME} COMMAND test_grad_strategy\)" "$BUILD" \
 
 # ── D1: 归因可观测（事件 + trace 双路）─────────────────────
 section "D1: stage observable in event and trace"
-grep -q 'grad_out.stats.stage' "$EVENT" \
+# 成员访问既可能是值（x.stats）也可能是指针（p->stats），只锚定字段路径。
+grep -qE 'stats\.stage' "$EVENT" \
     || fail "D1 机制面事件未携带 stats.stage，失败阶段不可观测"
 grep -qF 'stage\":%u' "$RUN" \
     || fail "D1 决策链 trace 未落盘 stage（事后无法归因）"
