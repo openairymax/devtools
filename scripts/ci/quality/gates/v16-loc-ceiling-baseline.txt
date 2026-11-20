@@ -69,5 +69,18 @@
 #     收为 job_alloc，helper 定义减去两处重复体后净增 3 行。
 # 结论：这是 0.1.21 的功能面扩张，不是清理过渡态；拆载义务记入 0.1.22
 # 首行（llm_d 传输/运行时已另立 providers 能力格，tool_d 的 job 面待分格）。
-tool_d|17127|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18)
-llm_d|9571|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a)
+# 2026-11-20 0.1.21 复核面再登记：tool_d 17127 → 17426（+299），llm_d 9571 →
+# 9713（+142），agent_d 新登记 9347。三笔逐条归因，均为功能与 CCN 拆分的
+# 行数代价，不是结构开销：
+#   agent_d（961b4e3/a50852d/7f86036/33732eb/50ebb4a）——执行期语义复核
+#     流水线宿主：判据复核通过后调用 think.review，判定入 hall 事件流，终裁
+#     拒绝按未达判据收尾；上游失败可重试性判定；R18 把 run 收尾与工具调用
+#     路径拆成小步（FAIL 档清零），另含任务台账用例拆分。
+#   tool_d（e5107da/7d0fcad/3795e99/7f86036）——审批闸两条路径合一到同一个
+#     询价 helper 并按返回值命名，R18 把询价路径拆小以压 CCN。
+#   llm_d（a50852d/2ade3b3/2b20ae1）——可重试性按真实错误码判定、流式错误帧
+#     改经 jsonrpc helper 构造、探针处理拆分。
+# 三条豁免只减不增；agent_d 与 tool_d 的收敛义务随 0.1.22 首行记入清理单。
+tool_d|17426|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99)
+llm_d|9713|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1)
+agent_d|9347|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f)
