@@ -333,7 +333,17 @@
 # 否则续跑与模型切换在事件路径上不可达。属 X1 真功能而非结构开销；后续批次
 # 增量同批配减，不再抬 pin。
 # RATCHET-JUSTIFY: 1e8afad58 +107 事件输入帧携带逐轮选项以承接 TUI 会话语义
+# 2026-11-21 0.1.21 X1 观察面改经事件管道：facade 79581 → 79644（+63），
+# core 与 cupolas 不动。构成是事件输入帧的第五类 query（airy_cli
+# d7f2997c090a）：cli_ev_in +43（in_query 取 id/method/params、同步
+# cli_gw_call、两趟拼装后回 query_result）、cli_ev_frame +18
+# （cli_ev_query_payload 的 ok/error 两分支与转义）、cli_ev.h +2（声明）。
+# 该增量换掉的是「观察面读仍须 TUI 直连 GatewayClient 的 18 处 RPC」——
+# 查询帧把看板、事件流、槽位、健康与运维查询收进同一条事件管道，RPC
+# 观察面随后整条删除。属 X1 真功能而非结构开销；79644 距 80000 目标
+# 仍余 356 行。后续 facade 增量以本批为上限，不设无配减的抬升。
+# RATCHET-JUSTIFY: d7f2997c090a +63 事件输入帧承载观察面查询以替代 TUI 直连 RPC
 core=79908
-facade=79581
+facade=79644
 cupolas=17656
 target=79999
