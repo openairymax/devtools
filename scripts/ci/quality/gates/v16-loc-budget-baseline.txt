@@ -381,7 +381,12 @@
 # 发布实际端口，启动器与健康检查只消费不预写。属可用性缺陷修复而非结构
 # 开销；79713 距 80000 目标仍余 287 行。
 # RATCHET-JUSTIFY: 7a4857d +23 gateway_d 启动成功后发布实际绑定端口
+# 2026-11-21 0.1.21 补丁批 R21：facade 79713 → 79710（-3），core 与 cupolas
+# 不动。端口发布改走 commons 既有的 airy_io_write_file()（同目录 tmp +
+# rename），去掉 gateway_d 内的裸 fopen/fprintf 落地序列：读者与写者无同步，
+# 直写可能读到半截数字，且该写点未在 INV-10 清单声明。属收敛而非新增；
+# 下行登记按棘轮"只降不升"直接收紧账本。
 core=79908
-facade=79713
+facade=79710
 cupolas=17656
 target=79999
