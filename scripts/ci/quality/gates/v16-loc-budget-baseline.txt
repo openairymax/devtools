@@ -344,6 +344,6 @@
 # 仍余 356 行。后续 facade 增量以本批为上限，不设无配减的抬升。
 # RATCHET-JUSTIFY: d7f2997c090a +63 事件输入帧承载观察面查询以替代 TUI 直连 RPC
 core=79908
-facade=79644
+facade=79634
 cupolas=17656
 target=79999
