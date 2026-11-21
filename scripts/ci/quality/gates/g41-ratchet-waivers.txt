@@ -5,5 +5,5 @@ dd32d9a9e74a6426743c5c51416b975f4c3a6232 落账 T-22 槽位准入成本（facade
 d81571aa6e06ac565815642c666d2141810d1b3e 落账在途工具取消（facade 78675→78706）时正文把 +31 逐项归到 agent_d 工具循环与引擎头，却用散文写了「按制度只登记不解释」这层意思而没写机器标签；该笔可对 d5cbf2b 的 diffstat 复核，无未审增长。
 4691804c4facbc8642d5fc6c4dc3964182a2db32 落账 vault 加固后的复钉（facade 78706→78729、cupolas 17604→17656）时正文说明两笔分别是口令拒绝与启动 fail-closed 检查、且逐项写进基线注释，但同样漏掉机器标签；两笔均在基线注释内可对提交 diffstat 复核，无未审增长。
 6e9f1ecaced00ec69b037e972a4fa3d79f2e2b82 落账 0.1.21 复核面收口（core 79493→79908、facade 78892→79474）时把两行 RATCHET-JUSTIFY 写进了基线注释而漏进提交消息；core 的 +415 是折回 90 个单次使用 helper（atoms a12415b -449、commons a2d7416 -95）后的余量，facade 的 +582 已按 daemon 逐条归因登记于上限基线，两笔均可对当前实测复核，无未审增长。
-3e49fe310d58b9944500fd9ec94e14521f3704a5 落账 0.1.22 的 CLI 带值选项修复（facade 79652→79654）时正文写了「同批登记 RATCHET-JUSTIFY」这层意思，机器标签却留在散文行内未顶行；+2 对 agentrt 08d39cfe1 的 diffstat 可逐行复核（cli_vopt_apply 的 1/2 分支拆分），基线注释亦已写明，无未审增长。
+3e49fe310d58b9944500fd9ec94e14521f3704a5 落账 0.1.21 的 CLI 带值选项修复（facade 79652→79654）时正文写了「同批登记 RATCHET-JUSTIFY」这层意思，机器标签却留在散文行内未顶行；+2 对 agentrt 08d39cfe1 的 diffstat 可逐行复核（cli_vopt_apply 的 1/2 分支拆分），基线注释亦已写明，无未审增长。
 

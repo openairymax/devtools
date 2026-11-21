@@ -86,7 +86,6 @@
     }
   },
   "probe_sha256": "e987f25957546f8740b88bdddd20adb5f3da301a519763be2e607c76ff767310",
-  "carried_from": "0.1.21",
-  "release": "0.1.22",
+  "release": "0.1.21",
   "schema": "airy.g37.perf/1"
 }
