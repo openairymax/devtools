@@ -358,7 +358,15 @@
 # 发行流水线 R17 的 run_stream 帧探针因此判红。属真缺陷修复而非结构
 # 开销；79654 距 80000 目标仍余 346 行。
 # RATCHET-JUSTIFY: 08d39cfe1 +2 CLI 带值选项返回码显式分支修复静默退出
+# 2026-11-21 0.1.21 补丁批 R18 门禁收口：facade 79654 → 79673（+19），
+# core 与 cupolas 不动。构成是事件模式对 needs_intent / needs_criteria
+# 门禁帧的识别与收口（agentrt cef32f8c5 的 cli_ev_turn.c）：ev_gate 读
+# state 判门禁、ev_gate_end 在未出终态时补发 run_end，ev_stream 记一
+# 个 gate 位并在收尾时优先于 stream_lost。服务端给出目标确认后会关闭
+# run-stream 等确认，原实现把这次正常停等判成断流，TUI 落失败卡片。
+# 属真缺陷修复而非结构开销；79673 距 80000 目标仍余 327 行。
+# RATCHET-JUSTIFY: 55505cb2e +19 事件模式识别门禁帧并补发 run_end 收口
 core=79908
-facade=79654
+facade=79673
 cupolas=17656
 target=79999
