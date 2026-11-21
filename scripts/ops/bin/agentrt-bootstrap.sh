@@ -387,10 +387,11 @@ declare -A DAEMON_PORT=(
 
 # gateway_d 健康检查端口以「实际 launch 声明」为准：安装器在
 # $AIRY_CONFIG_DIR/profile.env 写入
-# AIRYRT_LAUNCH_ARGS_gateway_d="-h 127.0.0.1 -p 8080"（run/gateway.port
-# 同为 8080），而本表登记的是二进制缺省值 2027。二者不一致时健康检查
-# 探测错误端口——gateway 已在 8080 监听（日志 probe ok）仍判
-# FAILED after 30s → abort 回滚整个 daemon 群（B50 实测根因）。
+# AIRYRT_LAUNCH_ARGS_gateway_d="-h 127.0.0.1 -p 8080"，而本表登记的是二进制
+# 缺省值 2027。二者不一致时健康检查探测错误端口——gateway 已在 8080 监听
+# （日志 probe ok）仍判 FAILED after 30s → abort 回滚整个 daemon 群（B50 实测
+# 根因）。run/gateway.port 是绑定方发布的运行期事实（输出），不得当作配置
+# 读入：上一个栈的残留值会把健康检查引到错误端口。
 gw_decl_port() {
     local decl="${AIRY_CONFIG_DIR}/profile.env"
     local argline="" p=""
@@ -402,9 +403,6 @@ gw_decl_port() {
     case " ${argline} " in
         *" -p "*) p="${argline##* -p }"; p="${p%% *}" ;;
     esac
-    if [[ ! "$p" =~ ^[0-9]+$ && -f "${AIRY_RUNTIME_DIR}/gateway.port" ]]; then
-        p="$(sed -n '1s/[^0-9]//gp' "${AIRY_RUNTIME_DIR}/gateway.port" 2>/dev/null | head -1)"
-    fi
     if [[ "$p" =~ ^[0-9]+$ ]]; then
         printf '%s' "$p"
     fi
@@ -1127,6 +1125,10 @@ start_daemon() {
     local daemon_log="${AIRY_LOG_DIR}/${name}.log"
     local pid_file="${AGENTRT_RUNTIME_DIR}/${name%_d}.pid"
     rm -f "$pid_file"
+    # 运行期端口事实由守护进程绑定成功后自发布（gateway_d → gateway.port）。
+    # 启动前清除旧值：文件描述的是上一个栈，残留值会把按端口探测的调用方
+    # 引到错误端点（实测：8080 陈旧值 vs 实监听 2027）。
+    rm -f "${AGENTRT_RUNTIME_DIR}/${name%_d}.port"
     if command -v setsid >/dev/null 2>&1; then
         # sh 包装参数：$0=_, $1=pid_file，shift 后 $@ 即 daemon 完整命令行
         # （bin + 可选 --manager）。shift 2 会把无参数 daemon 的 bin 也移掉，

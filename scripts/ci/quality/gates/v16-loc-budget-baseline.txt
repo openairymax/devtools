@@ -373,7 +373,15 @@
 # CACERT_BADFILE；改为无环境覆盖时按标准位置探测并显式指定 CAINFO。
 # 属可移植性缺陷修复而非结构开销；79690 距 80000 目标仍余 310 行。
 # RATCHET-JUSTIFY: a3964776397c +17 providers 按标准位置运行期探测 CA 包
+# 2026-11-21 0.1.21 补丁批 R20：facade 79690 → 79713（+23），core 与
+# cupolas 不动。构成是 gateway_d 的运行期端口事实发布（daemons 7a4857d 的
+# gw_boot.c）：gateway.port 此前只由整机启动器写，bootstrap/supervisor
+# 直启路径不写，上一个栈的陈旧值（实测 8080 对实监听 2027）会让按该文件
+# 解析端点的客户端恒判 gateway_unreachable。改由绑定方在服务启动成功后
+# 发布实际端口，启动器与健康检查只消费不预写。属可用性缺陷修复而非结构
+# 开销；79713 距 80000 目标仍余 287 行。
+# RATCHET-JUSTIFY: 7a4857d +23 gateway_d 启动成功后发布实际绑定端口
 core=79908
-facade=79690
+facade=79713
 cupolas=17656
 target=79999
