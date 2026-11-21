@@ -343,7 +343,15 @@
 # 观察面随后整条删除。属 X1 真功能而非结构开销；79644 距 80000 目标
 # 仍余 356 行。后续 facade 增量以本批为上限，不设无配减的抬升。
 # RATCHET-JUSTIFY: d7f2997c090a +63 事件输入帧承载观察面查询以替代 TUI 直连 RPC
+# 2026-11-21 0.1.22 补丁批 U4 轮次链补账：facade 79634 → 79652（+18），
+# core 与 cupolas 不动。构成是 CLI 记忆写入的轮次标注（agentrt 1b9078b09）：
+# cli_chat_memory.c +10（g_mem_turn 计数、metadata.tags 的 turn:N 标注、
+# 恢复回填入口）、cli_chat_session.c +7（restore 解析 tags 并回填计数）、
+# cli_internal.h +1（声明）。tui 只读化删去写入口后，U4 的「写入标注 →
+# 召回还原」链路转入 CLI；不加则 TUI 召回轮次恒 0、续写轮次断裂。属 U4
+# 真功能而非结构开销；79652 距 80000 目标仍余 348 行。
+# RATCHET-JUSTIFY: 1b9078b09 +18 CLI 写入标注对话轮次以承接只读 TUI 的 U4 链
 core=79908
-facade=79634
+facade=79652
 cupolas=17656
 target=79999
