@@ -366,7 +366,14 @@
 # run-stream 等确认，原实现把这次正常停等判成断流，TUI 落失败卡片。
 # 属真缺陷修复而非结构开销；79673 距 80000 目标仍余 327 行。
 # RATCHET-JUSTIFY: 55505cb2e +19 事件模式识别门禁帧并补发 run_end 收口
+# 2026-11-21 0.1.21 补丁批 R19：facade 79673 → 79690（+17），core 与
+# cupolas 不动。构成是 providers 的 CA 包运行期探测（daemons a396477 的
+# http.c）：发行包自带 libcurl/libgnutls 的编译期信任库取自构建机的
+# Debian 路径，RHEL 系（含 AirymaxOS）无此路径，provider HTTPS 恒判
+# CACERT_BADFILE；改为无环境覆盖时按标准位置探测并显式指定 CAINFO。
+# 属可移植性缺陷修复而非结构开销；79690 距 80000 目标仍余 310 行。
+# RATCHET-JUSTIFY: a3964776397c +17 providers 按标准位置运行期探测 CA 包
 core=79908
-facade=79673
+facade=79690
 cupolas=17656
 target=79999
