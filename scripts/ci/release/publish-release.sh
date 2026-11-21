@@ -567,18 +567,43 @@ fetch_existing_assets() {
 }
 fetch_existing_assets "$VERSION"
 
-# 删除远端同名附件（AIRY_FORCE_UPLOAD=1 先删后传；DELETE 失败仅告警不阻断，
-# PUT 本身带幂等，残留旧附件会再暴露于上传后校验并 fail-closed）。
+# 删除远端同名附件，直到附件表里不再有这个名字。
+#
+# 下载面按「文件名」解析到平台为该附件分配的对象路径，因此同名多条记录时
+# 旧对象会顶替新对象（0.1.21 实测：x86-32 / riscv-64 的 .sig 在列表内、
+# 长度同为 96，字节却是上一轮的；arm-64 的同名附件更是下载面 404）。删除
+# 结论以附件表为准：平台对已删对象可能回 404、对仍在的对象也可能回 200，
+# 只看 HTTP 码会把「没删掉」误判成「删掉了」，所以每次都刷新附件表复核。
+# 任一附件重试耗尽仍未消失即 fail-closed——旧对象冒充新制品比发布失败更糟，
+# 自更新链会把旧签名当本次制品去校验。
 delete_existing_asset() {
-    local b="$1" aid
-    aid="$(awk -F '\t' -v n="$b" '$1==n{print $2;exit}' <<<"$EXISTING_ASSETS")"
-    [ -n "$aid" ] || return 0
-    if curl -fsS --connect-timeout 20 -X DELETE -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
-        "${API}/${CUR_TAG}/attach_files/${aid}" >/dev/null 2>&1; then
-        log_ok "已删除远端同名附件（先删后传）: ${b} (asset ${aid})"
-    else
-        log_warn "远端附件删除失败（upload_url 将签发新 key，残留风险由校验兜底）: ${b}"
-    fi
+    local b="$1" aid n=0 i
+    while :; do
+        aid="$(awk -F '\t' -v n="$b" '$1==n{print $2;exit}' <<<"$EXISTING_ASSETS")"
+        if [ -z "$aid" ]; then
+            [ "$n" -eq 0 ] || log_ok "已清空远端同名附件（${n} 个）: ${b}"
+            return 0
+        fi
+        n=$((n + 1))
+        if [ "$n" -gt 8 ]; then
+            log_fail "远端同名附件过多（>8），无法收敛: ${b}"
+            return 1
+        fi
+        for i in 1 2 3; do
+            curl -fsS --connect-timeout 20 -X DELETE -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
+                "${API}/${CUR_TAG}/attach_files/${aid}" >/dev/null 2>&1 || true
+            fetch_existing_assets "$CUR_TAG"
+            awk -F '\t' -v n="$aid" '$2==n{found=1} END{exit !found}' \
+                <<<"$EXISTING_ASSETS" || break
+            log_warn "远端附件删除未生效（第 ${i}/3 次）: ${b} (asset ${aid})"
+            sleep "$((i * 5))"
+        done
+        if awk -F '\t' -v n="$aid" '$2==n{found=1} END{exit !found}' \
+            <<<"$EXISTING_ASSETS"; then
+            log_fail "远端附件删除失败（重试 3 次耗尽）: ${b} (asset ${aid})"
+            return 1
+        fi
+    done
 }
 
 # 远端是否已存在同名附件（精确匹配，防文件名含 . 触发的正则误判）
@@ -607,26 +632,12 @@ remote_matches_local() {
     fi
 }
 
-upload_asset() {
-    local f="$1" b upjson upurl
-    b="$(basename "$f")"
-    # 幂等跳过：同名附件已存在且未强制 → 跳过（重跑续传）。同版本修复重发
-    # 必须 AIRY_FORCE_UPLOAD=1：先删后传（delete_existing_asset），否则 OBS
-    # 覆盖不生效、下载仍是旧文件（0.1.10 同 tag 重发实证）。
-    if asset_exists "$b"; then
-        if [ "${AIRY_FORCE_UPLOAD:-0}" != "1" ]; then
-            log_warn "跳过（远端已存在同名附件，AIRY_FORCE_UPLOAD=1 可先删后传）: ${b}"
-            return 0
-        fi
-        # 强制重发语义保留（同 tag 重发必须能覆盖 OBS 旧对象），但内容
-        # 已一致者免重传——省下的带宽与墙钟全部留给真正需要重传的附件。
-        if remote_matches_local "$f" "$b"; then
-            log_ok "跳过（远端内容与本地一致，免重传）: ${b}"
-            return 0
-        fi
-        delete_existing_asset "$b"
-    fi
-    log_info "上传: ${b}…"
+# 单次上传（PUT 语义，含 upload_url 重取与看门狗重试）。只回答「服务端是否
+# 收下」，不回答「下载面是否已经是这份字节」——后者归 verify_asset。两件事
+# 在对象存储面上并不同步（0.1.21 实证：附件在列表内、下载面却 404），混在
+# 一起写会让失败归因失真。
+put_asset() {
+    local f="$1" b="$2" upjson upurl
     # U-1 看门狗（0.1.13 rc9 实证 2026-09-08）：大包单连接长 PUT 可能长时间
     # 零进度后 502 或白等到 --max-time 3600（windows zip 实测 43min 502 /
     # 60min 0 字节 timeout，两次 attempt 共浪费 >2h）。每文件看门狗重试：
@@ -661,7 +672,9 @@ upload_asset() {
         attempt=$((attempt + 1))
         if [ "$attempt" -gt 1 ]; then
             sleep "$((attempt * 15))"
-            asset_exists "$b" && delete_existing_asset "$b"
+            if asset_exists "$b"; then
+                delete_existing_asset "$b" || return 1
+            fi
         fi
         upjson="$(curl -fsSG --connect-timeout 20 -H "PRIVATE-TOKEN: ${ATOMGIT_TOKEN}" \
             --data-urlencode "file_name=${b}" "${API}/${CUR_TAG}/upload_url")" \
@@ -695,6 +708,12 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
         log_fail "上传失败(重试次数或预算耗尽): ${b}"
         return 1
     fi
+}
+
+# 上传后完整性校验（fail-closed）：读公开下载面——用户与自更新链实际取用的
+# 就是这一面，API 元数据「有这条附件」不等于「取得到且是本轮字节」。
+verify_asset() {
+    local f="$1" b="$2"
     # 上传后完整性校验（0.1.6f 强化，fail-closed）：GET 实际下载
     # 大小必须等于本地大小，防 OBS 截断/静默失败。0.1.10 实证补强：
     # 仅比大小会漏 sha256/sig/manifest 等恒长小文件的覆盖失败（新旧
@@ -743,6 +762,36 @@ for k, v in ((json.load(sys.stdin) or {}).get("headers") or {}).items():
     done
     log_fail "上传完整性校验失败: ${b}（远端 ${dl:-0} != 本地 ${local_size:-0} 字节）"
     return 1
+}
+
+# 附件发布：幂等跳过 → 先删后传 → 校验；校验不过按「新对象重建」再试一次。
+# 重建的理由是平台把对象路径绑在附件记录上：记录在册而下载面拿不到本轮
+# 字节时，只有删掉记录、重新上传让平台分配新路径才可能收敛。
+upload_asset() {
+    local f="$1" b
+    b="$(basename "$f")"
+    # 幂等跳过：同名附件已存在且未强制 → 跳过（重跑续传）。同版本修复重发
+    # 必须 AIRY_FORCE_UPLOAD=1：先删后传，否则 OBS 覆盖不生效、下载仍是
+    # 旧文件（0.1.10 同 tag 重发实证）；内容已一致者免重传，把带宽留给
+    # 真正需要重传的附件。
+    if asset_exists "$b"; then
+        if [ "${AIRY_FORCE_UPLOAD:-0}" != "1" ]; then
+            log_warn "跳过（远端已存在同名附件，AIRY_FORCE_UPLOAD=1 可先删后传）: ${b}"
+            return 0
+        fi
+        if remote_matches_local "$f" "$b"; then
+            log_ok "跳过（远端内容与本地一致，免重传）: ${b}"
+            return 0
+        fi
+        delete_existing_asset "$b" || return 1
+    fi
+    log_info "上传: ${b}…"
+    put_asset "$f" "$b" || return 1
+    verify_asset "$f" "$b" && return 0
+    log_warn "校验未过，按新对象重建远端附件一次: ${b}"
+    delete_existing_asset "$b" || return 1
+    put_asset "$f" "$b" || return 1
+    verify_asset "$f" "$b"
 }
 
 # ─── 阶段 4.4：准备 latest/ 发布树（通道全集 + 启动器 + 密钥）─────────────
