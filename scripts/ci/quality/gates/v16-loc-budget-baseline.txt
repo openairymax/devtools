@@ -351,7 +351,14 @@
 # 召回还原」链路转入 CLI；不加则 TUI 召回轮次恒 0、续写轮次断裂。属 U4
 # 真功能而非结构开销；79652 距 80000 目标仍余 348 行。
 # RATCHET-JUSTIFY: 1b9078b09 +18 CLI 写入标注对话轮次以承接只读 TUI 的 U4 链
+# 2026-11-21 0.1.22 补丁批 R17 修正：facade 79652 → 79654（+2），core 与
+# cupolas 不动。构成是 cli_parse_args 对带值选项返回码的显式分支
+# （agentrt 08d39cfe1）：1=已消费改为 continue、2=用法错误上抛，取代原先
+# 把 1 当终止返回的静默退出——--events/--timeout 一出现即零输出、rc=0，
+# 发行流水线 R17 的 run_stream 帧探针因此判红。属真缺陷修复而非结构
+# 开销；79654 距 80000 目标仍余 346 行。
+# RATCHET-JUSTIFY: 08d39cfe1 +2 CLI 带值选项返回码显式分支修复静默退出
 core=79908
-facade=79652
+facade=79654
 cupolas=17656
 target=79999
