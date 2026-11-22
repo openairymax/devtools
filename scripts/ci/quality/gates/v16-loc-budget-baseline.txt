@@ -445,7 +445,17 @@
 #      并把 a2a send_result 的两条同义错误分支合并（daemons 575db59）。
 # 属失败语义缺陷的真修复；同账相抵后 facade 净减 3 行，不收窄欠账口径。
 # RATCHET-JUSTIFY: 292cd14 +3 work_hall 对 invoke 失败载荷判失败
+# 2026-11-22 0.1.21 补丁批 S-P1-16：facade 79877 → 80004（+127），core 与
+# cupolas 不动。构成是 mem_d 的会话归属视图（daemons 69a5d14）：mem.recent
+# 与 mem.search 接受可选 conv，按 metadata.conv 精确过滤；recent 必须先全量
+# 倒序扫描再截断，先截断后过滤会让旧会话占满窗口。ranking/recent 自
+# service.c 拆出（service.c 662 → 415 行，守单文件 500 行上限），两处共用
+# 同一过滤谓词 mem_rec_in_conv。此前召回与最近列表是全局视图，多会话并行
+# 时互相串台，TUI/CLI 恢复会读到别的会话气泡。属缺陷归因真功能而非结构
+# 开销，拆分本身即同时回收单文件超限；机制核 core 仍在 80000 目标内
+# （79954），facade 形态面已越过 80000 四行，后续增量须同批配减。
+# RATCHET-JUSTIFY: 69a5d14 +127 mem 召回与最近列表按会话隔离
 core=79954
-facade=79877
+facade=80004
 cupolas=17656
 target=79999
