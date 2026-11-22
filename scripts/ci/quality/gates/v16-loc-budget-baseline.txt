@@ -438,6 +438,6 @@
 # 79999 余 98 行。
 # RATCHET-JUSTIFY: de72ed2 +40 two memory records per turn
 core=79951
-facade=79882
+facade=79880
 cupolas=17656
 target=79999
