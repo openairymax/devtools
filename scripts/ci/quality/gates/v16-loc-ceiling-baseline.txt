@@ -123,6 +123,17 @@
 #   e993a4f——持久化路径去掉空树早退（-11），
 #   981f4dd——run_rpc 参数改只读以修复持久化崩溃（+6）。
 # 三条豁免只减不增；收敛义务随 0.1.22 首行记入清理单。
+# 2026-11-22 0.1.21 P1 批登记：agent_d 9513 → 9526（+13），llm_d 9713 →
+# 9805（+92），tool_d 不动。两笔都是计划内 P1 交付，不是清理过渡态：
+#   agent_d（b99a0d5）——S-P1-20 子进程启动在没有传输面可承载输出时改为
+#     拒绝并给出独立 RPC 错误名，替代此前「起得来但读不到」的静默形态；
+#     新增错误名常量、拒绝分支与错误映射共 13 物理行。
+#   llm_d（51e3a4c）——S-P1-12 采样参数改为「模型表声明优先、否则单一默认」
+#     的唯一解析路径：模型类型补五个采样字段、yaml 模型与提供方表解析、
+#     解析件 gen_params.h、请求装参与链路透传；此前采样散落在请求侧字面量，
+#     无法按模型区分。传输侧同批增量落在 providers，不占本账。
+# 三条豁免只减不增的口径不变；新增差额随 0.1.22 首行 llm_d 拆载与
+# tool_d 分格一并配减。
 tool_d|18028|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734;net-split+ssrf@190558d;html-unescape@72f37a1;search-provider@682341c;net-prelude@bd7588b;net-fanin@e207adc;shell-iface@df52c6e)
-llm_d|9713|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1)
-agent_d|9513|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd)
+llm_d|9805|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1;sampling-single-source@51e3a4c)
+agent_d|9526|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5)

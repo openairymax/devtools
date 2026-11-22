@@ -510,7 +510,22 @@
 # 不再占满召回窗口、追加后同步落盘与 JSONL 尾行修复（daemons d28bddc）；
 # 均为记忆库正确性与崩溃安全所必需，无演示面，也未引入重复实现。
 # RATCHET-JUSTIFY: d28bddc +110 mem_d 租户范围与 JSONL 落盘完整性（S-P1-17）
-core=79994
-facade=80633
+# 2026-11-22 0.1.21 P1 批 S-P1-12/13/20：core 79994 → 80062（+68），facade
+# 80633 → 80753（+120），cupolas 不动。两笔逐条归因，均为计划内交付而非
+# 结构开销：
+#   core +68：commons 三笔（90e39ea/34b5eba/291db72）——采样参数只留一个
+#     兜底常量、本地推理端点由一张表发布；同批 atoms 命名收敛 -1、
+#     heapstore 尾行拷贝 -1、cmake +1 为实测抵消项。
+#   facade +121 实测（相对 pin 为 +120，差 1 行为上次登记的口径余量），
+#     全部在 daemons：51e3a4c 采样从模型表解析（llm_d +92、providers +14）、
+#     3807d7d 本地默认端点取自共享表（+1）、b99a0d5 无子进程传输时拒起并给
+#     独立错误名（+8）、dc06d4d PATH 分隔符按平台（+1）、b6e3fc8 macOS 动态
+#     库注入变量清洗（+5）。
+# 收敛义务不变：core 差额并入 §7.5 收敛表，daemons 差额随 0.1.22 首行
+# llm_d 拆载与 tool_d 分格一并配减。
+# RATCHET-JUSTIFY: 51e3a4c +106 采样与本地端点单一来源（S-P1-12/13）
+# RATCHET-JUSTIFY: b99a0d5 +8 无子进程传输时拒起并给独立错误名（S-P1-20）
+core=80062
+facade=80753
 cupolas=17656
 target=79999
