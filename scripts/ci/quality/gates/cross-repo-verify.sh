@@ -364,7 +364,7 @@ check_tool_schema_consistency() {
 
     local schema_out
     if schema_out=$(python3 "$check_script" "${PROJECT_ROOT}" 2>&1); then
-        log_ok "Python BUILTIN_TOOL_SCHEMAS is a subset of C tool_d registry"
+        log_ok "Python tool schema derives from tool_d catalog; registry == contract"
         check_pass
     else
         # 脚本对"真实子集违反"与"对比源缺席"返回同一退出码，原因必须原样

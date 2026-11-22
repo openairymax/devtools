@@ -1,64 +1,63 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
-"""AgentRT 跨仓同步点一致性校验（0.1.6 SSoT S-6）。
+"""AgentRT 工具 schema 跨仓同源校验（0.1.21 S-P1-15 重写）。
 
-对比两处工具 schema 定义：
-- Python 侧：ecosystem/agents/airymax_agents/base.py 的 BUILTIN_TOOL_SCHEMAS
-  （Python SDK 注册给 LLM 的工具 schema）
-- C 侧：agentrt/daemons/tool_d 的能力格注册表（数据化 SSoT）：
-  src/rpc/service_builtin.c 的 BTOOL("id", ...) 元数据表 +
-  src/builtin/builtin.c 的 g_builtin_slots[] 分发槽
+0.1.21 起模型可调用 schema 不再由策略侧静态声明，而是运行期从 tool_d
+目录（``list_tools``，C-16 目录 SSoT）生成。因此本门禁校验三条：
 
-约束（SSoT）：Python 侧是 C 侧的能力子集——Python 不得声明 C 侧不存在的
-工具（防 LLM 调用到运行时无法执行的工具）；C 侧多出未在 Python 暴露的
-工具属有意能力隔离（如 git_*/maths_* 无 Python 分发器），允许。
+1. ``airymax_agents/base.py`` 不得再定义 ``BUILTIN_TOOL_SCHEMAS``；
+2. 该文件必须以 ``tool_list()`` 目录为注册来源（不得另设白名单）；
+3. tool_d 的注册元数据（``BTOOL`` 行）与契约表（``k_contract`` 行）必须
+   逐项相等——注册了却没有 schema、或有 schema 却未注册，均为门禁失败。
 
 退出码：0 一致；1 不一致（CI 门禁失败）。
 用法：check-tool-schema-consistency.py [伞仓根]
 """
 
-import ast
 import os
 import re
 import sys
 
-
-def load_python_tools(base_py):
-    """提取 BUILTIN_TOOL_SCHEMAS 的工具 id 集合。"""
-    src = open(base_py, encoding="utf-8").read()
-    tree = ast.parse(src)
-    tools = set()
-    for node in ast.walk(tree):
-        if (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
-                and node.target.id == "BUILTIN_TOOL_SCHEMAS"
-                and isinstance(node.value, ast.Dict)):
-            for k in node.value.keys:
-                if isinstance(k, ast.Constant):
-                    tools.add(k.value)
-    return tools
+#: 契约表在 service_builtin.c 中的定义起点（提取到匹配的 "};" 为止）。
+_CONTRACT_HEAD = "k_contract[] = {"
 
 
-def load_c_tools(service_builtin_c, builtin_c):
-    """提取 C 侧内建工具能力格（数据化 SSoT）的工具 id 集合。
+def load_py_source(base_py):
+    """读取策略侧注册实现源码。"""
+    with open(base_py, encoding="utf-8") as fh:
+        return fh.read()
 
-    0.1.19 根因修复：本函数原以 builtin.c 内 `strcmp(tool_id, "...") == 0`
-    分发链为提取源。内建工具注册数据化后，该模式在树内消失（builtin.c 改为
-    `g_builtin_slots[]` 槽表 + `tool_builtin_run()` 纯查表），旧正则提取恒空，
-    致 Python 侧全部工具被误判为「仅 Python」（假阳门禁）。改为读取注册表本体：
-      - service_builtin.c 的 `BTOOL("id", ...)` 元数据表（工具 id 权威宿主）；
-      - builtin.c 的 `g_builtin_slots[]` 分发槽（`{"id", <fn>_tool}` 行），
-        与元数据表并集加固。两表应逐项一致，取并集既不漏报也不误报。
-    """
-    ids = set()
-    for path in (service_builtin_c, builtin_c):
-        if not os.path.exists(path):
-            continue
-        src = open(path, encoding="utf-8").read()
-        ids |= set(re.findall(r'BTOOL\(\s*"([^"]+)"', src))
-        ids |= set(re.findall(
-            r'\{\s*"([^"]+)"\s*,\s*[A-Za-z_][A-Za-z0-9_]*_tool\s*\}', src))
-    return ids
+
+def load_contract_ids(service_builtin_c):
+    """提取 k_contract 表的工具 id 集合。"""
+    with open(service_builtin_c, encoding="utf-8") as fh:
+        src = fh.read()
+    start = src.find(_CONTRACT_HEAD)
+    if start < 0:
+        return set()
+    end = src.find("};", start)
+    if end < 0:
+        return set()
+    return set(re.findall(r'\{\s*"([^"]+)"\s*,', src[start:end]))
+
+
+def load_btool_ids(service_builtin_c):
+    """提取 BTOOL 元数据表的工具 id 集合。"""
+    with open(service_builtin_c, encoding="utf-8") as fh:
+        src = fh.read()
+    return set(re.findall(r'BTOOL\(\s*"([^"]+)"', src))
+
+
+def check_python_side(base_py):
+    """校验策略侧不存在平行静态表，且注册来源是 tool_d 目录。"""
+    src = load_py_source(base_py)
+    issues = []
+    if "BUILTIN_TOOL_SCHEMAS" in src:
+        issues.append("base.py 仍定义平行静态表 BUILTIN_TOOL_SCHEMAS")
+    if "tool_list(" not in src:
+        issues.append("base.py 未以 tool_list() 目录作为注册来源")
+    return issues
 
 
 def main():
@@ -67,31 +66,34 @@ def main():
     root = os.path.normpath(root)
 
     base_py = os.path.join(root, "agent-workload/ecosystem/agents/airymax_agents/base.py")
-    builtin_c = os.path.join(
-        root, "agent-workload/agentrt/daemons/tool_d/src/builtin/builtin.c")
     service_builtin_c = os.path.join(
         root, "agent-workload/agentrt/daemons/tool_d/src/rpc/service_builtin.c")
 
-    if (not os.path.exists(base_py) or not os.path.exists(builtin_c)
-            or not os.path.exists(service_builtin_c)):
-        print(f"FAIL: 未找到对比源（{base_py} / {service_builtin_c} / {builtin_c}）",
-              file=sys.stderr)
+    if not os.path.exists(base_py) or not os.path.exists(service_builtin_c):
+        print(f"FAIL: 未找到对比源（{base_py} / {service_builtin_c}）", file=sys.stderr)
         return 1
 
-    py_tools = load_python_tools(base_py)
-    c_tools = load_c_tools(service_builtin_c, builtin_c)
+    issues = check_python_side(base_py)
+    contract_ids = load_contract_ids(service_builtin_c)
+    btool_ids = load_btool_ids(service_builtin_c)
 
-    only_py = sorted(py_tools - c_tools)
-    only_c = sorted(c_tools - py_tools)
-
-    print(f"[INFO] Python BUILTIN_TOOL_SCHEMAS: {len(py_tools)} 个")
-    print(f"[INFO] C tool_builtin_run ids:      {len(c_tools)} 个")
-    if only_c:
-        print(f"[INFO] 仅 C 侧（能力隔离，允许）: {only_c}")
-    if only_py:
-        print(f"[FAIL] 仅 Python 侧（SSoT 违反）：{only_py}")
+    print(f"[INFO] k_contract: {len(contract_ids)} 个；BTOOL: {len(btool_ids)} 个")
+    if not contract_ids or not btool_ids:
+        print("FAIL: 未能从 service_builtin.c 提取注册表/契约表", file=sys.stderr)
         return 1
-    print("[ OK ] Python 工具集为 C 侧子集，一致")
+
+    only_contract = sorted(contract_ids - btool_ids)
+    only_btool = sorted(btool_ids - contract_ids)
+    if only_contract:
+        issues.append(f"有 schema 未注册（仅 k_contract）：{only_contract}")
+    if only_btool:
+        issues.append(f"已注册无 schema（仅 BTOOL）：{only_btool}")
+
+    if issues:
+        for item in issues:
+            print(f"[FAIL] {item}", file=sys.stderr)
+        return 1
+    print("[ OK ] 目录唯一来源；注册表与契约表逐项一致")
     return 0
 
 
