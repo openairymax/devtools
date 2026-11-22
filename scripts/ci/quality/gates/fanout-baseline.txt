@@ -1,7 +1,7 @@
 # 0.1.19 G13 load/fan baseline (ratchet; only decrease)
 # section load: <daemon-relative header path> <src-face fan-in>
 # section fan : <whitelist target> <distinct project libs, self-held excluded>
-load tool_d/src/builtin/builtin_limits_internal.h	9
+load tool_d/src/builtin/builtin_limits_internal.h	8
 load agent_d/src/run/agent_run_internal.h	7
 load supervisor_d/src/supervisor_d_internal.h	6
 load tool_d/include/tool_service.h	6
@@ -27,9 +27,12 @@ fan think_d	7
 fan tool_d	6
 # 2026-11-18 0.1.21 登记：下列四项是「单文件 ≤500 行」拆分派生的共享内聚头，
 # 扇入来自拆分后的 TU 数，不是新增耦合（拆前为单体 TU，扇入恒为 1）：
-#   builtin_limits_internal.h 9 — builtin 家族公共前导（5 域头 + 4 TU）；
+#   builtin_limits_internal.h 8 — builtin 家族公共前导（5 域头 + 3 TU）；
+#                                  网络族前导经 result_internal 取 limits，
+#                                  priv.c 去掉与 exec 重复的两行后下压 9→8
+#                                  （daemons e207adc）；
 #   builtin_exec_internal.h   6 — 执行核 shell_run/proc_capture/child_fn
-#                                  被 builtin/priv/shell/git/net/verify 共用；
+#                                  被 builtin/priv/shell/git/verify 共用；
 #   agent_run_internal.h      7 — agent_run_engine.c 拆为 7 TU 后的共享契约；
 #   tool_service.h            6 — tool_d 服务面（core/rpc/job/registry 消费）。
 # 结论：扇入上限 5 与拆分义务冲突。建议 0.1.22 把 load 口径改为跨模块

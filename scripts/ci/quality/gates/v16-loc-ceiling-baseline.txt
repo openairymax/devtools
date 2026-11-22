@@ -96,8 +96,29 @@
 # conv」使 TUI 重启后助手回复与会话归属双丢失的缺陷，属缺陷归因真功能；
 # 拆出的构造件为纯函数，可脱离传输直测（test_turn_rec）。
 # 豁免只减不增的口径不变，agent_d 收敛义务随 0.1.22 首行记入清理单。
-tool_d|17432|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734)
-llm_d|9713|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1)
-agent_d|9472|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2)
 # 2026-11-22 收紧：agent_d 9477 → 9472（持久化循环去掉空树早退与冗余叙述），
 # 同批形态面 79901 → 79880、机制核 79963 → 79951，均为实测下调，非增长登记。
+# 2026-11-22 0.1.21 P1 网络面登记（S-P1-06/07）：tool_d 17432 → 17995
+# （+563）。构成是网络内置工具按域拆分与出站主机约束，全部为功能真增长：
+#   tool_d（190558d）——builtin_net.c 拆成抓取/搜索/守卫三个编译单元并新增
+#     约定头；web_fetch 在发请求前判定主机（私网/环回/链路本地/元数据/组播、
+#     非规范数字形态、本地后缀默认拒绝，解析后逐地址复核，另设显式放行表）。
+#   tool_d（72f37a1）——SERP 标题/摘要的 HTML 实体此前从不反转义，改为对
+#     压缩后的缓冲起点反转义。
+#   tool_d（682341c）——web_search 增加可配置 JSON provider（endpoint/key），
+#     provider 优先、抓取兜底；配置非法与双路失败各有明确错误码。
+#   tool_d（bd7588b）——结果信封内部头收进网络族前导，修复拆分带来的扇入
+#     上升（G13），净行数为 0。
+#   tool_d（e207adc）——网络族前导改经结果信封头取 limits、priv.c 去掉与
+#     exec 重复的两行，扇入回到基线内（limits 10→8、exec 7→6、result 6→5），
+#     净 -1 行。
+# 拆分本身没有搬运开销：三个单元均低于单文件 500 行上限，守卫与 provider
+# 各自可独立直测（test_net_guard / test_web_search）。
+# 2026-11-22 同批补记 agent_d 9472 → 9513（+41），漏记于上一轮复核之后：
+#   ccba91e（S-P1-19）——invoke 透传会话标识与历史（+42），
+#   e993a4f——持久化路径去掉空树早退（-11），
+#   981f4dd——run_rpc 参数改只读以修复持久化崩溃（+6）。
+# 三条豁免只减不增；收敛义务随 0.1.22 首行记入清理单。
+tool_d|17995|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734;net-split+ssrf@190558d;html-unescape@72f37a1;search-provider@682341c;net-prelude@bd7588b;net-fanin@e207adc)
+llm_d|9713|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1)
+agent_d|9513|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd)
