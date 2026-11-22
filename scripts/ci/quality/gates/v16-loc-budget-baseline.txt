@@ -418,7 +418,18 @@
 # 只能等任务答非所问才发现工具后端缺失。属可观测性缺陷的真修复而非结构
 # 开销；79779 距 80000 目标仍余 221 行。
 # RATCHET-JUSTIFY: 1d62897 +16 agent_d 转写子进程降级帧
+# 2026-11-22 0.1.21 补丁批 S-P0-04：facade 79778 → 79861（+83），core 与
+# cupolas 不动。构成是 model.yaml:context_window 到受管 llama-server 启动
+# 参数的映射（agentrt 4018eda05，airy_cli 三件）：
+#   ① context_window 由行内 ctx 字段承接，4k/16k/128k/1M/2M 与十进制等价；
+#   ② mr_sync 装配 -c <tokens>，恒置 --jinja（工具调用前提），-ngl 取策略
+#      环境变量 AIRY_LOCAL_GPU_LAYERS，末尾接策略 args；
+#   ③ 策略已显式给出 -c/--ctx-size 时不重复，避免两处策略打架。
+# 此前上下文窗口只存在于配置面、对受管进程无消费点，长上下文模型被
+# llama.cpp 缺省窗口截断；增量换掉的是该缺陷路径而非结构开销。79861 距
+# milestone target 79999 余 138 行。
+# RATCHET-JUSTIFY: 4018eda05 +83 cli context window mapping to managed args
 core=79963
-facade=79778
+facade=79861
 cupolas=17656
 target=79999
