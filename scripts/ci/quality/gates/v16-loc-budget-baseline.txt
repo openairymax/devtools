@@ -399,7 +399,19 @@
 # 网关与调度层因此判绿；现改为失败返回并把 error 文本回传 JSON-RPC。
 # 属正确性缺陷修复而非结构开销；79741 距 80000 目标仍余 259 行。
 # RATCHET-JUSTIFY: 0ea80f4 +21 facade agent.invoke 失败必须成为失败
-core=79928
-facade=79741
+# 2026-11-22 0.1.21 补丁批 R24：core 79928 → 79963（+35），facade
+# 79741 → 79763（+22），cupolas 不动。构成是 S-P0-10 的根因修复
+# （commons 0e52f4f / daemons d696734）：
+#   ① core +35：方法表由固定容量改为按需扩容（grow_handlers），并新增
+#      method_dispatcher_register_all 表驱动注册，失败时点名并返回；
+#   ② facade +22：daemon_boot 对静态表与 svc_attach 的注册结果逐条判死，
+#      svc_attach 改 int 上报，五族方法改表驱动注册且失败即回滚。
+# 该增量换掉的是「注册失败被静默吞掉、方法面残缺仍对外服务」的缺陷路径
+# （tool_d 的 skill.uninstall 长期缺失即此故），属缺陷归因真修复；
+# 余额随 §7.5 收敛表在 0.1.21 后段配减。
+# RATCHET-JUSTIFY: 0e52f4f +35 core 方法表按需扩容与表驱动注册
+# RATCHET-JUSTIFY: d696734 +22 facade 方法注册失败致命并回滚
+core=79963
+facade=79763
 cupolas=17656
 target=79999
