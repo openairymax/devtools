@@ -7,3 +7,4 @@ d81571aa6e06ac565815642c666d2141810d1b3e 落账在途工具取消（facade 78675
 6e9f1ecaced00ec69b037e972a4fa3d79f2e2b82 落账 0.1.21 复核面收口（core 79493→79908、facade 78892→79474）时把两行 RATCHET-JUSTIFY 写进了基线注释而漏进提交消息；core 的 +415 是折回 90 个单次使用 helper（atoms a12415b -449、commons a2d7416 -95）后的余量，facade 的 +582 已按 daemon 逐条归因登记于上限基线，两笔均可对当前实测复核，无未审增长。
 3e49fe310d58b9944500fd9ec94e14521f3704a5 落账 0.1.21 的 CLI 带值选项修复（facade 79652→79654）时正文写了「同批登记 RATCHET-JUSTIFY」这层意思，机器标签却留在散文行内未顶行；+2 对 agentrt 08d39cfe1 的 diffstat 可逐行复核（cli_vopt_apply 的 1/2 分支拆分），基线注释亦已写明，无未审增长。aa47a35 只把版本号从 0.1.22 改回 0.1.21，判据未变。
 
+8d3eaab881a89af0b118fd0c7ed1fdb5998ac74c 落账 shell 运行契约独立成头（facade 80516→80523、tool_d 上限 17995→18028）时把 RATCHET-JUSTIFY 写进了基线注释而漏进提交消息；+7 由基线注释逐项归因到 df52c6e 的 builtin_shell_internal.h，扇入、上限与预算三门同批复验一致，无未审增长。
