@@ -497,7 +497,14 @@
 #   ③ 拆分只为守单文件 500 行上限与单一职责，无行为迁移。
 # 属缺陷归因真功能（出站面此前没有任何主机约束），欠账并入 §7.5 收敛表。
 # RATCHET-JUSTIFY: 682341c +428 tool_d 网络工具分域与出站主机策略（S-P1-06/07）
+# 2026-11-22 0.1.21 P1 批 S-P1-06/07 补记：facade 80516 → 80523（+7），core
+# 与 cupolas 不动。构成是 shell 运行契约独立成头（daemons df52c6e 的
+# builtin_shell_internal.h）：网络族在上一批把结果信封收进前导后，不再经执行核
+# 内部头取 builtin_shell_run 声明，门禁编译在一次隐式声明上判红。契约按单一
+# 职责拆出（只含 shell 运行入口，不含 fork/pipe 捕获），执行核与网络族各自
+# 包含，扇入仍在上限内。属编译根因修复而非结构开销。
+# RATCHET-JUSTIFY: df52c6e +7 shell 运行契约独立成头以修复隐式声明
 core=79994
-facade=80516
+facade=80523
 cupolas=17656
 target=79999
