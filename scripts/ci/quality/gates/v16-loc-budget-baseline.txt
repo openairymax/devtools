@@ -482,7 +482,22 @@
 # 的旧路径被消除。属缺陷归因真功能（多轮追问此前无载体），测试不计入本账；
 # facade 形态面欠账并入 §7.5 收敛表，后续批次优先配减。
 # RATCHET-JUSTIFY: ccba91e +25 agent_d 透传会话标识与历史（S-P1-19）
+# 2026-11-22 0.1.21 P1 批 S-P1-06/07「网络工具分域与出站主机策略」：facade
+# 80088 → 80516（+428），core 与 cupolas 不动。构成是 tool_d 单文件
+# builtin_net.c（502 有效行）按职责拆为 fetch/search/guard 三件加共享内头
+# （203/452/255/20），差额全部是新增能力而非搬运开销：
+#   ① web_fetch 出站前做主机判定：私网/回环/链路本地/元数据/组播字面量、
+#      非规范数字形态（0x7f000001、2130706433、0177.0.0.1）与本地后缀
+#      （localhost/.local/.internal/.lan/.home.arpa）默认拒绝，域名解析后
+#      逐地址复核；AIRY_NET_ALLOW_HOSTS 提供显式放行表。
+#   ② web_search 增加可配置 JSON provider（endpoint 与 key 两个环境变量，
+#      key 以 Bearer 与 X-API-Key 双头发送），provider 优先、SERP 抓取兜底；
+#      配置非法返回 INVALID_PARAM，双路皆败返回明确 offline 错误，不再静默
+#      返回空结果。
+#   ③ 拆分只为守单文件 500 行上限与单一职责，无行为迁移。
+# 属缺陷归因真功能（出站面此前没有任何主机约束），欠账并入 §7.5 收敛表。
+# RATCHET-JUSTIFY: 682341c +428 tool_d 网络工具分域与出站主机策略（S-P1-06/07）
 core=79994
-facade=80088
+facade=80516
 cupolas=17656
 target=79999
