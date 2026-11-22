@@ -532,7 +532,11 @@
 # 属安装布局缺陷修复——点前缀目录在 Windows 不隐藏，用户级数据应随
 # LOCALAPPDATA 的清理/迁移策略走；余额随 §7.5 收敛表配减。
 # RATCHET-JUSTIFY: afbcd6b +12 Windows 安装根按 LOCALAPPDATA 解析（S-P1-04）
+# 2026-11-22 0.1.21 B5 批：facade 80753 → 80758（+5），core 与 cupolas 不动。
+# agent_d 的 parent_task_id 协议层透传（99b25d7）——RPC 解析可选字段并在
+# 请求行下发；纯注释的接口文档不计入，增量为实际解析与下发语句。
+# RATCHET-JUSTIFY: 99b25d7 +5 子代理父任务标识经 agent.invoke 透传（S-P2-01）
 core=80074
-facade=80753
+facade=80758
 cupolas=17656
 target=79999
