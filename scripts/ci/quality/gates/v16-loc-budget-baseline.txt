@@ -411,7 +411,14 @@
 # 余额随 §7.5 收敛表在 0.1.21 后段配减。
 # RATCHET-JUSTIFY: 0e52f4f +35 core 方法表按需扩容与表驱动注册
 # RATCHET-JUSTIFY: d696734 +22 facade 方法注册失败致命并回滚
+# 2026-11-22 0.1.21 补丁批 S-P0-11：facade 79763 → 79779（+16），core 与
+# cupolas 不动。构成是 agent_d 对子进程降级帧的转写（daemons 1d62897 的
+# service_spawn.c）：ready 校验通过后读 degraded/reason 并落一条 WARN。
+# 此前 SyscallProxy 初始化失败的子进程与健康子进程在日志上无法区分，运维
+# 只能等任务答非所问才发现工具后端缺失。属可观测性缺陷的真修复而非结构
+# 开销；79779 距 80000 目标仍余 221 行。
+# RATCHET-JUSTIFY: 1d62897 +16 agent_d 转写子进程降级帧
 core=79963
-facade=79763
+facade=79779
 cupolas=17656
 target=79999
