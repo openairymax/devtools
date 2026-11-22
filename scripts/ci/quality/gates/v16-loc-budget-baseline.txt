@@ -455,7 +455,24 @@
 # 开销，拆分本身即同时回收单文件超限；机制核 core 仍在 80000 目标内
 # （79954），facade 形态面已越过 80000 四行，后续增量须同批配减。
 # RATCHET-JUSTIFY: 69a5d14 +127 mem 召回与最近列表按会话隔离
-core=79954
-facade=80004
+# 2026-11-22 0.1.21 P1 批 S-P1-18「编排超时贯穿」：core 79954 → 79995（+41），
+# facade 80004 → 80065（+61），cupolas 不动。两笔同批落地（agentrt acd6d61dc）：
+#   ① core +41：编排器新增调用级预算入口（orchestrator_execute_budget），
+#      think_d 的 timeout_ms 不再被丢弃；绝对 deadline 在阶段前、每次重试前、
+#      阶段体后三处判定，超期落 ORCH_TASK_TIMEOUT 并记断路器；pipeline 步骤的
+#      timeout_ms 同时生效（此前是死字段）。同时删除 execute_single_phase
+#      包装，预算 0 语义收归单一入口。
+#   ② facade +61：DAG 节点预算解析统一到 dag_node_budget（节点级 > 图级 >
+#      传输默认），预算经 executor 签名贯穿串行/并行/队列三条派发路径到
+#      daemon_rpc_call；超期成为可回报终态 SCHED_DAG_NODE_TIMEOUT（图仍
+#      FAILED），传输层不再把 AIRY_ERR_TIMEOUT 折叠为 SVC_NOT_READY；
+#      invoke 失败/超期补 terminate（固定 2s 上限），杜绝孤儿 agent。
+# 均为缺陷归因真功能：超时此前在编排侧被丢弃、DAG 侧既无预算、原因又被
+# 传输层折叠。机制核 core 79995 仍在 80000 与 milestone target 79999 之内；
+# facade 形态面越过 80000 六十五行，欠账并入 §7.5 收敛表，后续批次优先配减。
+# RATCHET-JUSTIFY: acd6d61dc +41 编排调用级预算贯穿（S-P1-18）
+# RATCHET-JUSTIFY: acd6d61dc +61 DAG 节点超时贯穿与可回报终态（S-P1-18）
+core=79995
+facade=80065
 cupolas=17656
 target=79999
