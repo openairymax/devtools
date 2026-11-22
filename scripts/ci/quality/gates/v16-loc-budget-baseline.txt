@@ -473,7 +473,16 @@
 # 六十三行，欠账并入 §7.5 收敛表，后续批次优先配减。
 # RATCHET-JUSTIFY: acd6d61dc +41 编排调用级预算贯穿（S-P1-18）
 # RATCHET-JUSTIFY: acd6d61dc +61 DAG 节点超时贯穿与可回报终态（S-P1-18）
+# 2026-11-22 0.1.21 P1 批 S-P1-19「会话历史随请求」：facade 80063 → 80088
+# （+25），core 与 cupolas 不动。构成是 agent_d 的调用面把会话标识与历史
+# 透传到子进程（daemons ccba91e）：inv_add_history 只转发非空消息数组，畸形
+# 或空数组按「无历史」处理不阻断调用；inv_send/inv_child 与
+# agent_service_invoke 增参透传，agent.* RPC 解析可选 session_id/history。
+# 每次请求独立构造执行上下文、历史在本轮输入前重放，跨请求复用实例上下文
+# 的旧路径被消除。属缺陷归因真功能（多轮追问此前无载体），测试不计入本账；
+# facade 形态面欠账并入 §7.5 收敛表，后续批次优先配减。
+# RATCHET-JUSTIFY: ccba91e +25 agent_d 透传会话标识与历史（S-P1-19）
 core=79994
-facade=80063
+facade=80088
 cupolas=17656
 target=79999
