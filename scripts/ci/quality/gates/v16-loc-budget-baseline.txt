@@ -525,7 +525,14 @@
 # llm_d 拆载与 tool_d 分格一并配减。
 # RATCHET-JUSTIFY: 51e3a4c +106 采样与本地端点单一来源（S-P1-12/13）
 # RATCHET-JUSTIFY: b99a0d5 +8 无子进程传输时拒起并给独立错误名（S-P1-20）
-core=80062
+# 2026-11-22 S-P1-04：core 80062 → 80074（+12），Windows 安装根改由
+# %LOCALAPPDATA%\airymaxrt 解析（commons afbcd6b）。默认根解析抽为
+# paths_default_home：Windows 先看 LOCALAPPDATA、再退回 USERPROFILE，POSIX
+# 与临时根不变；同规则同步到 TUI paths.rs（tui 76f7248）与 install.ps1。
+# 属安装布局缺陷修复——点前缀目录在 Windows 不隐藏，用户级数据应随
+# LOCALAPPDATA 的清理/迁移策略走；余额随 §7.5 收敛表配减。
+# RATCHET-JUSTIFY: afbcd6b +12 Windows 安装根按 LOCALAPPDATA 解析（S-P1-04）
+core=80074
 facade=80753
 cupolas=17656
 target=79999
