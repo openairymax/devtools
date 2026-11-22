@@ -37,7 +37,6 @@ a2a_v03_get_agent_count
 a2a_v03_get_capabilities
 a2a_v03_get_task_count
 a2a_v03_invalidate_token
-a2a_v03_is_initialized
 a2a_v03_negotiate_task
 a2a_v03_register_agent
 a2a_v03_route_request
@@ -530,7 +529,6 @@ binder_pending_call_create
 binder_pending_call_destroy
 binder_remove_pending_call_locked
 bridge_reload_callback
-build_correction_prompt
 build_decomposition_prompt
 build_filepath_with_seq
 build_generation_prompt

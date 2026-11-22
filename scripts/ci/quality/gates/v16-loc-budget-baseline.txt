@@ -468,11 +468,12 @@
 #      FAILED），传输层不再把 AIRY_ERR_TIMEOUT 折叠为 SVC_NOT_READY；
 #      invoke 失败/超期补 terminate（固定 2s 上限），杜绝孤儿 agent。
 # 均为缺陷归因真功能：超时此前在编排侧被丢弃、DAG 侧既无预算、原因又被
-# 传输层折叠。机制核 core 79995 仍在 80000 与 milestone target 79999 之内；
-# facade 形态面越过 80000 六十五行，欠账并入 §7.5 收敛表，后续批次优先配减。
+# 传输层折叠。后续命名收敛与 mem_d 范围读路径合并各减 1 行：机制核 core
+# 79994 仍在 80000 与 milestone target 79999 之内；facade 形态面越过 80000
+# 六十三行，欠账并入 §7.5 收敛表，后续批次优先配减。
 # RATCHET-JUSTIFY: acd6d61dc +41 编排调用级预算贯穿（S-P1-18）
 # RATCHET-JUSTIFY: acd6d61dc +61 DAG 节点超时贯穿与可回报终态（S-P1-18）
-core=79995
-facade=80065
+core=79994
+facade=80063
 cupolas=17656
 target=79999
