@@ -437,7 +437,15 @@
 # 在线时不一致。属缺陷归因真功能而非结构开销；79901 距 milestone target
 # 79999 余 98 行。
 # RATCHET-JUSTIFY: de72ed2 +40 two memory records per turn
-core=79951
-facade=79880
+# 2026-11-22 0.1.21 补丁批 S-P0-09 消费侧：core 79951 → 79954（+3），
+# facade 79880 → 79877（-3），cupolas 不动。两笔同批落地：
+#   ① core +3：work_hall 的 invoke 产物提取对显式 success=false 判失败
+#      （atoms 292cd14），失败节点不再把同信封里的 output 当产物下发；
+#   ② facade -3：dispatch 消费侧同一判据并入既有判空分支（daemons 45e99d9），
+#      并把 a2a send_result 的两条同义错误分支合并（daemons 575db59）。
+# 属失败语义缺陷的真修复；同账相抵后 facade 净减 3 行，不收窄欠账口径。
+# RATCHET-JUSTIFY: 292cd14 +3 work_hall 对 invoke 失败载荷判失败
+core=79954
+facade=79877
 cupolas=17656
 target=79999
