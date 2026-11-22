@@ -429,7 +429,15 @@
 # llama.cpp 缺省窗口截断；增量换掉的是该缺陷路径而非结构开销。79861 距
 # milestone target 79999 余 138 行。
 # RATCHET-JUSTIFY: 4018eda05 +83 cli context window mapping to managed args
+# 2026-11-22 0.1.21 补丁批 S-P0-05：facade 79861 → 79901（+40），core 与
+# cupolas 不动。构成是 agent_d 会话写读契约（daemons de72ed2 的
+# agent_turn_rec.{c,h}）：一轮问答由一条合写记录改为两条独立记录，显式携带
+# conv 与 role，供读侧按会话归组、按角色区分说话方。此前合写记录只有单一
+# role=agentrt，TUI 侧无法把历史拆回用户与助手两条气泡，重启后对话形态与
+# 在线时不一致。属缺陷归因真功能而非结构开销；79901 距 milestone target
+# 79999 余 98 行。
+# RATCHET-JUSTIFY: de72ed2 +40 two memory records per turn
 core=79963
-facade=79861
+facade=79901
 cupolas=17656
 target=79999
