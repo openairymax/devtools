@@ -386,7 +386,20 @@
 # rename），去掉 gateway_d 内的裸 fopen/fprintf 落地序列：读者与写者无同步，
 # 直写可能读到半截数字，且该写点未在 INV-10 清单声明。属收敛而非新增；
 # 下行登记按棘轮"只降不升"直接收紧账本。
-core=79908
-facade=79710
+# 2026-11-22 0.1.21 补丁批 R22：core 79908 → 79928（+20），facade 与
+# cupolas 不动。构成是 commons 的 AIRY_HOME 兜底（platform_paths.c 的
+# paths_tmp_home）：无 HOME 的干净环境（Windows 服务账户、洁净房用例）
+# 此前拼出相对路径，运行期目录与日志落在进程 cwd。属可移植性缺陷修复
+# 而非结构开销；79928 距 80000 目标仍余 71 行。
+# RATCHET-JUSTIFY: d9d30132c9a7 +20 core commons 无 HOME 时使用绝对兜底根
+# 2026-11-22 0.1.21 补丁批 R23：facade 79710 → 79741（+31），core 与
+# cupolas 不动。两处来源：其一是 airy_cli 的日志路径提示单点化（+10），
+# 其二是 agent.invoke 失败契约（daemons 0ea80f4，+21）：runner 回报
+# success:false 时 inv_take/inv_child 曾以 AIRY_SUCCESS 上交错误载荷，
+# 网关与调度层因此判绿；现改为失败返回并把 error 文本回传 JSON-RPC。
+# 属正确性缺陷修复而非结构开销；79741 距 80000 目标仍余 259 行。
+# RATCHET-JUSTIFY: 0ea80f4 +21 facade agent.invoke 失败必须成为失败
+core=79928
+facade=79741
 cupolas=17656
 target=79999
