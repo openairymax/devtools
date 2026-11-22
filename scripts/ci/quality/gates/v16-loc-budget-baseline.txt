@@ -504,7 +504,13 @@
 # 职责拆出（只含 shell 运行入口，不含 fork/pipe 捕获），执行核与网络族各自
 # 包含，扇入仍在上限内。属编译根因修复而非结构开销。
 # RATCHET-JUSTIFY: df52c6e +7 shell 运行契约独立成头以修复隐式声明
+# 2026-11-22 0.1.21 P1 批 S-P1-17「会话记忆的租户范围与落盘完整性」：facade
+# 80523 → 80633（+110），core 与 cupolas 不动。构成是 mem_d 的读路径范围谓词
+# 统一（mem_scope_t 由召回与检索共用，tenant 缺键归属 default）、范围外记录
+# 不再占满召回窗口、追加后同步落盘与 JSONL 尾行修复（daemons d28bddc）；
+# 均为记忆库正确性与崩溃安全所必需，无演示面，也未引入重复实现。
+# RATCHET-JUSTIFY: d28bddc +110 mem_d 租户范围与 JSONL 落盘完整性（S-P1-17）
 core=79994
-facade=80523
+facade=80633
 cupolas=17656
 target=79999
