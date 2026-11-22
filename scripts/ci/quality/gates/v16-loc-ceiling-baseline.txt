@@ -90,6 +90,12 @@
 #   tool_d（d696734）——方法注册失败致命并回滚时，工具面注册表随之改成
 #     表驱动，净增 6 行。
 # 三条豁免只减不增；agent_d 与 tool_d 的收敛义务随 0.1.22 首行记入清理单。
+# 2026-11-22 S-P0-05 再登记：agent_d 9393 → 9477（+84）。构成是会话写读
+# 契约的落地（de72ed2）：新增 agent_turn_rec 构造件（实现与头），exec 侧
+# 的合写拼装改为逐记录发送。换掉的是「单条合并文本 + role=agentrt + 无
+# conv」使 TUI 重启后助手回复与会话归属双丢失的缺陷，属缺陷归因真功能；
+# 拆出的构造件为纯函数，可脱离传输直测（test_turn_rec）。
+# 豁免只减不增的口径不变，agent_d 收敛义务随 0.1.22 首行记入清理单。
 tool_d|17432|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734)
 llm_d|9713|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1)
-agent_d|9393|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96)
+agent_d|9477|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2)
