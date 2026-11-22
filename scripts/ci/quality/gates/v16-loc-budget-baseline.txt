@@ -437,7 +437,7 @@
 # 在线时不一致。属缺陷归因真功能而非结构开销；79901 距 milestone target
 # 79999 余 98 行。
 # RATCHET-JUSTIFY: de72ed2 +40 two memory records per turn
-core=79963
-facade=79901
+core=79951
+facade=79882
 cupolas=17656
 target=79999
