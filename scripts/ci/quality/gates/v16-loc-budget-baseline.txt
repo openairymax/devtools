@@ -419,6 +419,6 @@
 # 开销；79779 距 80000 目标仍余 221 行。
 # RATCHET-JUSTIFY: 1d62897 +16 agent_d 转写子进程降级帧
 core=79963
-facade=79779
+facade=79778
 cupolas=17656
 target=79999
