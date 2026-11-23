@@ -555,7 +555,19 @@
 # cupolas 不动。同窗口两笔结构收敛：插件发现结果改由调用方独占、模块内不再
 # 存镜像引用（daemons 4da2eed，-11）；就绪记账并入 svc.c 后删去独立文件
 # （daemons b8ccb4e，-6）。只减不增，无需抬账理由。
-core=80074
+# 2026-11-23 0.1.21 macOS 启动自证修复：core 80074 → 80137（实测 +63），
+# facade 与 cupolas 不动。两笔逐条归因：
+#   ① gateway +30（dc35558）——probe_listen 按地址族给出精确的 sockaddr 长度，
+#      补 Darwin 的 sin_len/sin6_len，每轮重开套接字并落 errno。换掉的是
+#      「macOS 上 daemon 群启动自证必败」的可用性缺陷；
+#   ② atoms +33（c297f1a）——OOM 总内存兑现「0 即自动探测」的公开契约
+#      （Darwin hw.memsize / Windows GlobalMemoryStatusEx / POSIX sysconf），
+#      探测失败才回落固定基线并告警。此前恒取 512 MiB，压力口径在大小机器
+#      上同时失真。
+# 两者均为缺陷真修复，非结构开销；余额随 §7.5 收敛表配减。
+# RATCHET-JUSTIFY: dc35558 +30 Darwin 监听探测的套接字长度修正
+# RATCHET-JUSTIFY: c297f1a +33 OOM 总内存自动探测契约兑现
+core=80137
 facade=80838
 cupolas=17656
 target=79999
