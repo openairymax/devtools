@@ -536,7 +536,15 @@
 # agent_d 的 parent_task_id 协议层透传（99b25d7）——RPC 解析可选字段并在
 # 请求行下发；纯注释的接口文档不计入，增量为实际解析与下发语句。
 # RATCHET-JUSTIFY: 99b25d7 +5 子代理父任务标识经 agent.invoke 透传（S-P2-01）
+# 2026-11-23 0.1.21 B3 批：facade 80758 → 80829（实测 +71），core 与 cupolas
+# 不动。supervisor_d 的启动就绪判据（daemons 958436c，S-P2-03）——CORE 子进程
+# 存活且端点探测可达才判 RUNNING，全部 CORE 就绪才发布 ready，控制口
+# health_check 带聚合就绪与逐项 ready。该提交净 +104 行（新增 ready.c 与
+# 状态名归一、ctrl 响应加聚合字段），其中 33 行落在上次登记的余量内，故账面
+# 抬 71。它以「编排器看见的启动完成」替换「进程已 fork」的伪判据，属可用性
+# 缺陷真修复；余额随 §7.5 收敛表配减。
+# RATCHET-JUSTIFY: 958436c +71 supervisor_d 启动就绪按 CORE 端点判定（S-P2-03）
 core=80074
-facade=80758
+facade=80829
 cupolas=17656
 target=79999
