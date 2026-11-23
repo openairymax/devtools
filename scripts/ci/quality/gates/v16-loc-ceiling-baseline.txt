@@ -139,6 +139,13 @@
 # service_invoke 透传到 runner 请求行，子任务据此与父任务关联；新增请求
 # 字段、解析分支与接口注释共 13 物理行，属计划内交付而非清理过渡态。
 # 豁免只减不增的口径不变；新增差额随 0.1.22 首行 agent_d 清理单一并配减。
-tool_d|18028|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734;net-split+ssrf@190558d;html-unescape@72f37a1;search-provider@682341c;net-prelude@bd7588b;net-fanin@e207adc;shell-iface@df52c6e)
+# 2026-11-23 0.1.21 诊断面登记：agent_d 9539 → 9541（+2），tool_d 18028 →
+# 18041（+13）。两笔都是「拒绝/截断不可归因」缺陷的收口，属可运维性真增长：
+#   agent_d（e1ad43c）——会话表满只回 BUSY，补一条写明在飞会话数与上限的
+#     WARN（不带外部可控标识），使并发打满与会话回收滞后可区分；
+#   tool_d（38c584d）——发现循环在 128 个插件处静默截断，改为走完目录、
+#     只对有 manifest 的目录计数并汇总一条 WARN，被挡条目不再无声消失。
+# 两处均为缺陷归因；豁免只减不增的口径不变，差额随 0.1.22 首行清理单配减。
+tool_d|18041|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734;net-split+ssrf@190558d;html-unescape@72f37a1;search-provider@682341c;net-prelude@bd7588b;net-fanin@e207adc;shell-iface@df52c6e;disc-cap-warn@38c584d)
 llm_d|9805|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1;sampling-single-source@51e3a4c)
-agent_d|9539|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5;parent-task@99b25d7)
+agent_d|9541|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5;parent-task@99b25d7;session-cap-warn@e1ad43c)
