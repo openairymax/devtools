@@ -17,7 +17,7 @@ agent-workload/agentrt/commons/utils/logging/logging_backend_file.c	a334b1dd	app
 agent-workload/agentrt/commons/utils/memory/memory_debug_core.c	3407a2ff	exempt	memory_dump_debug_info：内存调试转储，可选写文件或 stderr，仅在 debug_enabled 时启用
 agent-workload/agentrt/commons/utils/observability/alert_manager.c	614cbaa1	append	告警文件通道逐条追加 "[时间][级别] 名称: 消息"，不做原地覆盖
 agent-workload/agentrt/commons/utils/sd/service_discovery_backend_file.c	8ee9d0f2	atomic	注册表快照：tmp 写入后 airy_file_rename 覆盖，读者看不到半截 JSON
-agent-workload/agentrt/daemons/agent_d/src/service/service_child.c	31853db5	append	子进程 stderr 重定向到 agent 日志，启动 O_TRUNC 清空后仅顺序追加
+agent-workload/agentrt/daemons/agent_d/src/service/service_child_posix.c	31853db5	append	子进程 stderr 重定向到 agent 日志，启动 O_TRUNC 清空后仅顺序追加
 agent-workload/agentrt/daemons/channel_d/src/io/channel_io.c	85945171	exempt	chan_pipe_send：打开 FIFO 端点写 IPC 帧，非文件持久化
 agent-workload/agentrt/daemons/common/src/security/daemon_security.c	8ed14ae2	append	审计日志以追加模式打开，轮转由 aud_rot 负责
 agent-workload/agentrt/daemons/common/src/security/daemon_security_rotate.c	1861b3ae	reviewed	rot_aes_unpack：解密输出写新建目标文件，GCM tag 校验通过才算成功，失败 rot_close_pair remove
@@ -33,6 +33,7 @@ agent-workload/agentrt/daemons/supervisor_d/src/admit/admit.c	e60918c7	exempt	�
 agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	50c01655	append	子进程输出泵（proc_monitor_pump）以 "a" 建日志并持续追加，EOF/错误即关档回收槽位
 agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	5be9097e	reviewed	sup_pidfile_write："w" 整体覆写单行 PID 文件，仅启动存活判据，重启可重建
 agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	7f01a361	append	子进程 STDOUT/STDERR 直连日志文件（O_WRONLY|O_CREAT|O_APPEND），仅顺序追加
+agent-workload/agentrt/daemons/tool_d/src/builtin/builtin_net_http.c	c8fae58d	reviewed	temp_body_open：抓取体一次临时文件，mkstemp/GetTempFileName 唯一命名，正文经 temp_body_remove 即删，不落地为业务状态
 agent-workload/agentrt/daemons/tool_d/src/builtin/builtin_toolmake.c	b3472b43	reviewed	make_write_script：先写 .tmp 再 rename(2) 落地并 chmod 0700，失败 remove（未走 airy_file_rename 封装）
 agent-workload/agentrt/heapstore/src/heapstore_log.c	12f43088	append	get_main_log_file：主日志以 "a" 打开
 agent-workload/agentrt/heapstore/src/heapstore_log.c	45bdeb16	append	heapstore_log_init：初始化主日志追加句柄

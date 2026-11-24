@@ -1462,7 +1462,6 @@ skill_execute_pipeline
 skill_execute_text_process
 skill_execute_web_search
 sock_set_recv_timeout
-spec_resolve_rust_binary
 stdio_gateway_destroy
 svc_common_module_cleanup
 svc_common_module_init
