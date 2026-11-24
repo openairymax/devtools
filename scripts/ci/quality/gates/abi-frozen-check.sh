@@ -46,14 +46,13 @@ mapfile -t DUP_NAMES < <(for h in "${CL3_INTERNAL_HEADERS[@]}"; do
 done)
 
 # ---------------------------------------------------------------------------
-# 外部消费白名单（0.1.9 调研实证：coreloopthree/include 被外部消费的 24 头）
+# 外部消费白名单（0.1.9 调研实证 + 0.1.21 大厅域退役后的公共头）
 # ---------------------------------------------------------------------------
 PUBLIC_ALLOWLIST=(
     airy_hook.h hook_service.h hook_registry.h hook_builtin_handlers.h
     hook_executor.h hook_interceptor.h hook_timeout.h
     cognition.h orchestrator.h llm_svc_adapter.h lang_gateway.h airy_orch_ops.h
-    loop.h roadmap_sched.h gccp.h work_hall.h hall_store.h governance.h
-    plan_to_dag.h execution_review.h multi_agent_collaboration.h
+    loop.h roadmap_sched.h gccp.h execution_review.h multi_agent_collaboration.h
     airy_artifact_validator.h memory.h agent_registry.h
     # 机制本体公共面（0.1.9 M3 实证外部消费）：
     checkpoint_adapter.h memoryrovol_bridge.h tool_svc_adapter.h

@@ -597,7 +597,14 @@
 # RATCHET-JUSTIFY: 8dee346 +13 子进程传输头拆分
 # RATCHET-JUSTIFY: 7a80f78 +8 AF_UNIX 端点校验
 # RATCHET-JUSTIFY: 12a37af +8 内置工具注册 fail-closed
-core=80233
+# 2026-11-24 0.1.21 S30-P0-4 大厅域退役：core 80233 → 75881（实测 -4352），
+# facade 与 cupolas 不动。大厅状态机（work_hall 5,641 有效行）、事件存储
+# （hall_store）、治理（governance）、计划适配（plan_to_dag）与嵌套委派
+# （execution_delegate）在 daemons / 产品层 / CLI / SDK 全树零生产扇入，仅
+# 自身单测自循环；权威状态源自 0.1.9 起为 sched_d 的 DAG 表，看板走事件
+# 派生。两处仍有消费者的设施先归位保留：产物验证器落 dispatch/、执行单元
+# 注册表落 registry/，公共头不变。账本随设施同步收敛，无行为删减。
+core=75881
 facade=81937
 cupolas=17656
 target=79999

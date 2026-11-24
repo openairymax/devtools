@@ -4,7 +4,6 @@
 # 新增写点未在此声明即判红；逐条登记，禁止按文件整包豁免；同一 (relpath,hash8) 重复出现即对应源码中的多处写点
 # 口径与判据见 inv10-atomic-write-check.sh 文件头注释
 agent-workload/agentrt/atoms/coreloopthree/src/dispatch/roadmap/rs_semantic_cache_persist.c	7da4d129	atomic	rs_write_dump：临时文件 + fflush + fsync + airy_file_rename 落地，中断只留 .tmp
-agent-workload/agentrt/atoms/coreloopthree/src/work_hall/work_hall_persist.c	8ee9d0f2	atomic	wh_state_write：tmp + fwrite + fsync + airy_file_rename，主文件永远是完整 JSON
 agent-workload/agentrt/atoms/coreloopthree/src/workspace/workspace.c	21a34169	reviewed	ws_copy_file：按块直写工作区副本，属执行期临时副本，随工作区销毁清理，非持久状态
 agent-workload/agentrt/atoms/syscall/src/skill/skill_code.c	c8fae58d	reviewed	code_tmp：mkstemp 生成唯一临时脚本，随即被子进程执行并在 code_unlink 中删除，非持久数据
 agent-workload/agentrt/atoms/syscall/src/skill/skill_file.c	a5e558f3	reviewed	file_do_write：fs_write 工具语义即覆盖用户指定文件，直写为对外约定行为
