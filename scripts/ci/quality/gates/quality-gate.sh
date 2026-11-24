@@ -1709,6 +1709,24 @@ gate_l9_reflow() {
     esac
 }
 
+# Gate 52: 测试运行宏假绿灯（0.1.21 S30-P1-13）
+# 判据只认可静态证实的一种形态：宏体调用用例函数后无条件报 PASS，且整段
+# 宏体没有任何失败面（fail 标识/失败计数/FAIL 分支）。收窄后的水位比较
+# 写法不触发。扫描器自带判定矩阵自证，夹具缺失或无测试树一律 fail-closed。
+gate_macro52() {
+    section "Gate 52: Test-Macro False-Green (0.1.21 S30-P1-13)"
+    local rc=0
+    "$SCRIPT_DIR/m52-test-macro-check.py" --self-test 2>&1 | gate_view || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        "$SCRIPT_DIR/m52-test-macro-check.py" 2>&1 | gate_view || rc=$?
+    fi
+    case "$rc" in
+        0) check_gate "M52-TestMacro" 0 ;;
+        2) log_warn "M52: environment error (rc=2)"; check_gate "M52-TestMacro" 2 ;;
+        *) check_gate "M52-TestMacro" 1 ;;
+    esac
+}
+
 # ============================================================================
 # 主函数
 # ============================================================================
@@ -1732,6 +1750,7 @@ main() {
     local skip_b6=false
     local skip_inv10=false
     local skip_l9=false
+    local skip_macro52=false
     local skip_stub_scan=false
     local skip_file_length=false
     local skip_clone=false
@@ -1837,6 +1856,10 @@ main() {
                 ;;
             --skip-l9)
                 skip_l9=true
+                shift
+                ;;
+            --skip-macro52)
+                skip_macro52=true
                 shift
                 ;;
             --skip-stub-scan)
@@ -2003,6 +2026,7 @@ main() {
                 echo "  42. Canary Blast Radius (0.1.20, Gate 39 3 files / 200 lines / 150+200)"
                 echo "  43. Kill Switch Four Channels (0.1.20, Gate 40 gate:lab env/file/sentry/CLI)"
                 echo "  44. Ecosystem Four-Module Contract (0.1.20, Gate 46 vocab/contract/registry/skill)"
+                echo "  45. Test-Macro False-Green (0.1.21, Gate 52 unconditional-pass macros)"
                 echo ""
                 echo "Options:"
                 echo "  --security-scan      Run only security scan"
@@ -2023,6 +2047,7 @@ main() {
                 echo "  --skip-b7             Skip G48 CPU path parity (0.1.21 B-7) check"
                 echo "  --skip-inv10          Skip G50 INV-10 atomic-write (0.1.21 L-4) check"
                 echo "  --skip-l9             Skip G51 L-9 patch-reflow (0.1.21) check"
+                echo "  --skip-macro52        Skip Gate 52 test-macro false-green (0.1.21 S30-P1-13) check"
                 echo "  --skip-stub-scan      Skip G6 stub scan (zero-tolerance) check"
                 echo "  --skip-file-length    Skip G24 file-length (<= 800 lines/file) check"
                 echo "  --skip-clone          Skip G26 clone/duplication (target <3%) check"
@@ -2096,6 +2121,7 @@ main() {
         $skip_b6 || gate_scope_guard49
         $skip_inv10 || gate_inv10
         $skip_l9 || gate_l9_reflow
+        $skip_macro52 || gate_macro52
         $skip_stub_scan || gate_stub_scan
         $skip_file_length || gate_file_length
         $skip_clone || gate_clone
