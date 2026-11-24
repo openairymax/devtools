@@ -42,7 +42,8 @@ if [ -z "$BASE" ]; then
 fi
 
 git -C "$REPO" rev-parse --verify -q "${BASE}^{commit}" >/dev/null || {
-    echo "g47: 基线不可解析：${BASE}" >&2
+    echo "g47: 基线不可解析：${BASE}（非快进推送或历史整体改写；按 fail-closed 记环境错误，" >&2
+    echo "     改写后首个新提交起恢复「仅判新增」的判定）" >&2
     exit 2
 }
 
