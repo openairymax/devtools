@@ -567,7 +567,37 @@
 # 两者均为缺陷真修复，非结构开销；余额随 §7.5 收敛表配减。
 # RATCHET-JUSTIFY: dc35558 +30 Darwin 监听探测的套接字长度修正
 # RATCHET-JUSTIFY: c297f1a +33 OOM 总内存自动探测契约兑现
-core=80137
-facade=80838
+# 2026-11-24 0.1.21 施工面落账：core 80137 → 80233（实测 +96），facade
+# 80838 → 81937（实测 +1099），cupolas 不动。两本账逐笔归因如下，余额随
+# §7.5 收敛表配减。
+# core +96：
+#   atoms 208793f +33  库内委派续轮（S30-P0-3）
+#   atoms c348efa +28  memory 转发侧 evolve 计数（S31-P1-2）
+#   commons 0831ff2 +26 Windows 写全量（S31-P1-3）
+#   commons 787d245 +1  usage 流式成本分量
+#   commons 846d0d1 +4  AF_UNIX 路径长度校验
+#   gateway ac3328e +4  socket 路径长度校验
+# facade +1099：
+#   daemons 净 +1104，逐笔 afe6b50 +383 / ff4f29e +313 / 3a2ad87 +186 /
+#   7067c7e +167 / 1d97e0a +22 / 8dee346 +13 / 7a80f78 +8 / 12a37af +8 /
+#   badea52 +6 / e8a5191 +1 / 251af61 +1 / 27ff3d8 -4 / d97af29 0 /
+#   ceefec7 0；（Windows 子进程传输、网络栈与逐跳重定向校验、会话记忆召回、
+#   文本工具补全、usage 统一、AF_UNIX 校验、注册 fail-closed）
+#   airy_cli 净 -5：dacf61241 +26 / 89150a3f0 -10（TUI 宿主切换），
+#   13ea6a903 与 229e37e88 合计 -21（命令面重复样板收敛）
+#   protocols 0
+# RATCHET-JUSTIFY: 208793f +33 库内委派续轮（S30-P0-3）
+# RATCHET-JUSTIFY: c348efa +28 memory 转发侧 evolve 计数（S31-P1-2）
+# RATCHET-JUSTIFY: 0831ff2 +26 Windows 写全量（S31-P1-3）
+# RATCHET-JUSTIFY: afe6b50 +383 Windows 子进程传输拆分
+# RATCHET-JUSTIFY: ff4f29e +313 网络栈拆分与逐跳重定向校验
+# RATCHET-JUSTIFY: 3a2ad87 +186 会话记忆召回接入运行链（S31-P0-1）
+# RATCHET-JUSTIFY: 7067c7e +167 文本工具补全
+# RATCHET-JUSTIFY: 1d97e0a +22 usage 载荷统一（S30-P0-5）
+# RATCHET-JUSTIFY: 8dee346 +13 子进程传输头拆分
+# RATCHET-JUSTIFY: 7a80f78 +8 AF_UNIX 端点校验
+# RATCHET-JUSTIFY: 12a37af +8 内置工具注册 fail-closed
+core=80233
+facade=81937
 cupolas=17656
 target=79999
