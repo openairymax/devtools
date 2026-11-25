@@ -14,7 +14,7 @@
 #   [T4] 主题三级降级（TrueColor / Color256 / Basic + to_256 / to_basic）
 #   [T5] 纯投影：present.rs 与 engine/fold.rs 无 client 依赖（零业务决策）
 #   [T6] 六域锚点齐备（渲染引擎 / markdown / 组件库 / 键位 / 交互流 / 平台基建）
-#   [T7] CLI 命令面 cmd+core+chat 行数 ∈ [8000, 12000]
+#   [T7] CLI 命令面 cmd+core+chat 有效行（SLOC，同 Gate 18 口径）∈ [8000, 12000]
 #   [T8] 三 venue 共用 command 层：CLI_COMMANDS[] 唯一定义、分发点 ≥2、
 #        sdk/tui 无自建命令表、TUI 以 cli_bin 委托 CLI 进程
 #   [T9] sdk/tui 单文件 ≤ 800 行（基线棘轮，基线外新增超限即 FAIL）
@@ -41,8 +41,8 @@ HARNESS="${SCRIPT_DIR}/cli-golden-twelve.sh"
 MAX_TUI_FILE_LINES=800
 MIN_GOLDEN=100
 MIN_BUDGET_CONSTS=34
-CLI_MIN_LINES=8000
-CLI_MAX_LINES=12000
+CLI_MIN_SLOC=8000
+CLI_MAX_SLOC=12000
 
 UPDATE_BASELINE=0
 if [ "${1:-}" = "--update-baseline" ]; then
@@ -230,9 +230,11 @@ check_domains() {
     log_ok "render/markdown/components/keys/interaction/platform anchors present"
 }
 
-# [T7] 命令面行数带
+# [T7] 命令面有效行带（SLOC 口径，与 Gate 18 同一计数法）
+# 0.1.19 方案 §5.2 的「≈8k~12k」以有效行计量（cmd+core+chat，扣除空行与
+# 整行注释）。按原始行统计会把注释与空行算进规模，合法增长被误判越界。
 check_cmd_surface() {
-    section "T7 CLI command surface (${CLI_MIN_LINES}..${CLI_MAX_LINES} lines)"
+    section "T7 CLI command surface (${CLI_MIN_SLOC}..${CLI_MAX_SLOC} SLOC)"
     local dirs=() d
     for d in cmd core chat; do
         if [ -d "$CLI_DIR/src/$d" ]; then
@@ -245,11 +247,14 @@ check_cmd_surface() {
         return 0
     fi
     local n
-    n=$(find "${dirs[@]}" -type f -name '*.c' -print0 | xargs -0 -r cat | wc -l | tr -d ' ')
-    if [ "$n" -ge "$CLI_MIN_LINES" ] && [ "$n" -le "$CLI_MAX_LINES" ]; then
-        log_ok "command surface = ${n} lines (in band)"
+    n=$(find "${dirs[@]}" -type f -name '*.c' -print0 | xargs -0 -r cat \
+        | { grep -vE '^[[:space:]]*$' || true; } \
+        | { grep -vE '^[[:space:]]*(//|/\*|\*)' || true; } \
+        | wc -l | tr -d ' ')
+    if [ "$n" -ge "$CLI_MIN_SLOC" ] && [ "$n" -le "$CLI_MAX_SLOC" ]; then
+        log_ok "command surface = ${n} SLOC (in band)"
     else
-        fail "command surface = ${n} lines (out of band ${CLI_MIN_LINES}..${CLI_MAX_LINES})"
+        fail "command surface = ${n} SLOC (out of band ${CLI_MIN_SLOC}..${CLI_MAX_SLOC})"
     fi
 }
 
