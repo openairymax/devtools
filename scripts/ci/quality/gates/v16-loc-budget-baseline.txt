@@ -681,7 +681,11 @@
 # 的基线准入全集无任何落点，属能力补实而非结构开销；测试与 CMake 不计。
 # RATCHET-JUSTIFY: 0.1.21-16 +17 providers secrets.env 读前收紧为 0600
 # RATCHET-JUSTIFY: 0.1.21-14 +130 策略基线 YAML 单点导入 PDP 运行集
-core=74976
+# 2026-11-25 0.1.21 包含面自洽落账：core 74976 → 74974（-2），facade 与
+# cupolas 不动。构成是 gateway 路由头清除两条自身不消费的 syscall 私有面
+# include（gateway 5c2a594），使仅挂公开面的消费者可编译；无功能变化，
+# 测试与 CMake 不计。
+core=74974
 facade=82076
 cupolas=17880
 target=79999
