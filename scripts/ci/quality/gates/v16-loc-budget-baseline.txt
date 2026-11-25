@@ -664,7 +664,24 @@
 # 同批删除 gateway 的 gw_hall_read_file（与 airy_io_read_file 同义）与
 # hall_event_flatten 两份重复实现。下沉中的一增一减均在 core 内，净 -22
 # 来自被删的重复读件与本地映射，属结构收敛而非功能增减。
+# 2026-11-25 0.1.21 §33.2 #16 落账：facade 82059 → 82076（+17），core 与
+# cupolas 不动。构成是 providers 的 secrets.env 读前收紧（daemons 054f5da）：
+# 凭据以明文存盘，写侧按 0600 落盘，但手工创建、从备份恢复或宽权限重写后
+# 仍带组/其他用户可读位。读取前检查模式位、有宽权限则收紧再读，收紧失败
+# 即不读——宁可表现为未配置，也不把已对他人可见的密钥装入内存。净增 17
+# 行（新增 18 有效行、删去 1 行旧分支），属凭据边界加固的真功能。
+# 同批 gateway_d 可执行与其测试目标的 include 面改挂
+# GATEWAY_COMMON_INCLUDE_DIRS（daemons 51f72eb）只动 CMake，不计入本账。
+# 2026-11-25 0.1.21 §33.2 #14 落账：cupolas 17750 → 17880（+130），core 与
+# facade 不动。构成是策略基线 YAML 单点导入 PDP 运行集（cupolas 666305f）：
+# dpolicy_baseline.c 107 行、svc.c 装载点 22 行、头声明 1 行。基线只是运行集
+# 的启动形态，进程启动时一次性导入，之后 policy.load / policy.activate 仍以
+# 运行集为唯一裁决源，不形成并行真相源；文件存在但解析失败、缺 id、effect
+# 非法或 id 重复即整体拒绝，由 svc_prepare 拒启（fail-closed）。此前 S5 承诺
+# 的基线准入全集无任何落点，属能力补实而非结构开销；测试与 CMake 不计。
+# RATCHET-JUSTIFY: 0.1.21-16 +17 providers secrets.env 读前收紧为 0600
+# RATCHET-JUSTIFY: 0.1.21-14 +130 策略基线 YAML 单点导入 PDP 运行集
 core=74976
-facade=82059
-cupolas=17750
+facade=82076
+cupolas=17880
 target=79999
