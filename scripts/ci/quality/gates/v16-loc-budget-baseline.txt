@@ -706,7 +706,18 @@
 # 同域声明改为引用，净增 30 行头面。属结构开销，功能面零变化；不改变
 # 任何运行时行为，扇入由超限回落到上限内（4d98c40）。
 # RATCHET-JUSTIFY: 0.1.21-n8-struct +30 运行域拆头收敛扇入（4d98c40）
-core=74975
-facade=82607
+# 2026-11-25 0.1.21 N-2 落账：core 74975 → 75031（+56），facade 82607 →
+# 82582（-25），cupolas 不动。构成是南向阻塞客户端仪式的单点化：
+#   ① core +56（commons 57b6c39）——新增 platform_sock_conn.c，出站端点解析
+#      （POSIX AF_UNIX 路径 / Windows TCP 回环 "host:port"）、连接、接收超时
+#      与阻塞整包收发成为唯一出口；gateway 侧随之后删去自持的 POSIX 连接与
+#      分片收发，故 core 净 +56 而非整件行数；
+#   ② facade -25（daemons 35142ba）——RPC 客户端 Windows 分支手写的
+#      getaddrinfo 连接序列退役，agent_d 侧策略判据声明压为行尾一句。
+# 该增量换掉的是「gateway Windows 腿恒为失败桩、同一端点语义两份实现」的
+# 缺陷形态，属缺陷归因真功能而非结构开销；core 距 target 79999 仍余 4968 行。
+# RATCHET-JUSTIFY: b7ae3a711 +56 南向连接与阻塞收发收口平台层（N-2）
+core=75031
+facade=82582
 cupolas=17880
 target=79999
