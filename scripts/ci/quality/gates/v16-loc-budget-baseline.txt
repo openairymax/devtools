@@ -618,7 +618,15 @@
 # RATCHET-JUSTIFY: 4d1986f +4 工具环 stop_reason 契约三值
 # RATCHET-JUSTIFY: 5b0611c +54 工具循环默认无界与 token 安全阀
 # RATCHET-JUSTIFY: 9965352 -1 暂停判定收口到循环出口
+# 2026-11-25 0.1.21 N-3/N-6 落账：facade 81977 → 81974（实测 -3），core 与
+# cupolas 不动。净减是「删得多、加得少」的如实结果，不称减重，逐笔归因：
+#   tool_d -232 有效行（075f462）——webfetch 的外部 curl 子进程路径退役；
+#   providers +136（70e5496）——逐跳 GET 新件 http_hop.c 123 + 契约头 13；
+#   llm_d +31（f81a984）——语义缓存作用域（契约版本 + 采样参数指纹）；
+#   mem_d +62（f81a984）——cache_ns 入键派生与 L1 精确比较。
+# 四条相加 -3，与实测同值。同一批 products 侧的 memoryrovol 改动不入三账，
+# 由产品侧独立预算。
 core=75872
-facade=81977
+facade=81974
 cupolas=17656
 target=79999
