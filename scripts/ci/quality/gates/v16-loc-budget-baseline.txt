@@ -658,7 +658,13 @@
 # 唯一落点。
 # RATCHET-JUSTIFY: 0.1.21-13 +68 AF_UNIX 端点仪式收敛到 commons 单点
 # RATCHET-JUSTIFY: 0.1.21-13b +60 supervisor_d 零依赖边界内自持 UDS 装配
-core=74998
+# 2026-11-25 0.1.21 §33.2 #12 落账：core 74998 → 74976（-22），facade 与
+# cupolas 不动。hall watch 的 envelope 压平由 gateway 本地实现下沉 commons
+# （hall_event_wire.c），读侧字段映射与写侧同库，两侧口径不再各自维持；
+# 同批删除 gateway 的 gw_hall_read_file（与 airy_io_read_file 同义）与
+# hall_event_flatten 两份重复实现。下沉中的一增一减均在 core 内，净 -22
+# 来自被删的重复读件与本地映射，属结构收敛而非功能增减。
+core=74976
 facade=82059
 cupolas=17750
 target=79999
