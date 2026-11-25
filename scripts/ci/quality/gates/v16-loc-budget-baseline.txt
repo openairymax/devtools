@@ -604,7 +604,21 @@
 # 自身单测自循环；权威状态源自 0.1.9 起为 sched_d 的 DAG 表，看板走事件
 # 派生。两处仍有消费者的设施先归位保留：产物验证器落 dispatch/、执行单元
 # 注册表落 registry/，公共头不变。账本随设施同步收敛，无行为删减。
-core=75868
-facade=81924
+# 2026-11-25 0.1.21 N-7 工具循环无界化登记：core 75868 → 75872（+4），facade
+# 81924 → 81977（+53），cupolas 不动。逐笔归因（有效行，测试不计）：
+#   core +4（commons 4d1986f）——工具环契约补 stop_reason 键与 done /
+#     cancelled / rounds_limit 三值，与既有失败原因词表同源；契约 SSoT 在
+#     airy_run_stream.h，sdk-rust 由宏自动生成常量，无替代位置。
+#   facade +54 / -1（daemons 5b0611c / 9965352）——轮次上限由 16/32 硬界
+#     改为「默认不设上限 + 同参连败 / token 预算 / 取消三道安全阀」，token
+#     预算与 stop_reason 经 args / result 贯通 loop / exec / rpc 三层；9965352
+#     把「还有活」的判定收口到循环出口，失败与取消不再被改写成预算暂停。
+# 两者均为社区反馈「工具轮次到点即卡死」的功能交付与根因修复，非结构开销；
+# 余额随 §7.5 收敛表配减，agent_d 与 commons 的收敛义务随 0.1.22 首行记入清理单。
+# RATCHET-JUSTIFY: 4d1986f +4 工具环 stop_reason 契约三值
+# RATCHET-JUSTIFY: 5b0611c +54 工具循环默认无界与 token 安全阀
+# RATCHET-JUSTIFY: 9965352 -1 暂停判定收口到循环出口
+core=75872
+facade=81977
 cupolas=17656
 target=79999

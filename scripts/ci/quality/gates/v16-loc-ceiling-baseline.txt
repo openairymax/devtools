@@ -162,6 +162,15 @@
 #   tool_d（12a37af +18）——内置工具注册失败即拒绝服务；
 #   tool_d（27ff3d8 -4）——收敛时间依赖并缩短剩余预算助手。
 # 豁免只减不增的口径不变，差额随 0.1.22 首行清理单配减。
+# 2026-11-25 0.1.21 N-7 登记：agent_d 10404 → 10475（+71）。构成是工具循环
+# 默认无界化与三道安全阀（5b0611c 源码 +70 / 9965352 +1），逐项归因：
+#   · 轮次上限由 16/32 硬界改为参数（0 = 不设上限），token 预算经环境与
+#     请求两层解析下发，取消 / 同参连败 / token 到点三阀各有独立终态；
+#   · stop_reason 在 result / run_end / error 三处同源（done / cancelled /
+#     rounds_limit 复用失败原因词表），客户端不再靠轮次数字猜终态；
+#   · 9965352 把「还有活」判定收口到循环出口，失败与取消不再被前一轮的
+#     成功标记改写成预算暂停（缺陷真修复）。
+# 豁免只减不增的口径不变，差额随 0.1.22 首行 agent_d 清理单一并配减。
 tool_d|18453|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734;net-split+ssrf@190558d;html-unescape@72f37a1;search-provider@682341c;net-prelude@bd7588b;net-fanin@e207adc;shell-iface@df52c6e;disc-cap-warn@38c584d;owner-fix@4da2eed;redirect-recheck@ff4f29e;reg-failclosed@12a37af;budget-helper@27ff3d8)
 llm_d|9805|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1;sampling-single-source@51e3a4c)
-agent_d|10404|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5;parent-task@99b25d7;session-cap-warn@e1ad43c;win-child-transport@afe6b50;mem-recall@3a2ad87;usage-unify@1d97e0a;child-hdr@8dee346;slot-recycle@e8a5191;env-reloc@193a71d)
+agent_d|10475|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5;parent-task@99b25d7;session-cap-warn@e1ad43c;win-child-transport@afe6b50;mem-recall@3a2ad87;usage-unify@1d97e0a;child-hdr@8dee346;slot-recycle@e8a5191;env-reloc@193a71d;n7-rounds@5b0611c+9965352)
