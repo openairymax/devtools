@@ -24,6 +24,7 @@
 #   GITEE_REPO          默认 openairymax/agentrt
 #   SKIP_GITEE=1        只镜像 GitHub（快通道先行），Gitee 段交由
 #                       mirror-release.yml 后台幂等补齐（U-3 方案 A）
+#   SKIP_PRUNE=1        跳过镜像面版本保留（分片并行镜像时仅主片执行收敛）
 #   FETCH_MISSING=1     dist 缺件时从 atomgit release 下载补齐（历史版本
 #                       回填模式：release-dist 工件天然缺 manifest/sig 小件）
 #   RELEASE_NOTES       发布说明正文（显式优先；三端正文纠偏用）
@@ -613,7 +614,13 @@ else
 fi
 
 # ─── 镜像面版本保留（发布先落地，窗口后收敛；fail-soft 不入 failed.txt）───
-mirror_prune_face
+# SKIP_PRUNE=1：分片并行镜像时只由主片收敛窗口。多片并发删除同一超窗
+# Release 只会换来 404 噪声，并成倍放大列举/删除 API 的配额消耗。
+if [ "${SKIP_PRUNE:-0}" = "1" ]; then
+    log_info "SKIP_PRUNE=1: 跳过镜像面版本保留（由主片统一收敛）"
+else
+    mirror_prune_face
+fi
 
 # ─── 汇总（fail-closed）────────────────────────────────────────────────────
 if [ -f "$TMP/failed.txt" ] && [ -s "$TMP/failed.txt" ]; then
