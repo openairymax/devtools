@@ -639,7 +639,18 @@
 # 2026-11-25 同族续：core 75120 → 74930（-190）。执行入口退役后，顺序/
 # 并行步进器、节点执行器、内部执行状态与节点上的执行钩子均无调用方，
 # 一并退役；节点模型只留图结构与数据负载。
-core=74930
-facade=82083
+# 2026-11-25 0.1.21 §33.2 #13 落账：core 74930 → 74998（+68），facade
+# 82083 → 81999（-84），cupolas 不动。AF_UNIX 端点仪式收敛到 commons：
+# 新增 airy_sock_conn_unix / airy_sock_bind_unix 与三个内部件，sun_path
+# 填充、108 字节超长判定、陈旧节点清理与 listen 兜底只留 platform_compat.c；
+# 九处生产调用点（gateway A-IPC、daemon_rpc_client、channel_io/service、
+# supervisor_d ctrl 两处与 net、tool_d builtin_maths 与 tool_avail）各删
+# 一份本地副本改调原语，facade 侧因此净减 84 行。core 的 +68 是新增契约面
+# 与「只留一份」的净值（airy_sock_create_unix_server 同时改为 bind 原语的
+# 薄包装，删去与之重复的一套 bind/listen 序列），生产侧 sockaddr_un 出现
+# 文件 9 → 1。属结构收敛而非功能新增；core 距 target 79999 仍余 5001 行。
+# RATCHET-JUSTIFY: 0.1.21-13 +68 AF_UNIX 端点仪式收敛到 commons 单点
+core=74998
+facade=81999
 cupolas=17750
 target=79999
