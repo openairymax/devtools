@@ -700,7 +700,13 @@
 # 开销；余额随 §7.5 收敛表配减。
 # RATCHET-JUSTIFY: 0.1.21-n8 +501 子任务委派策略面与机制件（N-8）
 # RATCHET-JUSTIFY: 0.1.21-n8 +1 atoms 委派原语公共化与深度配置化
+# 2026-11-25 0.1.21 N-8 结构收口：facade 82577 → 82607（+30）。为满足
+# G13 扇入上限，工具循环域与事件通道从 agent_run_internal.h /
+# agent_run_engine.h 切出两个单立头（agent_run_loop.h / agent_run_evt.h），
+# 同域声明改为引用，净增 30 行头面。属结构开销，功能面零变化；不改变
+# 任何运行时行为，扇入由超限回落到上限内（4d98c40）。
+# RATCHET-JUSTIFY: 0.1.21-n8-struct +30 运行域拆头收敛扇入（4d98c40）
 core=74975
-facade=82577
+facade=82607
 cupolas=17880
 target=79999

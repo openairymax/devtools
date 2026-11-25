@@ -180,6 +180,17 @@
 #     侧与 L0 进程内键同源纳入。有效行 +31，其余 38 行为空行与函数说明。
 # 口径不变：tool_d 收紧到实测值；llm_d 的 +69 是功能真增量，其 9000 超额
 # 欠账随 0.1.22 首行 llm_d 拆载一并配减。
+# 2026-11-25 0.1.21 N-8 登记（物理行，测试不计）：agent_d 10475 → 11245
+# （+770）。逐 commit 归因（同口径实测量得）：
+#   1d593f0 +625——子任务委派机制件与配额策略面：agent_run_sub.{c,h} 与
+#     agent_sub_policy.{c,h} 四件新建，含委派工具识别、子 run 生命周期、
+#     深度/并发策略解析与拒绝话术；
+#   071532b +75——工具循环接入委派派发（子任务在一次 delegate 任务内跑完
+#     ReAct，父会话历史不重放）；
+#   4d98c40 +70——工具循环域与事件通道分头（agent_run_loop.h /
+#     agent_run_evt.h），把运行域扇入收敛到上限内，属结构开销。
+# 换掉的是「子代理功能不存在、只能由主代理硬扛」的能力空缺，属功能交付
+# 而非结构开销；超额欠账随 0.1.22 首行 agent_d 清理单一并配减。
 tool_d|18169|table1-tool_d(0.1.20,ledger-356;P-D-cupolas-path@795191b;P-E-gen-bound@10e19ec;+114-reject-diag@b84605c;+38-wait-vis@d135ed2;+530-tool-create@r124;0.1.21-net-move@79da570;priv-exec@540c3c2+ec990d3+173679f+e9ac687;job-face@867bf9a+33a014e+5d6626a;clone-fold@cf82c18;approval-ask@e5107da+7d0fcad;R18-approval-split@7f86036+3795e99;method-registry-fatal@d696734;net-split+ssrf@190558d;html-unescape@72f37a1;search-provider@682341c;net-prelude@bd7588b;net-fanin@e207adc;shell-iface@df52c6e;disc-cap-warn@38c584d;owner-fix@4da2eed;redirect-recheck@ff4f29e;reg-failclosed@12a37af;budget-helper@27ff3d8;hop-get@70e5496;no-curl-child@075f462)
 llm_d|9874|table1-llm_d(0.1.21,slots-single-source@964ea9e;probe+stats@f0f75ae+7560b0d+e4a3ee2;local-adapter@74eaa74;context-cap@bece34f+31a495a;retry-classify@a50852d;stream-err-frames@2ade3b3;R18-probe-split@2b20ae1;sampling-single-source@51e3a4c;cache-scope@f81a984)
-agent_d|10475|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5;parent-task@99b25d7;session-cap-warn@e1ad43c;win-child-transport@afe6b50;mem-recall@3a2ad87;usage-unify@1d97e0a;child-hdr@8dee346;slot-recycle@e8a5191;env-reloc@193a71d;n7-rounds@5b0611c+9965352)
+agent_d|11245|table1-agent_d(0.1.21,review-host@961b4e3;retry-classify@a50852d;R18-run-split@7f86036+33732eb+50ebb4a;ledger-cases@688f52f;fail-relay@0ea80f4;degrade-relay@1d62897;name@1a99f96;persist-contract@de72ed2;session-carry@ccba91e;lean-persist@e993a4f;params-readonly@981f4dd;spawn-no-transport@b99a0d5;parent-task@99b25d7;session-cap-warn@e1ad43c;win-child-transport@afe6b50;mem-recall@3a2ad87;usage-unify@1d97e0a;child-hdr@8dee346;slot-recycle@e8a5191;env-reloc@193a71d;n7-rounds@5b0611c+9965352;n8-delegate@1d593f0+071532b;loop-evt-split@4d98c40)

@@ -7,7 +7,7 @@ load supervisor_d/src/supervisor_d_internal.h	6
 load tool_d/include/tool_service.h	6
 load tool_d/src/builtin/builtin_exec_internal.h	6
 fan a2a_d	3
-fan agent_d	4
+fan agent_d	5
 fan airy_cli	5
 fan airy_gateway_service	3
 fan airy_security_dome	2
@@ -37,3 +37,8 @@ fan tool_d	6
 #   tool_service.h            6 — tool_d 服务面（core/rpc/job/registry 消费）。
 # 结论：扇入上限 5 与拆分义务冲突。建议 0.1.22 把 load 口径改为跨模块
 # 消费者数，或按拆分前单体度量基线；本版按实测登记。
+# 2026-11-25 N-8 登记：agent_d fan 4 → 5。新增依赖是 coreloopthree 的
+# 委派原语（create/assign/collect/cancel/destroy），对应 0.1.21 方案
+# §34.3 判据 1「agent_d 接入 delegate 生命周期」。link-whitelist.txt 的
+# agent_d 行已列入 airy_coreloopthree，本行是扇出基线对该授权的同步
+# 落账（daemons 1d593f0 + 071532b），不是并户抬升。
