@@ -8,7 +8,6 @@ agent-workload/agentrt/atoms/coreloopthree/src/workspace/workspace.c	21a34169	re
 agent-workload/agentrt/atoms/syscall/src/skill/skill_code.c	c8fae58d	reviewed	code_tmp：mkstemp 生成唯一临时脚本，随即被子进程执行并在 code_unlink 中删除，非持久数据
 agent-workload/agentrt/atoms/syscall/src/skill/skill_file.c	a5e558f3	reviewed	file_do_write：fs_write 工具语义即覆盖用户指定文件，直写为对外约定行为
 agent-workload/agentrt/commons/utils/execution/checkpoint_persist.c	731afb5b	atomic	airy_checkpoint_save：tmp 写入后 airy_file_rename 落地，失败保留旧检查点
-agent-workload/agentrt/commons/utils/execution/checkpoint_snapshot.c	bd1362ed	reviewed	airy_snapshot_create：一次性明文快照写到调用方路径，读完由 magic/END 标记校验，非原地更新状态文件
 agent-workload/agentrt/commons/utils/hall/hall_evt_gseq.c	a9976f99	reviewed	evt_reserve：以 "a" 只打开锁文件取 flock 句柄，不写数据；水位线经 airy_io_write_file 原子落盘
 agent-workload/agentrt/commons/utils/io/file_utils.c	a1c34683	atomic	airy_io_write_file：同目录 tmp + fsync + airy_file_rename，崩溃不留半截文件
 agent-workload/agentrt/commons/utils/logging/logging_backend_file.c	a334b1dd	append	log_internal_file_open：日志文件追加打开，轮转前 fsync 旧文件
@@ -47,7 +46,7 @@ agent-workload/agentrt/tools/airy_cli/src/cmd/cli_key.c	16f92d52	atomic	airy_cli
 agent-workload/agentrt/tools/airy_cli/src/core/main.c	85a3c758	append	cli_boot_log：stderr 以追加模式重定向到 airy_cli.log，失败回退终端
 agent-workload/agentrt/tools/airy_cli/src/model/cli_model_store.c	ef51ff7c	atomic	mr_save：tmp + fflush + fsync + airy_file_rename
 agent-workload/agentrt/tools/airy_cli/src/tui/tui_history.c	8ee9d0f2	atomic	tui_cmd_hist_save：tmp 写入历史后 airy_file_rename 覆盖，失败 remove
-agent-workload/products/cupolas/src/audit/audit_overflow.c	5bd38b35	append	open_new_overflow_file：溢出审计文件以唯一新名追加打开，不覆盖既有文件
+agent-workload/products/cupolas/src/audit/audit_overflow_io.c	5bd38b35	append	ovf_open_new：溢出审计文件以唯一新名追加打开，不覆盖既有文件
 agent-workload/products/cupolas/src/audit/audit_rotator.c	5c579bc5	append	cupolas_audit_open_current_file：审计日志追加打开，尺寸用于轮转判据
 agent-workload/products/cupolas/src/security/cupolas_runtime_protection_memory.c	3c751d9f	exempt	写 /proc/sys/kernel/randomize_va_space 内核开关，非文件数据持久化
 agent-workload/products/cupolas/src/security/cupolas_vault_io.c	2c7dd723	reviewed	cupolas_vault_export：一次性加密容器直接写调用方路径，各失败分支 remove 半成品，不覆盖既有凭证状态
