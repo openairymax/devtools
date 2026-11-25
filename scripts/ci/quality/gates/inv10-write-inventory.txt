@@ -32,7 +32,6 @@ agent-workload/agentrt/daemons/supervisor_d/src/admit/admit.c	e60918c7	exempt	�
 agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	50c01655	append	子进程输出泵（proc_monitor_pump）以 "a" 建日志并持续追加，EOF/错误即关档回收槽位
 agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	5be9097e	reviewed	sup_pidfile_write："w" 整体覆写单行 PID 文件，仅启动存活判据，重启可重建
 agent-workload/agentrt/daemons/supervisor_d/src/proc/proc.c	7f01a361	append	子进程 STDOUT/STDERR 直连日志文件（O_WRONLY|O_CREAT|O_APPEND），仅顺序追加
-agent-workload/agentrt/daemons/tool_d/src/builtin/builtin_net_http.c	c8fae58d	reviewed	temp_body_open：抓取体一次临时文件，mkstemp/GetTempFileName 唯一命名，正文经 temp_body_remove 即删，不落地为业务状态
 agent-workload/agentrt/daemons/tool_d/src/builtin/builtin_toolmake.c	b3472b43	reviewed	make_write_script：先写 .tmp 再 rename(2) 落地并 chmod 0700，失败 remove（未走 airy_file_rename 封装）
 agent-workload/agentrt/heapstore/src/heapstore_log.c	12f43088	append	get_main_log_file：主日志以 "a" 打开
 agent-workload/agentrt/heapstore/src/heapstore_log.c	45bdeb16	append	heapstore_log_init：初始化主日志追加句柄
