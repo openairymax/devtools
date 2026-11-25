@@ -644,13 +644,21 @@
 # 新增 airy_sock_conn_unix / airy_sock_bind_unix 与三个内部件，sun_path
 # 填充、108 字节超长判定、陈旧节点清理与 listen 兜底只留 platform_compat.c；
 # 九处生产调用点（gateway A-IPC、daemon_rpc_client、channel_io/service、
-# supervisor_d ctrl 两处与 net、tool_d builtin_maths 与 tool_avail）各删
-# 一份本地副本改调原语，facade 侧因此净减 84 行。core 的 +68 是新增契约面
-# 与「只留一份」的净值（airy_sock_create_unix_server 同时改为 bind 原语的
-# 薄包装，删去与之重复的一套 bind/listen 序列），生产侧 sockaddr_un 出现
-# 文件 9 → 1。属结构收敛而非功能新增；core 距 target 79999 仍余 5001 行。
+# tool_d builtin_maths 与 tool_avail）各删一份本地副本改调原语，facade 侧
+# 因此净减 84 行。core 的 +68 是新增契约面与「只留一份」的净值
+# （airy_sock_create_unix_server 同时改为 bind 原语的薄包装，删去与之重复
+# 的一套 bind/listen 序列）。属结构收敛而非功能新增；core 距 target 79999
+# 仍余 5001 行。
+# 2026-11-25 同项续：facade 81999 → 82059（+60）。supervisor_d 的
+# link-whitelist 为空，控制口与探活不得外借任何项目库，其 UDS 装配只能
+# 自持；现将两份 sockaddr_un 仪式收敛为 net.c 的 sup_uds_bind /
+# sup_uds_conn（含 sup_uds_fill 超长判定），ctrl.c 降为端点字面量调用，
+# 模块内单点化并以 +60 行换掉两份副本。至此生产侧 sockaddr_un 出现文件
+# 9 → 2（commons/platform 与 supervisor_d/net），两处均为各自边界的
+# 唯一落点。
 # RATCHET-JUSTIFY: 0.1.21-13 +68 AF_UNIX 端点仪式收敛到 commons 单点
+# RATCHET-JUSTIFY: 0.1.21-13b +60 supervisor_d 零依赖边界内自持 UDS 装配
 core=74998
-facade=81999
+facade=82059
 cupolas=17750
 target=79999
