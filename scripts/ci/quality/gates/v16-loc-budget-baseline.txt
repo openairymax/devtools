@@ -626,7 +626,12 @@
 #   mem_d +62（f81a984）——cache_ns 入键派生与 L1 精确比较。
 # 四条相加 -3，与实测同值。同一批 products 侧的 memoryrovol 改动不入三账，
 # 由产品侧独立预算。
+# 2026-11-25 0.1.21 §33.2 #5 落账：facade 81974 → 82084（+110），core 与
+# cupolas 不动。新增 tools/airy_cli/src/cmd/cli_brk.c 为熔断读数的唯一呈现
+# 点（/daemon(s) 附加行与 breakers 子命令同一取数口），语义仍只在 providers
+# 的 prov_breaker 与 llm.health_check 发布面，此处只读、不设阈值。
+# 该增量是可观测面欠账的补实（§33.2 表 #5），非结构开销。
 core=75872
-facade=81974
+facade=82084
 cupolas=17656
 target=79999
