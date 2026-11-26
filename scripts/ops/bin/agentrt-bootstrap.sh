@@ -144,7 +144,12 @@ fi
 # --user 避免污染系统 Python）；生产 lib 布局依赖 $AIRY_HOME/lib 下已安装
 # 的 SDK（由发行包安装器负责，检查时注入 PYTHONPATH），检查失败仅告警不阻断。
 AGENT_SDK_OK=1
-AIRY_SDK_CHECK="import airymax_agents, orchestration, agentrt"
+# 0.1.21 D4：三包以目录形态落在 $AIRY_HOME/lib，运行时必须进 Python 搜索
+# 路径（agent_d → 子进程环境继承），否则 runner 导入失败、spawn 直接失败。
+if [ -d "${AIRY_HOME}/lib" ]; then
+    export PYTHONPATH="${AIRY_HOME}/lib${PYTHONPATH:+:${PYTHONPATH}}"
+fi
+AIRY_SDK_CHECK="import airymax_agents, airymax_agents.runner, orchestration, agentrt"
 if (( AIRY_BOOTSTRAP_LIB )); then
     :   # 库模式：依赖面由调用方负责，此处不探测亦不安装
 elif [ -d "${AIRY_HOME}/lib" ]; then
