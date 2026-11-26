@@ -757,7 +757,15 @@
 # 属缺陷归因真修复而非结构开销；测试文件不计入本账。
 # RATCHET-JUSTIFY: ebae95d3 +3 tool_d 目录补 privileged 参数声明
 # RATCHET-JUSTIFY: 800ddadc +5 tool_d 提权路径可覆写且拒绝测试不派生特权进程
-core=75060
+# 2026-11-26 0.1.21 错误码语义收口：core 75060 → 75061（+1），facade 与
+# cupolas 不动。commons 新增 JSONRPC_NOT_FOUND(-32005)，把「实体不存在」
+# 从 JSONRPC_METHOD_NOT_FOUND(-32601) 拆出。此前实体缺席与「本端无此方法」
+# 撞码：客户端按 -32601 判路由，会把真实的业务缺席误读为「未实现」，也让
+# daemons 侧 25 处实体查询缺陷被掩盖（285H 全量复验 D2.routing 实证）。
+# +1 为这一条宏定义的有效行；配套注释行按口径不计。九仓同批把实体不存在
+# 改判 -32005 属调用点替换，行数零净增。
+# RATCHET-JUSTIFY: 43d26a3 +1 commons 新增实体不存在独立错误码 -32005
+core=75061
 facade=82885
 cupolas=17880
 target=79999
