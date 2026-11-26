@@ -746,7 +746,18 @@
 # 主函数回到 25。+14 为两个文件的签名、注释与守卫开销，无新增行为，
 # 属以行数换圈复杂度的门禁对价而非结构开销。
 # RATCHET-JUSTIFY: 3cf12021 +14 端点归属清理抽为静态件以守 CCN 门禁（N-9）
+# 2026-11-26 0.1.21 N-9 测试面收口：facade 82877 → 82885（+8），core 与
+# cupolas 不动。两笔同因，均为 Build & Test 两次判红的根因修复：
+#   ① +3 tool_d 目录补 shell_run 的 privileged 参数声明（ebae95d3）——
+#      commons 契约层已声明，目录未同步，test_registry 的双向一致断言判红；
+#   ② +5 tool_d 提权路径可覆写（800ddadc）——sudo -n 接入后，非 root 测试
+#      原先断言「一律拒绝」，在 sudo 可用的 CI 上会真的执行 sudo -n dnf。
+#      给 AIRY_PRIV_SUDO 加覆写，测试指向不存在路径以确定性覆盖拒绝分支，
+#      不派生任何特权进程；头注释同步为「提权不可用即拒绝」。
+# 属缺陷归因真修复而非结构开销；测试文件不计入本账。
+# RATCHET-JUSTIFY: ebae95d3 +3 tool_d 目录补 privileged 参数声明
+# RATCHET-JUSTIFY: 800ddadc +5 tool_d 提权路径可覆写且拒绝测试不派生特权进程
 core=75060
-facade=82877
+facade=82885
 cupolas=17880
 target=79999
