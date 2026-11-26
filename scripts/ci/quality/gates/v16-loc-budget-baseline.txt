@@ -721,7 +721,24 @@
 # cupolas 不动。构成是任务契约头里退役的轮次硬界宏（daemons 86bafc6）：
 # 该宏在树内零引用，且与本版「轮次不再设固定上限」的运行口径相左，删除后
 # 账本随实测收敛。属死代码清理，行为零变化；只降不升，无需配减。
-core=75031
-facade=82581
+# 2026-11-26 0.1.21 N-9 复验修复落账：core 75031 → 75060（+29），facade
+# 82581 → 82860（+279），cupolas 不动。两账逐笔归因：
+#   core +29（commons cabd85c / a5dd34d）——套接字路径的 dev/ino 归属查询
+#     （airy_sock_path_ident / airy_sock_path_owned）为「退出清理只删自己的
+#     节点」提供判据；shell_run 工具声明增 privileged 参数。两者是下列缺陷
+#     的机制件，机制核无替代位置。
+#   facade +279（daemons a8598815 / c324f994 / 20c9288c / a3f275f8）——
+#     既有五个守护的端点清理改按 inode 归属（daemon_boot / notify_d /
+#     hook_svc / supervisor_d / channel_d 与 net.c 的 bind 失败路径，
+#     +105）；tool_d 特权通道经 sudo -n 提权并放行本地 rpm 绝对路径
+#     （+106）；agent_d 运行前言补齐安装与桌面路径契约（+32）；providers
+#     本地回环推理端点读空闲放宽至 180s（+18）；其余为测试与内头声明面。
+# 三处换掉的是实测缺陷：「非 root 守护无法提权」「退出清理误删接管者节点」
+# 「本地首 token 超 30s 被误判停滞」，属缺陷归因真修复而非结构开销；
+# core 距 target 79999 仍余 4939 行，facade 欠账随 §7.5 收敛表配减。
+# RATCHET-JUSTIFY: cabd85c +29 端点 inode 归属查询与 privileged 参数声明（N-9）
+# RATCHET-JUSTIFY: a8598815 +279 端点归属清理、sudo 提权、运行前言与本地读空闲（N-9）
+core=75060
+facade=82860
 cupolas=17880
 target=79999
