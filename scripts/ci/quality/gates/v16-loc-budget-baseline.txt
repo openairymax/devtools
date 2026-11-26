@@ -739,7 +739,14 @@
 # core 距 target 79999 仍余 4939 行，facade 欠账随 §7.5 收敛表配减。
 # RATCHET-JUSTIFY: cabd85c +29 端点 inode 归属查询与 privileged 参数声明（N-9）
 # RATCHET-JUSTIFY: a8598815 +282 端点归属清理、sudo 提权、运行前言与本地读空闲（N-9）
+# 2026-11-26 0.1.21 N-9 门禁收口：facade 82863 → 82877（+14），core 与
+# cupolas 不动。daemon_boot 的 inode 归属判定使主函数 CCN 25 → 29，越过
+# 复杂度 FAIL 阈值；把「绑定后记录路径身份」与「退出时按归属删除」抽为
+# daemon_capture_sock / daemon_unlink_own_sock 两个静态件（CCN 5 / 7），
+# 主函数回到 25。+14 为两个文件的签名、注释与守卫开销，无新增行为，
+# 属以行数换圈复杂度的门禁对价而非结构开销。
+# RATCHET-JUSTIFY: 3cf12021 +14 端点归属清理抽为静态件以守 CCN 门禁（N-9）
 core=75060
-facade=82863
+facade=82877
 cupolas=17880
 target=79999
