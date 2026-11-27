@@ -6,3 +6,8 @@
 app/poll.rs
 app/task.rs
 client/tests.rs
+# 2026-11-28 X6 时间线接入期登记：entry.rs（920）、panels/chat/view.rs（854）
+#   为 X6 时间线归并与会话视图的宿主文件，当前正随 X6/X7 改造增长；拆分随
+#   该批收尾按「一个 impl 一个文件」重排后消账，同样只降不升。
+entry.rs
+panels/chat/view.rs
