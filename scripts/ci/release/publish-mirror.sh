@@ -552,11 +552,30 @@ print(json.dumps(d))' "$VERSION" "$BODY" "$PRERELEASE")"
                     --data-urlencode "target_commitish=${_GITEE_DEFBRANCH}" \
                     -o "$TMP/grel.out" -w '%{http_code}' 2>"$TMP/grel.err" || true)"
             fi
+            # 并发分片竞态：同 tag 的发行版可能刚被另一分片建成，POST 返回
+            # 「该标签已经存在发行版」。按 tag 取回 id 继续上传即可，良性竞态
+            # 不得记成镜像失败——否则 4 分片并行时总有一片被随机判红。
+            if [ "${_REL_CODE}" != "200" ] && [ "${_REL_CODE}" != "201" ] \
+                && grep -q '已经存在' "$TMP/grel.out" 2>/dev/null; then
+                log_info "Gitee 发行版由并发分片建立，按 tag 取回 id…"
+                for _try in 1 2 3 4 5; do
+                    gitee_rel="$(gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/tags/${VERSION}" \
+                        --data-urlencode "access_token=${GITEE_TOKEN}" || true)"
+                    GREL_ID="$(python3 -c 'import json,sys
+d=json.load(sys.stdin)
+if isinstance(d,list): d=d[0] if d else {}
+print(d.get("id",""))' <<<"$gitee_rel" 2>/dev/null || true)"
+                    [ -n "$GREL_ID" ] && break
+                    sleep 3
+                done
+            fi
             if [ "${_REL_CODE}" = "200" ] || [ "${_REL_CODE}" = "201" ]; then
                 GREL_ID="$(python3 -c 'import json,sys
 d=json.load(sys.stdin)
 print(d.get("id","") if isinstance(d,dict) else "")' <"$TMP/grel.out" 2>/dev/null || true)"
                 log_ok "Gitee release 已创建 (id=${GREL_ID})"
+            elif [ -n "${GREL_ID:-}" ]; then
+                log_ok "Gitee release 已存在，本分片直接续传 (id=${GREL_ID})"
             else
                 log_fail "Gitee release 创建失败（HTTP ${_REL_CODE:-?}，错误体尾部如下）"
                 tail -c 400 "$TMP/grel.out" 2>/dev/null | sed 's/^/    rel: /' || true
