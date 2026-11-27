@@ -782,7 +782,14 @@
 #   tool_d 审批干跑 RPC（tool_svc_appr_probe 与干跑实现）。
 # 增长即增长，不称减重；拆载义务并入 0.1.21 首行。
 # RATCHET-JUSTIFY: b6d16162 +287 审批干跑面落地（daemons 与 commons 契约）
-core=75066
-facade=83197
+# 2026-11-28 N-9 身份两分账：core 75066 → 75067（+1），facade 83197 → 83224（+27）。
+#   core +1——工具执行请求新增 audit_id 字段，授权主体与审计主体分字段承载；
+#   facade +27——agent_d 审批预检改由 audit_id 留痕、tool_d 判权只认 agent_id，
+#   异步作业台账随身份位取值。有效行增长来自字段与分发，测试文件不计本账。
+# 增长即增长，不称减重；拆载义务并入 0.1.21 首行。
+# RATCHET-JUSTIFY: 5c08f1f1 +27 授权主体与审计主体分离（daemons 与 commons 契约）
+# RATCHET-JUSTIFY: 3ef7dd5a +1 工具执行请求新增 audit_id
+core=75067
+facade=83224
 cupolas=17880
 target=79999
