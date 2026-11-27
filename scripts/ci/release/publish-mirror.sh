@@ -620,6 +620,32 @@ except Exception:
                     log_fail "Gitee 上传失败: ${b}"; echo "gitee:${b}" >> "$TMP/failed.txt"
                 fi
             done
+            # 同名附件去重：Gitee 附件列表不返回体积，历史重复上载（并发分片
+            # 各传共享小件）会留下同名多份。按 id 单调递增保留最后一份，删除
+            # 其余；删除失败只告警——无论如何不动最后一份，不会删空发行页。
+            gitee_api -G "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}/attach_files" \
+                --data-urlencode "access_token=${GITEE_TOKEN}" \
+                --data-urlencode "per_page=100" \
+                | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d=[]
+if not isinstance(d,list): d=[]
+seen={}
+for a in d:
+    seen.setdefault(a.get("name",""),[]).append(int(a.get("id",0)))
+for v in seen.values():
+    if len(v)>1:
+        for i in sorted(v)[:-1]: print(i)' > "$TMP/gitee-dupes.txt" 2>/dev/null \
+                || { : > "$TMP/gitee-dupes.txt"; log_warn "Gitee 同名附件盘点失败，跳过去重"; }
+            while read -r did; do
+                [ -n "$did" ] || continue
+                if gitee_api -X DELETE \
+                    "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/${GREL_ID}/attach_files/${did}?access_token=${GITEE_TOKEN}" >/dev/null; then
+                    log_info "Gitee 同名旧附件已删: id=${did}"
+                else
+                    log_warn "Gitee 同名旧附件删除失败（保留）: id=${did}"
+                fi
+            done < "$TMP/gitee-dupes.txt"
         fi
     fi
 else
