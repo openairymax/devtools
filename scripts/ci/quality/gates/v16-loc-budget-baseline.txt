@@ -774,9 +774,15 @@
 # cupolas 不动。游标原用数组下标，删除压实后下标前移，已交付记录会被
 # 重新挤进续页（daemons mem_d 用例 n==1 断言失败）。每条记录增加单调
 # seq 字段、写入与持久化载入补发序号、扫描按 seq < before 裁剪，有效
-# 行 +7（测试文件不计本账）。
-# RATCHET-JUSTIFY: 5d5646cb +7 daemons 分页游标改用写入序号
-core=75061
-facade=82916
+# 2026-11-28 N-9 审批事件面登记：core 75061 → 75066（+5），
+# facade 82916 → 83198（+282）。
+#   core +5——运行流审批请求帧常量与工具执行请求的 approval_request_id
+#   字段（commons 审批契约两提交移植到 dev/hubs-01 线之上）；
+#   facade +282——agent_d 审批预检（事件帧、凭据生成、执行参数下发）与
+#   tool_d 审批干跑 RPC（tool_svc_appr_probe 与干跑实现）。
+# 增长即增长，不称减重；拆载义务并入 0.1.21 首行。
+# RATCHET-JUSTIFY: b6d16162 +287 审批干跑面落地（daemons 与 commons 契约）
+core=75066
+facade=83198
 cupolas=17880
 target=79999
