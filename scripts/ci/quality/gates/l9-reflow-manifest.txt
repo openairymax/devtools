@@ -5,7 +5,7 @@
 # repo 取值：daemons=agent-workload/agentrt/daemons，products=agent-workload/products，
 #   agentrt=agent-workload/agentrt（本清单五项只落在 daemons 与 products）。
 3	done	daemons	4d8f204	空输出判 rc=6 落 failed 且不写 mem；新增 AGENT_RUN_RC_EMPTY
-4	done	products	5dd2945	board 为空时按 hall 事件派生，source=hall_events；字段对齐 HallBoardEntry
+4	done	products	a8ff6e2	board 为空时按 hall 事件派生，source=hall_events；字段对齐 HallBoardEntry（历史复位后现役同主题提交）
 5	done	daemons	4f31fb0	run_chain() 终态必调；state/status 共用 run_state_name()、文案共用 run_rc_msg()
 1	na	-	-	宿主 gateway_biz_agent.c 已为纯转发，全仓无 task_mode/goal_has_word，规则表所在层不存在
 2	na	-	-	全仓无 verify/criteria 子系统，无宿主可挂 test -e -- 命令
