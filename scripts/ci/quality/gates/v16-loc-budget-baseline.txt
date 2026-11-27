@@ -770,7 +770,13 @@
 # 故按写入序游标分页（≤50 条/页、回 next 与 has_more），daemons 侧新增
 # 请求参数、区间裁剪与分页应答字段；有效行 +24（测试文件不计本账）。
 # RATCHET-JUSTIFY: 47113a39 +24 daemons mem.recent 游标分页（X8-01~03）
+# 2026-11-27 分页游标改用写入序号：facade 82909 → 82916（+7），core 与
+# cupolas 不动。游标原用数组下标，删除压实后下标前移，已交付记录会被
+# 重新挤进续页（daemons mem_d 用例 n==1 断言失败）。每条记录增加单调
+# seq 字段、写入与持久化载入补发序号、扫描按 seq < before 裁剪，有效
+# 行 +7（测试文件不计本账）。
+# RATCHET-JUSTIFY: 5d5646cb +7 daemons 分页游标改用写入序号
 core=75061
-facade=82909
+facade=82916
 cupolas=17880
 target=79999
