@@ -765,7 +765,12 @@
 # +1 为这一条宏定义的有效行；配套注释行按口径不计。九仓同批把实体不存在
 # 改判 -32005 属调用点替换，行数零净增。
 # RATCHET-JUSTIFY: 43d26a3 +1 commons 新增实体不存在独立错误码 -32005
+# 2026-11-27 0.1.21 X8-01~03 记忆分页：facade 82885 → 82909（+24），core 与
+# cupolas 不动。mem.recent 一次取千条会把应答撑到数百 KB 被网关截断，
+# 故按写入序游标分页（≤50 条/页、回 next 与 has_more），daemons 侧新增
+# 请求参数、区间裁剪与分页应答字段；有效行 +24（测试文件不计本账）。
+# RATCHET-JUSTIFY: 47113a39 +24 daemons mem.recent 游标分页（X8-01~03）
 core=75061
-facade=82885
+facade=82909
 cupolas=17880
 target=79999
