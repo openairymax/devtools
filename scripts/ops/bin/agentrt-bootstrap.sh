@@ -1482,7 +1482,16 @@ main() {
         export AIRY_RUNTIME_DIR="$AGENTRT_RUNTIME_DIR"
     fi
 
-    log_info "AgentRT Bootstrap v0.1.9"
+    # 版本取自安装态 release.env（current 软链）或源码树 VERSION，禁止
+    # 字面量——0.1.21 实机复现：安装 0.1.21 后 banner 仍打印 v0.1.9。
+    _airy_ver="$(sed -n 's/^AIRY_VERSION=//p' "${AIRY_HOME}/current/release.env" 2>/dev/null | head -1)"
+    [ -n "${_airy_ver}" ] || _airy_ver="$(cat "${AIRYMAXHUB_ROOT}/VERSION" 2>/dev/null || true)"
+    case "${_airy_ver}" in
+        "")  _airy_ver="unknown" ;;
+        v*)  ;;
+        *)   _airy_ver="v${_airy_ver}" ;;
+    esac
+    log_info "AgentRT Bootstrap ${_airy_ver}"
     log_info "  Bindir:    $AGENTRT_BINDIR"
     log_info "  Runtime:   $AGENTRT_RUNTIME_DIR"
     log_info "  Config:    ${AGENTRT_CONFIG:-<none>}"
