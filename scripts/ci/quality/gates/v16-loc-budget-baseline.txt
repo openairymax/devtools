@@ -789,7 +789,18 @@
 # 增长即增长，不称减重；拆载义务并入 0.1.21 首行。
 # RATCHET-JUSTIFY: 5c08f1f1 +27 授权主体与审计主体分离（daemons 与 commons 契约）
 # RATCHET-JUSTIFY: 3ef7dd5a +1 工具执行请求新增 audit_id
-core=75067
+# 2026-11-28 0.1.21 发版前真机复验修复：core 75067 → 75080（+13），
+# cupolas 17880 → 17915（+35），facade 不动。
+#   core +13——gateway 补 GET /v1/models 路由与处理器。此前只有带体 POST
+#   进入 JSON-RPC 聚合，GET 走精确路由表、未命中即 404；OpenAI SDK 以
+#   GET 探测模型列表，首个请求即判服务不可用（285H 2027 端口实证）。
+#   cupolas +35——口令生成改拒绝采样并按四类字符保底。旧实现以
+#   256 % 66 = 58 的取模下标选字符，特殊字符区 62..65 永不可达，
+#   password_has_special 恒红且分布偏置。
+# 增长即增长，不称减重；测试与用例文件不计本账。
+# RATCHET-JUSTIFY: e0ed68a2 +13 gateway 补 GET /v1/models 路由与处理器
+# RATCHET-JUSTIFY: 397663e1 +35 cupolas 口令生成改拒绝采样并按字符类保底
+core=75080
 facade=83224
-cupolas=17880
+cupolas=17915
 target=79999
