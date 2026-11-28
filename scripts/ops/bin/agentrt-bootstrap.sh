@@ -153,7 +153,12 @@ AIRY_SDK_CHECK="import airymax_agents, airymax_agents.runner, orchestration, age
 if (( AIRY_BOOTSTRAP_LIB )); then
     :   # 库模式：依赖面由调用方负责，此处不探测亦不安装
 elif [ -d "${AIRY_HOME}/lib" ]; then
-    if ! PYTHONPATH="${AIRY_HOME}/lib" python3 -c "${AIRY_SDK_CHECK}" >/dev/null 2>&1; then
+    # 剥离 LD_LIBRARY_PATH：env.sh 会把 $AIRY_HOME/lib 前置（内含为旧发行版
+    # 采集的 libsqlite3.so.0，缺 sqlite3_deserialize），python3 的 _sqlite3
+    # 扩展会优先解析到该旧库而导入失败，进而把「SDK 可用」误判为不可用。
+    # 0.1.21 实机：14 daemon 全在线但此处恒报 agents will not execute。
+    if ! env -u LD_LIBRARY_PATH PYTHONPATH="${AIRY_HOME}/lib" \
+            python3 -c "${AIRY_SDK_CHECK}" >/dev/null 2>&1; then
         AGENT_SDK_OK=0
         if [ -n "${AIRYMAXHUB_ROOT}" ] && [ -d "${AIRYMAXHUB_ROOT}/ecosystem/agents" ]; then
             log_info "Agent SDK packages not importable — editable-installing from source tree"
@@ -270,16 +275,13 @@ export AIRY_CACHE_DIR="$AIRY_HOME/data/agentrt/cache"
 export AIRY_TMP_DIR="$AIRY_HOME/data/agentrt/tmp"
 export AIRY_WORKSPACE_DIR="$AIRY_HOME/data/agentrt/workspaces"
 
-# ── 运行库路径兜底（0.1.6c 系统性修复，AIRY_HOME 已定稿）───────────────
-# 老用户（0.1.5a 及更早安装）的 env.sh 无 LD_LIBRARY_PATH 注入行（airymaxrt
-# update 热替换不重新生成 env.sh），仅 source 不会注入；此处确保最终
-# $AIRY_HOME/lib 始终在 LD_LIBRARY_PATH 首位（幂等，已含则跳过），与完整
-# 启动器 airymaxrt 兜底同源。必须在此处（而非 env.sh 之后）——--home/-H
-# 覆盖前的注入会指向旧安装 lib（实测复现 sched_d 缺 libssl.so.1.1）。
-case ":${LD_LIBRARY_PATH:-}:" in
-    *":${AIRY_HOME}/lib:"*) ;;
-    *) export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}" ;;
-esac
+# ── 运行库路径策略（0.1.21 收敛：自包含改由 RPATH 承担）──────────────────
+# 历史做法是把 $AIRY_HOME/lib 前置进全局 LD_LIBRARY_PATH。该变量对 daemon
+# 并非必需——发行包内二进制均带 RPATH=$ORIGIN/../lib（readelf 实测），且
+# 无该变量时 ldd 仍能解析包内 .so；反倒会污染本脚本派生的一切子进程：
+# python3 的 _sqlite3 会加载包内旧 libsqlite3.so.0（缺 sqlite3_deserialize）
+# 而导入失败，curl 等亦可能取到旧 libssl/libcurl。故此处不再导出。
+# 需要包内私有库的 daemon 由自身 RPATH 解析，宿主进程保持干净搜索路径。
 
 # 默认值对齐 AIRY_HOME（原 /tmp/agentrt、/usr/local/bin 已废弃）。
 # 直接以 AIRY_* 权威子目录为准（空默认值 + 覆盖，等价于旧"强制覆盖"）。
