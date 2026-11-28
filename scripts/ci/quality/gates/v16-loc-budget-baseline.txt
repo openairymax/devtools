@@ -800,7 +800,15 @@
 # 增长即增长，不称减重；测试与用例文件不计本账。
 # RATCHET-JUSTIFY: e0ed68a2 +13 gateway 补 GET /v1/models 路由与处理器
 # RATCHET-JUSTIFY: 397663e1 +35 cupolas 口令生成改拒绝采样并按字符类保底
-core=75080
-facade=83224
+# 2026-11-28 r49：core 75080 → 75102（+22），facade 83224 → 83236（+12）。
+#   core +22——GET /v1/models 处理器改走协议入口按路径归类，替换原先合成
+#   service.list 的走法；后者在能力表查无此方法，285H 实证返回 -32601。
+#   facade +12——网关装配阶段把 gateway_biz 解析出的默认模型注入
+#   gw_llm_api_config，使模型清单与 chat/embeddings 选择同源；此前该字段
+#   恒空，清单永远为空数组。
+# RATCHET-JUSTIFY: 260bd09e +22 gateway 模型清单改走协议入口按路径分发
+# RATCHET-JUSTIFY: f8b1edf4 +12 daemons 注入默认模型使模型清单非空
+core=75102
+facade=83236
 cupolas=17915
 target=79999
